@@ -122,6 +122,47 @@ class ProjectDraftPersistenceTests(TestCase):
         response = APIClient().get(f'/api/projects/drafts/{draft.id}/')
         self.assertEqual(response.status_code, 404)
 
+    def test_delete_anonymous_draft(self):
+        from apps.projects.models import ProjectDraft
+        draft = ProjectDraft.objects.create(idea='Temporary plan', project_type='Startup')
+
+        response = APIClient().delete(f'/api/projects/drafts/{draft.id}/')
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(ProjectDraft.objects.filter(pk=draft.id).exists())
+
+    def test_delete_missing_draft_is_idempotent(self):
+        import uuid
+
+        response = APIClient().delete(f'/api/projects/drafts/{uuid.uuid4()}/')
+
+        self.assertEqual(response.status_code, 204)
+
+    def test_anonymous_cannot_delete_account_owned_draft(self):
+        from django.contrib.auth import get_user_model
+        from apps.projects.models import ProjectDraft
+        user = get_user_model().objects.create_user(username='owner', password='secret')
+        draft = ProjectDraft.objects.create(owner=user, idea='Private plan', project_type='Startup')
+
+        response = APIClient().delete(f'/api/projects/drafts/{draft.id}/')
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(ProjectDraft.objects.filter(pk=draft.id).exists())
+
+    def test_team_member_cannot_delete_another_users_draft(self):
+        from django.contrib.auth import get_user_model
+        owner = get_user_model().objects.create_user(username='owner', password='secret')
+        member_user = get_user_model().objects.create_user(username='teammate', password='secret')
+        draft = ProjectDraft.objects.create(owner=owner, idea='Shared plan', project_type='Startup')
+        TeamMember.objects.create(project=draft, slot=2, user=member_user)
+        client = APIClient()
+        client.force_authenticate(user=member_user)
+
+        response = client.delete(f'/api/projects/drafts/{draft.id}/')
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(ProjectDraft.objects.filter(pk=draft.id).exists())
+
 
 class ProjectLearningTests(TestCase):
     def setUp(self):
@@ -1592,6 +1633,3 @@ class MarketingGenerationServiceTests(SimpleTestCase):
         from apps.core.gemini_service import GeminiConfigurationError, generate_marketing_content
         with self.assertRaisesRegex(GeminiConfigurationError, 'GEMINI_API_KEY'):
             generate_marketing_content(mode='tool', inputs={'topic': 'An announcement'})
-
-
-

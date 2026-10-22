@@ -188,8 +188,8 @@ const TYPE_ICON = {
   budget_exceeded: <AlertTriangle size={11} />,
 }
 const TYPE_COLOR = {
-  step_passed: '#176b45', step_failed: '#8b2020', error: '#8b2020',
-  browser_error: '#8b2020', run_complete: '#176b45', retry: '#9a5c00',
+  step_passed: '#8e4b49', step_failed: '#8b2020', error: '#8b2020',
+  browser_error: '#8b2020', run_complete: '#8e4b49', retry: '#9a5c00',
   run_cancelled: '#57706a', budget_exceeded: '#9a5c00', assert: '#1d5c9b',
 }
 
@@ -209,7 +209,7 @@ function ActivityPanel({ events, connStatus }) {
     <div className="tp-activity-list">
       {events.map((ev, i) => (
         <div key={`${ev.seq}-${i}`} className={`tp-event tp-event-${(ev.event_type || '').replace(/_/g, '-')}`}>
-          <span className="tp-event-icon" style={{ color: TYPE_COLOR[ev.event_type] || '#668272' }}>
+          <span className="tp-event-icon" style={{ color: TYPE_COLOR[ev.event_type] || '#a35a53' }}>
             {TYPE_ICON[ev.event_type] || <Circle size={9} />}
           </span>
           <span className="tp-event-msg" style={{ color: TYPE_COLOR[ev.event_type] }}>
@@ -604,7 +604,7 @@ export default function TestPilot() {
 
                   {TERMINAL.has(runStatus) && run?.results_summary && (
                     <div className="tp-summary-card">
-                      <div className="tp-card-head"><CheckCircle2 size={13} color="#176b45" /><strong>Run summary</strong></div>
+                      <div className="tp-card-head"><CheckCircle2 size={13} color="#8e4b49" /><strong>Run summary</strong></div>
                       <div className="tp-summary-grid">
                         {['passed', 'failed', 'blocked', 'skipped', 'total'].map(k => {
                           const v = run.results_summary[k]

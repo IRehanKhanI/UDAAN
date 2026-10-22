@@ -1,0 +1,89 @@
+:root {
+  --ud-reference-canvas: #fff8f3;
+  --ud-reference-sidebar: #f9f2ed;
+  --ud-reference-surface: #fffdfb;
+  --ud-reference-ink: #1d1b18;
+  --ud-reference-muted: #756660;
+  --ud-reference-border: #efeae4;
+  --ud-reference-coral: #ffaaa6;
+  --ud-reference-coral-ink: #7a3c3a;
+}
+
+html,
+body {
+  background: var(--ud-reference-canvas);
+  color: var(--ud-reference-ink);
+  font-family: "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+body .ud-dashboard {
+  color: var(--ud-reference-ink);
+  background: var(--ud-reference-canvas);
+  font-family: "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+body .ud-work-area {
+  margin-left: 320px;
+}
+
+body .ud-dashboard .ud-topbar {
+  border-color: var(--ud-reference-border);
+  color: var(--ud-reference-ink);
+  background: #fff8f3ed;
+  backdrop-filter: blur(14px);
+}
+
+body .ud-dashboard .ud-topbar-title,
+body .ud-dashboard .ud-topbar-left,
+body .ud-dashboard .ud-topbar-actions {
+  color: var(--ud-reference-ink);
+}
+
+body .ud-dashboard .ud-topbar .ud-icon-button {
+  color: var(--ud-reference-muted);
+}
+
+body .ud-dashboard .ud-topbar .ud-icon-button:hover {
+  color: var(--ud-reference-ink);
+  background: #ede7e2;
+}
+
+body .ud-dashboard .ud-topbar .ud-avatar {
+  border-color: #d8c1c0;
+  color: var(--ud-reference-coral-ink);
+  background: #fff;
+}
+
+body .vr-root {
+  background: var(--ud-reference-canvas);
+  font-family: "Plus Jakarta Sans", "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+body .vr-body {
+  margin-left: 320px;
+}
+
+body .vr-topbar {
+  background: #fff8f3ed;
+  border-color: var(--ud-reference-border);
+  backdrop-filter: blur(14px);
+}
+
+body .vr-topbar-title {
+  color: var(--ud-reference-ink);
+}
+
+body .vr-menu-btn {
+  color: var(--ud-reference-muted);
+}
+
+@media (max-width: 1023px) {
+  body .ud-work-area,
+  body .vr-body {
+    margin-left: 0;
+  }
+
+  body .vr-menu-btn {
+    display: flex;
+  }
+}

@@ -209,6 +209,19 @@ class ProjectDraftView(APIView):
         draft = get_object_or_404(self._drafts_for_request(request), pk=draft_id)
         return Response(ProjectDraftSerializer(draft).data)
 
+    def delete(self, request, draft_id):
+        if request.user.is_authenticated:
+            drafts = ProjectDraft.objects.filter(owner=request.user)
+        else:
+            drafts = ProjectDraft.objects.filter(owner__isnull=True)
+        draft = drafts.filter(pk=draft_id).first()
+        if draft is None:
+            if ProjectDraft.objects.filter(pk=draft_id).exists():
+                raise NotFound
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        draft.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     def put(self, request, draft_id):
         payload = request.data.copy()
         edited_stages = payload.pop('edited_stages', [])

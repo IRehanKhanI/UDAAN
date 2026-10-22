@@ -40,6 +40,10 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
+import Header from '../layouts/Header.jsx'
+import AddTaskModal from '../components/modals/AddTaskModal.jsx'
+import PlainEnglishExplainerModal from '../components/modals/PlainEnglishExplainerModal.jsx'
+import CreativeBriefModal from '../components/modals/CreativeBriefModal.jsx'
 import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
 import {
   generateIdeaStage,
@@ -858,13 +862,13 @@ function ComparisonSummaryBanner({ summary, onClose }) {
         <Sparkles size={16} />
         <div>
           <b>Comparison Complete</b>
-          <p style={{ margin: '2px 0 0', color: '#385741' }}>
+          <p style={{ margin: '2px 0 0', color: '#8e4b49' }}>
             Assessed against revision <code>{shortSha(summary.commit_sha) || 'head'}</code> on branch <b>{summary.branch || 'main'}</b>.
           </p>
         </div>
       </div>
       <div className="fp-compare-banner-counts">
-        <span style={{ background: '#e8f5e9', color: '#1f6a31' }}>{summary.evidence_found_count || 0} Evidence found</span>
+        <span style={{ background: '#fff8f3', color: '#8e4b49' }}>{summary.evidence_found_count || 0} Evidence found</span>
         <span style={{ background: '#fff8e6', color: '#886208' }}>{summary.partially_implemented_count || 0} Partial</span>
         <span style={{ background: '#fdf0f0', color: '#a62424' }}>{summary.mismatch_detected_count || 0} Mismatches</span>
         <button type="button" className="fp-compare-banner-close" onClick={onClose} aria-label="Dismiss banner">
@@ -1007,7 +1011,7 @@ function TaskAssessmentModal({
               <span>Gemini AI Rationale & Explanation</span>
             </div>
             {aiExplanation ? (
-              <div style={{ fontSize: 12, color: '#27412e', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 12, color: '#8e4b49', lineHeight: 1.6 }}>
                 <p style={{ margin: '0 0 6px' }}><b>Explanation:</b> {aiExplanation.explanation}</p>
                 <p style={{ margin: '0 0 6px' }}><b>Rationale:</b> {aiExplanation.rationale}</p>
                 <p style={{ margin: 0 }}><b>Recommended Next Step:</b> {aiExplanation.recommended_next_step}</p>
@@ -1469,6 +1473,34 @@ export default function FlightPlan() {
 
   // Timing Modal
   const [timingModalOpen, setTimingModalOpen] = useState(false)
+  const [addTaskModalOpen, setAddTaskModalOpen] = useState(false)
+  const [creativeBriefModalOpen, setCreativeBriefModalOpen] = useState(false)
+  const [explainerTask, setExplainerTask] = useState(null)
+
+  function handleAddNewTaskFromModal(partial) {
+    if (!project || !flightPlan) return
+    const milestonesList = flightPlan.milestones || []
+    if (!milestonesList.length) return
+    const targetIdx = selectedMilestone < milestonesList.length ? selectedMilestone : 0
+    const currentTasks = milestonesList[targetIdx].tasks || []
+    const newTask = {
+      title: partial.title,
+      category: partial.category,
+      estimated_minutes: partial.estimatedMinutes || 25,
+      lead: partial.lead || 'TS',
+      due_today: partial.dueToday ?? true,
+      difficulty: 'medium',
+      subtasks: [],
+    }
+    const updatedMilestones = milestonesList.map((m, idx) => {
+      if (idx !== targetIdx) return m
+      return { ...m, tasks: [...currentTasks, newTask] }
+    })
+    const updatedPlan = { ...flightPlan, milestones: updatedMilestones }
+    persistPlan(updatedPlan)
+    setNotice(`Added "${partial.title}" to ${milestonesList[targetIdx].title || 'milestone'}`)
+    setTimeout(() => setNotice(''), 3000)
+  }
 
   // Repository & Roadmap Assessment State
   const [connectedRepo, setConnectedRepo] = useState(null)
@@ -2028,21 +2060,19 @@ export default function FlightPlan() {
   }, [allTasks, completed, statusFilter, priorityFilter, milestoneFilter])
 
   return (
-    <div className="ud-dashboard fp-page">
+    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] fp-page">
       <Sidebar activePage="flight-plan" open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <div className="ud-work-area">
-        <header className="ud-topbar">
-          <div className="ud-topbar-left">
-            <button className="ud-mobile-menu ud-icon-button" aria-label="Open navigation" onClick={() => setMenuOpen(true)}>
-              <Menu size={20} />
-            </button>
-            <span className="fp-crumb">Workspace <span>/</span> <b>Flight Plan</b></span>
-          </div>
-          <div className="ud-topbar-actions">
-            <button className="ud-icon-button" aria-label="Notifications"><Bell size={18} /></button>
-            <span className="ud-avatar ud-top-avatar">TS</span>
-          </div>
-        </header>
+      <div className="lg:pl-80 flex-1 flex flex-col min-w-0">
+        <Header
+          currentProject={project}
+          onToggleMobileMenu={() => setMenuOpen(!menuOpen)}
+          onProjectSelect={(p) => {
+            setSelectedId(p.id)
+            setSelectedMilestone(0)
+            setNotice('')
+            setError('')
+          }}
+        />
 
         <main className="ud-main fp-main">
           <div className="fp-content">
@@ -2057,7 +2087,25 @@ export default function FlightPlan() {
             ) : (
               <>
                 <div className="fp-project-switch">
-                  <span className="fp-eyebrow">YOUR WORKSPACE</span>
+                  <div className="flex items-center gap-2">
+                    <span className="fp-eyebrow">YOUR WORKSPACE</span>
+                    <button
+                      type="button"
+                      onClick={() => setCreativeBriefModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#EFEAE4] text-[11px] font-bold text-[#8E4B49] hover:bg-[#F9F2ED] transition-colors shadow-xs cursor-pointer ml-3"
+                    >
+                      <Sparkles size={13} />
+                      <span>Creative Brief</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddTaskModalOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1D1B18] text-white text-[11px] font-bold hover:bg-black transition-colors shadow-xs cursor-pointer"
+                    >
+                      <Plus size={13} />
+                      <span>Add Task</span>
+                    </button>
+                  </div>
                   <label className="fp-project-select">
                     <span className="sr-only">Choose a project</span>
                     <select
@@ -2442,6 +2490,30 @@ export default function FlightPlan() {
             aiExplanation={taskAiExplanation}
           />
         )}
+
+        {/* Creative Brief Modal */}
+        <CreativeBriefModal
+          isOpen={creativeBriefModalOpen}
+          onClose={() => setCreativeBriefModalOpen(false)}
+          project={project}
+        />
+
+        {/* Add Task Modal */}
+        <AddTaskModal
+          isOpen={addTaskModalOpen}
+          onClose={() => setAddTaskModalOpen(false)}
+          onAddTask={handleAddNewTaskFromModal}
+          projectName={project?.name}
+        />
+
+        {/* Plain English Explainer Modal */}
+        <PlainEnglishExplainerModal
+          isOpen={Boolean(explainerTask)}
+          onClose={() => setExplainerTask(null)}
+          taskTitle={explainerTask?.title}
+          plainEnglish={explainerTask?.plain_english}
+          analogy={explainerTask?.analogy}
+        />
       </div>
     </div>
   )

@@ -25,13 +25,13 @@ function StatusIcon({ status, size = 16 }) {
 
 // ─── Score ring ───────────────────────────────────────────────────────────────
 function ScoreRing({ score, band }) {
-  const colors = { green: '#176b45', blue: '#1d5c9b', amber: '#9a5c00', red: '#8b2020', grey: '#8a9a8e' }
+  const colors = { green: '#8e4b49', blue: '#1d5c9b', amber: '#9a5c00', red: '#8b2020', grey: '#d8a09a' }
   const r = 40, cx = 50, cy = 50, circ = 2 * Math.PI * r
   const filled = score != null ? circ * (score / 100) : 0
   const col = colors[statusClass(band)] ?? colors.grey
   return (
     <svg viewBox="0 0 100 100" width="100" height="100" aria-hidden="true">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e2eae3" strokeWidth="9" />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#fff1ed" strokeWidth="9" />
       <circle
         cx={cx} cy={cy} r={r} fill="none"
         stroke={col} strokeWidth="9" strokeLinecap="round"

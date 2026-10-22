@@ -25,7 +25,7 @@ function MermaidDiagram({ definition, nodes, onSelect, zoom }) {
       if (!definition) return
       try {
         const { default: mermaid } = await import('mermaid')
-        mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'base', htmlLabels: false, themeVariables: { primaryColor: '#e8f3eb', primaryTextColor: '#174a31', primaryBorderColor: '#176b45', lineColor: '#6d9276', edgeLabelBackground: '#fbfdfb', secondaryColor: '#f0f6f1', tertiaryColor: '#fbfdfb', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '15px' }, flowchart: { htmlLabels: false, curve: 'basis', nodeSpacing: 90, rankSpacing: 130, wrappingWidth: 220, padding: 14 }, er: { useMaxWidth: true, fontSize: 14 } })
+        mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'base', htmlLabels: false, themeVariables: { primaryColor: '#fff8f3', primaryTextColor: '#8e4b49', primaryBorderColor: '#8e4b49', lineColor: '#a35a53', edgeLabelBackground: '#fbfdfb', secondaryColor: '#fff8f3', tertiaryColor: '#fbfdfb', fontFamily: 'Inter, system-ui, sans-serif', fontSize: '15px' }, flowchart: { htmlLabels: false, curve: 'basis', nodeSpacing: 90, rankSpacing: 130, wrappingWidth: 220, padding: 14 }, er: { useMaxWidth: true, fontSize: 14 } })
         const validation = validateArchitectureDiagram(definition)
         if (!validation.valid) throw new Error(validation.reason)
         await mermaid.parse(definition)

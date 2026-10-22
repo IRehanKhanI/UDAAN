@@ -9,6 +9,7 @@ import './pages/MyProjects.css'
 import './pages/TeamWorkspace.css'
 import './pages/IdeaAnalysis.css'
 import './pages/FlightPlan.css'
+import './styles/reference-theme.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -17,4 +18,3 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </React.StrictMode>,
 )
-

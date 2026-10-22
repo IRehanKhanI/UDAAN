@@ -1,23 +1,112 @@
 @import "tailwindcss";
 
-:root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #1d2a21;
-  background: #fbfcfa;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+@layer base {
+  :root {
+    --font-sans: 'Plus Jakarta Sans', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-heading: 'Plus Jakarta Sans', 'Manrope', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --ud-canvas: #FFF8F3;
+    --ud-sidebar: #F9F2ED;
+    --ud-surface: #FFFFFF;
+    --ud-surface-warm: #FFFDFB;
+    --ud-ink: #1D1B18;
+    --ud-muted: #534342;
+    --ud-subtle: #7C766F;
+    --ud-border: #EFEAE4;
+    --ud-coral: #FFAAA6;
+    --ud-coral-dark: #8E4B49;
+    --ud-coral-ink: #7A3C3A;
+    --ud-honey: #FBE191;
+    --ud-honey-ink: #766320;
+    --ud-sage: #fff1ed;
+    --ud-sage-ink: #8e4b49;
+    --ud-lavender: #EAE4F8;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    background-color: #FFF8F3;
+    color: #1D1B18;
+    -webkit-font-smoothing: antialiased;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  html, body, #root {
+    min-width: 320px;
+    min-height: 100%;
+  }
+
+  button, input, textarea, select {
+    font: inherit;
+  }
 }
 
-html, body, #root {
-  min-width: 320px;
-  min-height: 100%;
-  margin: 0;
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #E7DFD0;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D8C1C0;
 }
 
-body {
-  min-height: 100vh;
+/* Tactile animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-button, input, textarea {
-  font: inherit;
+.animate-fadeIn {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Material symbols outlined helper */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+  vertical-align: middle;
+}
+
+.material-symbols-filled {
+  font-family: 'Material Symbols Outlined';
+  font-variation-settings:
+    'FILL' 1,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+  vertical-align: middle;
+  line-height: 1;
 }

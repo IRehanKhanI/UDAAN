@@ -42,3 +42,15 @@ export function updateSavedProject(projectId, update) {
   if (updatedProject) localStorage.setItem(projectsKey, JSON.stringify(nextProjects))
   return updatedProject
 }
+
+export function removeSavedProject(projectId) {
+  const projects = readSavedProjects()
+  const nextProjects = projects.filter(project => project.id !== projectId)
+  if (nextProjects.length === projects.length) return false
+
+  localStorage.setItem(projectsKey, JSON.stringify(nextProjects))
+  if (localStorage.getItem('udaan:selected-project') === projectId) {
+    localStorage.removeItem('udaan:selected-project')
+  }
+  return true
+}

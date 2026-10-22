@@ -1,88 +1,177 @@
 import { useMemo, useState } from 'react'
 import {
-  ArrowRight, Bell, Bolt, Check, ChevronDown, CircleCheck, GraduationCap, Menu,
-  Grid2X2, List, MoreHorizontal, Plus, Rocket, Search, SlidersHorizontal, Sparkles,
+  ArrowRight, Bolt, Check, ChevronDown, CircleCheck, GraduationCap,
+  Grid2X2, List, MoreHorizontal, Plus, Rocket, Search, Sparkles, Trash2
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
-import { readSavedProjects } from '../services/projectStorage.js'
-
-const initialProjects = [
-  {
-    id: 'ecotrack', name: 'EcoTrack — Smart Sustainability Platform',
-    description: 'Enterprise ESG telemetry aggregator with streaming IoT sensor connectors, Pydantic v2 schemas, and automated GHG calculations.',
-    category: 'Startup', status: 'in-progress', statusLabel: 'In flight', level: 'Level 3: Build the Core', xp: '450 / 1,200 XP', progress: 38,
-    milestone: 'IoT data pipeline', stack: ['FastAPI', 'React', 'PostgreSQL'], team: ['TS', 'DS', 'AK'], updated: 'Updated 5 minutes ago', tone: 'forest',
-  },
-  {
-    id: 'neohealth', name: 'NeoHealth FHIR Sync',
-    description: 'Bi-directional HL7/FHIR v4 medical record reconciliation with cryptographic audit trails and offline cache.',
-    category: 'College Project', status: 'completed', statusLabel: 'Viva ready', level: 'Level 6: Viva Ready & Deployed', xp: '1,100 / 1,200 XP', progress: 92,
-    milestone: 'Final dry-run stage', stack: ['Django', 'FHIR', 'PostgreSQL'], team: ['TS', 'MV'], updated: 'Updated yesterday', tone: 'sage',
-  },
-  {
-    id: 'liquidity', name: 'Liquidity AMM Engine',
-    description: 'Deterministic constant-product market maker with cross-slot arbitrage simulations and gas-optimized settlement.',
-    category: 'Personal Lab', status: 'planning', statusLabel: 'Planning', level: 'Level 2: System Specs', xp: '200 / 1,200 XP', progress: 18,
-    milestone: 'Drafting math verification', stack: ['Rust', 'Axum', 'Solana'], team: ['DS'], updated: 'Updated yesterday', tone: 'violet',
-  },
-  {
-    id: 'aeroshield', name: 'AeroShield Autonomous Drone Router',
-    description: 'Decentralized mesh telemetry and dynamic waypoint collision avoidance for agricultural drone clusters.',
-    category: 'Hackathon', status: 'in-progress', statusLabel: 'Active sprint', level: 'Level 4: Connect the Wings', xp: '650 / 1,200 XP', progress: 54,
-    milestone: 'ROS2 integration', stack: ['Go', 'ROS2', 'Protobuf'], team: ['TS', 'MV', 'SK'], updated: 'Updated 1 day ago', tone: 'blue',
-  },
-  {
-    id: 'carbonpulse', name: 'CarbonPulse MRV Exchanger',
-    description: 'Carbon offset registry verification protocol with verifiable satellite multispectral data ingestion.',
-    category: 'Startup', status: 'archived', statusLabel: 'Archived & live', level: 'Level 6: Ready for Takeoff', xp: '1,200 / 1,200 XP', progress: 100,
-    milestone: 'Fully verified', stack: ['FastAPI', 'React', 'PostgreSQL'], team: ['TS', 'DS', 'AK'], updated: 'Completed 3 weeks ago', tone: 'gold',
-  },
-]
+import Header from '../layouts/Header.jsx'
+import { readSavedProjects, removeSavedProject } from '../services/projectStorage.js'
+import { deleteProject } from '../services/projectService.js'
 
 const tabs = [
-  { id: 'all', label: 'All' }, { id: 'in-progress', label: 'In Progress' },
-  { id: 'planning', label: 'Planning' }, { id: 'completed', label: 'Completed' }, { id: 'archived', label: 'Archived' },
+  { id: 'all', label: 'All' },
+  { id: 'in-progress', label: 'In Progress' },
+  { id: 'planning', label: 'Planning' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'archived', label: 'Archived' },
 ]
-const categoryIcon = { Startup: Rocket, Hackathon: Bolt, 'College Project': GraduationCap, 'Personal Lab': Sparkles, 'Personal Project': Sparkles }
 
-function ProjectCard({ project, onOptions }) {
+const categoryIcon = {
+  Startup: Rocket,
+  Hackathon: Bolt,
+  'College Project': GraduationCap,
+  'Personal Lab': Sparkles,
+  'Personal Project': Sparkles,
+}
+
+function ProjectCard({ project, menuOpen, deleting, onOptions, onDelete, onSelect }) {
   const CategoryIcon = categoryIcon[project.category] ?? Rocket
-  return <article className="mp-card">
-    <div className="mp-card-top"><span className={`mp-category ${project.tone}`}><CategoryIcon size={13} />{project.category}</span>
-      <div className="mp-card-tools"><span className={`mp-status ${project.status}`}>{project.status === 'completed' && <CircleCheck size={12} />}{project.statusLabel}</span><button className="mp-icon-button" aria-label={`Options for ${project.name}`} onClick={() => onOptions(project.name)}><MoreHorizontal size={18} /></button></div>
-    </div>
-    <div className="mp-card-description"><h2>{project.name}</h2><p>{project.description}</p></div>
-    <div className="mp-progress-box"><div className="mp-progress-heading"><strong>{project.level}</strong><span>{project.xp}</span></div><div className="mp-progress-track"><span style={{ width: `${project.progress}%` }} /></div><div className="mp-progress-foot"><span>{project.progress}% complete</span><span>{project.milestone}</span></div></div>
-    <div className="mp-stack">{project.stack.map(item => <span key={item}>{item}</span>)}</div>
-    <div className="mp-card-footer"><div className="mp-avatars" aria-label="Project team">{project.team.map((person, index) => <span key={person} className={`avatar-${index % 3}`}>{person}</span>)}</div><span>{project.updated}</span></div>
-    {project.workflow?.flight_plan ? <Link className="mp-card-action" to={`/flight-plan?project=${encodeURIComponent(project.id)}`}>Open Flight Plan<ArrowRight size={15} /></Link> : <button className="mp-card-action" onClick={() => onOptions(project.name)}>{project.status === 'completed' || project.status === 'archived' ? 'View Workspace' : 'Continue Building'}<ArrowRight size={15} /></button>}
-  </article>
+  const toneBg = {
+    coral: 'bg-[#FFAAA6]/30 border-[#FFAAA6]/80 text-[#7A3C3A]',
+    mint: 'bg-[#fff1ed]/40 border-[#f0dedb] text-[#8e4b49]',
+    butter: 'bg-[#FBE191]/40 border-[#FBE191] text-[#766320]',
+    lavender: 'bg-[#EAE4F8]/60 border-[#D8C1C0] text-[#534342]',
+    honey: 'bg-[#FDE293]/40 border-[#E7DFD0] text-[#705D1B]',
+  }[project.tone] || 'bg-white border-[#EFEAE4] text-[#1D1B18]'
+
+  const barColor = {
+    coral: 'bg-[#8E4B49]',
+    mint: 'bg-[#8e4b49]',
+    butter: 'bg-[#705D1B]',
+    lavender: 'bg-[#534342]',
+    honey: 'bg-[#705D1B]',
+  }[project.tone] || 'bg-[#8E4B49]'
+
+  return (
+    <article className="group bg-white rounded-3xl p-5 md:p-6 border border-[#EFEAE4] shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-4">
+      <div className="space-y-3">
+        {/* Top Badges */}
+        <div className="flex items-center justify-between">
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${toneBg}`}>
+            <CategoryIcon size={13} />
+            <span>{project.category}</span>
+          </span>
+
+          <div className="relative flex items-center gap-2">
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#F3EDE7] text-[#534342] flex items-center gap-1">
+              {project.status === 'completed' && <CircleCheck size={11} className="text-[#8e4b49]" />}
+              <span>{project.statusLabel}</span>
+            </span>
+            <button
+              type="button"
+              className="text-[#7C766F] hover:text-[#1D1B18] p-1 rounded-full hover:bg-[#F3EDE7] transition-colors cursor-pointer"
+              aria-label={`Options for ${project.name}`}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => onOptions(project.id)}
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menuOpen && (
+              <div className="mp-project-menu" role="menu" aria-label={`${project.name} options`}>
+                <button type="button" role="menuitem" onClick={() => onDelete(project)} disabled={deleting}>
+                  <Trash2 size={14} />
+                  <span>{deleting ? 'Deleting…' : 'Delete project'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Name and Description */}
+        <div>
+          <h2 className="text-lg font-bold text-[#1D1B18] font-['Plus_Jakarta_Sans'] group-hover:text-[#8E4B49] transition-colors leading-snug">
+            {project.name}
+          </h2>
+          <p className="text-xs text-[#534342] mt-1.5 font-normal leading-relaxed line-clamp-2">
+            {project.description}
+          </p>
+        </div>
+
+        {/* Progress Bar & Milestones */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex items-center justify-between text-[11px] text-[#534342] font-semibold">
+            <span>{project.level}</span>
+            <span className="font-mono">{project.progress}% complete</span>
+          </div>
+          <div className="w-full bg-[#F3EDE7] h-2 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+              style={{ width: `${project.progress}%` }}
+            ></div>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-[#7C766F]">
+            <span>Milestone: {project.milestone}</span>
+            <span>{project.xp}</span>
+          </div>
+        </div>
+
+        {/* Stack Chips */}
+        {project.stack && project.stack.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+            {project.stack.map((item) => (
+              <span key={item} className="px-2 py-0.5 rounded-md bg-[#F9F2ED] text-[#534342] text-[10px] font-mono font-medium">
+                {item}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="pt-3 border-t border-[#EFEAE4] flex items-center justify-between">
+        <div className="flex items-center -space-x-1.5" aria-label="Project team">
+          {(project.team || ['TS']).map((person) => (
+            <span
+              key={person}
+              className="w-6 h-6 rounded-full bg-[#E7E1DC] text-[#1D1B18] text-[10px] font-bold flex items-center justify-center ring-2 ring-white"
+            >
+              {person}
+            </span>
+          ))}
+          <span className="text-[11px] text-[#7C766F] ml-3">{project.updated}</span>
+        </div>
+
+        <Link
+          to={`/flight-plan?project=${encodeURIComponent(project.id)}`}
+          onClick={() => onSelect(project)}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shadow-xs group-hover:scale-105 no-underline"
+        >
+          <span>Open Plan</span>
+          <ArrowRight size={13} />
+        </Link>
+      </div>
+    </article>
+  )
 }
 
 export default function MyProjects() {
-  const [projects, setProjects] = useState(() => [...readSavedProjects(), ...initialProjects])
+  const [projects, setProjects] = useState(readSavedProjects)
   const [activeTab, setActiveTab] = useState('all')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('All Types')
   const [sortBy, setSortBy] = useState('Recently Updated')
   const [view, setView] = useState('grid')
   const [notice, setNotice] = useState('')
+  const [noticeIsError, setNoticeIsError] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
   const counts = useMemo(() => ({
     all: projects.length,
-    'in-progress': projects.filter(project => project.status === 'in-progress').length,
-    planning: projects.filter(project => project.status === 'planning').length,
-    completed: projects.filter(project => project.status === 'completed').length,
-    archived: projects.filter(project => project.status === 'archived').length,
+    'in-progress': projects.filter(p => p.status === 'in-progress').length,
+    planning: projects.filter(p => p.status === 'planning').length,
+    completed: projects.filter(p => p.status === 'completed').length,
+    archived: projects.filter(p => p.status === 'archived').length,
   }), [projects])
 
   const visibleProjects = useMemo(() => {
-    const filtered = projects.filter(project => {
-      const statusMatches = activeTab === 'all' || project.status === activeTab
-      const typeMatches = category === 'All Types' || project.category === category
-      const queryMatches = `${project.name} ${project.description} ${project.category} ${project.stack.join(' ')}`.toLowerCase().includes(search.toLowerCase())
+    const filtered = projects.filter(p => {
+      const statusMatches = activeTab === 'all' || p.status === activeTab
+      const typeMatches = category === 'All Types' || p.category === category
+      const queryMatches = `${p.name} ${p.description} ${p.category} ${(p.stack || []).join(' ')}`.toLowerCase().includes(search.toLowerCase())
       return statusMatches && typeMatches && queryMatches
     })
     if (sortBy === 'Highest Progress') return filtered.sort((a, b) => b.progress - a.progress)
@@ -91,38 +180,253 @@ export default function MyProjects() {
     return filtered
   }, [activeTab, category, projects, search, sortBy])
 
-  function createProject() {
-    setNotice('Start with your idea on the dashboard.')
-    window.setTimeout(() => setNotice(''), 3000)
+  function handleSelectProject(project) {
+    localStorage.setItem('udaan:selected-project', project.id)
   }
 
-  function projectAction(name) {
-    setNotice(`${name} workspace is ready to continue.`)
-    window.setTimeout(() => setNotice(''), 3000)
+  async function handleDeleteProject(project) {
+    if (!window.confirm(`Delete "${project.name}"? This will permanently remove the project and its saved data.`)) {
+      setOpenMenuId(null)
+      return
+    }
+
+    setDeletingId(project.id)
+    setOpenMenuId(null)
+    setNotice('')
+    try {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(project.id)) {
+        await deleteProject(project.id)
+      }
+      removeSavedProject(project.id)
+      setProjects(current => current.filter(item => item.id !== project.id))
+      setNotice(`${project.name} was deleted.`)
+      setNoticeIsError(false)
+    } catch (error) {
+      setNotice(`Could not delete ${project.name}: ${error.message}`)
+      setNoticeIsError(true)
+    } finally {
+      setDeletingId(null)
+    }
   }
 
-  return <div className="ud-dashboard mp-page">
-    <Sidebar activePage="projects" open={menuOpen} onClose={() => setMenuOpen(false)} />
-    <div className="ud-work-area">
-      <header className="ud-topbar">
-        <div className="ud-topbar-left"><button className="ud-mobile-menu ud-icon-button" aria-label="Open navigation" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><span className="ud-topbar-title">My Projects</span></div>
-        <div className="ud-topbar-actions"><label className="ud-search"><Search size={16} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search workspace" aria-label="Search workspace" /></label><button className="ud-icon-button" aria-label="Notifications"><Bell size={18} /></button><button className="ud-top-account"><span className="ud-avatar ud-top-avatar">TS</span><span>Tara</span><ChevronDown size={14} /></button></div>
-      </header>
-      <main className="ud-main mp-main">
-        <div className="mp-content">
-          <div className="mp-heading-row"><div><div className="mp-eyebrow">Your workspace</div><h1>My Projects</h1><p>Every idea has a journey. Pick up where you left off.</p></div><Link className="mp-new-project" to="/"><Plus size={16} />New Project</Link></div>
-          <div className="mp-summary"><span><Rocket size={15} /> <strong>{counts['in-progress'] + counts.planning}</strong> active projects</span><i /><span><Check size={15} /> <strong>{counts.completed + counts.archived}</strong> finished</span></div>
-          <div className="mp-controls">
-            <label className="mp-search"><Search size={16} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search projects by name, stack, or keyword..." aria-label="Search projects" /></label>
-            <label className="mp-select-wrap"><SlidersHorizontal size={15} /><select aria-label="Filter by project type" value={category} onChange={event => setCategory(event.target.value)}><option>All Types</option><option>Startup</option><option>Hackathon</option><option>College Project</option><option>Personal Lab</option><option>Personal Project</option></select><ChevronDown size={14} /></label>
-            <label className="mp-select-wrap mp-sort"><select aria-label="Sort projects" value={sortBy} onChange={event => setSortBy(event.target.value)}><option>Recently Updated</option><option>Highest Progress</option><option>Alphabetical</option><option>Deadline Approaching</option></select><ChevronDown size={14} /></label>
-            <div className="mp-view-toggle" aria-label="Project layout"><button aria-label="Grid view" className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}><Grid2X2 size={16} /></button><button aria-label="List view" className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}><List size={17} /></button></div>
+  return (
+    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans']">
+      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+
+      <div className="lg:pl-80 flex-1 flex flex-col min-w-0">
+        <Header
+          onToggleMobileMenu={() => setMenuOpen(!menuOpen)}
+          onProjectSelect={handleSelectProject}
+        />
+
+        <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-7 animate-fadeIn">
+          {/* Top Eyebrow & Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFFFFF] text-[#8E4B49] text-xs font-bold tracking-wide border border-[#EFEAE4] shadow-xs mb-2">
+                <span className="w-2 h-2 rounded-full bg-[#FFAAA6]"></span>
+                <span>STUDIO WORKSPACES</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1D1B18] tracking-tight leading-tight font-['Plus_Jakarta_Sans']">
+                My Projects
+              </h1>
+              <p className="text-sm text-[#534342] mt-1 leading-relaxed">
+                Every idea has a journey. Pick up where you left off or launch a new initiative.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Link
+                to="/projects/new/setup"
+                className="px-5 py-2.5 rounded-full bg-[#FFAAA6] text-[#7A3C3A] hover:bg-[#FFDAD8] text-xs font-bold flex items-center gap-1.5 transition-all shadow-md hover:scale-105 active:scale-95 no-underline"
+              >
+                <Plus size={16} />
+                <span>New Project</span>
+              </Link>
+            </div>
           </div>
-          <div className="mp-tabs" role="tablist" aria-label="Filter projects by status">{tabs.map(tab => <button role="tab" aria-selected={activeTab === tab.id} className={activeTab === tab.id ? 'active' : ''} key={tab.id} onClick={() => setActiveTab(tab.id)}>{tab.label}<span>{counts[tab.id]}</span></button>)}</div>
-          {visibleProjects.length ? <div className={`mp-project-grid ${view === 'list' ? 'list-view' : ''}`}>{visibleProjects.map(project => <ProjectCard key={project.id} project={project} onOptions={projectAction} />)}<Link className="mp-create-card" to="/"><span className="mp-create-icon"><Plus size={22} /></span><strong>Start something new</strong><small>Bring an idea and we’ll help you shape the plan.</small><span className="mp-create-link">Create a project <ArrowRight size={14} /></span></Link></div> : <div className="mp-empty"><span><Search size={20} /></span><h2>{activeTab === 'archived' ? 'No archived projects yet' : 'No projects found'}</h2><p>{activeTab === 'archived' ? 'Completed projects you archive will be saved here.' : 'Try another search or filter to find a project.'}</p><button onClick={() => { setSearch(''); setCategory('All Types'); setActiveTab('all') }}>Show all projects</button></div>}
-          {notice && <div className="mp-toast" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Dismiss">×</button></div>}
-        </div>
-      </main>
+
+          {/* Summary Badges Bar */}
+          <div className="flex items-center gap-4 text-xs font-semibold text-[#534342] bg-white p-3.5 rounded-2xl border border-[#EFEAE4] shadow-xs">
+            <span className="flex items-center gap-1.5">
+              <Rocket size={15} className="text-[#8E4B49]" />
+              <strong>{counts['in-progress'] + counts.planning}</strong> active projects
+            </span>
+            <span className="w-1 h-1 rounded-full bg-[#D8C1C0]" />
+            <span className="flex items-center gap-1.5">
+              <Check size={15} className="text-[#8e4b49]" />
+              <strong>{counts.completed + counts.archived}</strong> finished or live
+            </span>
+          </div>
+
+          {/* Controls: Search, Filters, Sorters, Grid/List */}
+          <div className="bg-white p-4 rounded-3xl border border-[#EFEAE4] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C766F]" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search projects by name, stack, or keyword..."
+                className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] text-xs text-[#1D1B18] focus:outline-none focus:ring-2 focus:ring-[#FFAAA6]"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="appearance-none pl-3 pr-8 py-2 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18] focus:outline-none focus:ring-2 focus:ring-[#FFAAA6] cursor-pointer"
+                >
+                  <option>All Types</option>
+                  <option>Startup</option>
+                  <option>Hackathon</option>
+                  <option>College Project</option>
+                  <option>Personal Lab</option>
+                  <option>Personal Project</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#7C766F] pointer-events-none" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="appearance-none pl-3 pr-8 py-2 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18] focus:outline-none focus:ring-2 focus:ring-[#FFAAA6] cursor-pointer"
+                >
+                  <option>Recently Updated</option>
+                  <option>Highest Progress</option>
+                  <option>Alphabetical</option>
+                  <option>Deadline Approaching</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#7C766F] pointer-events-none" />
+              </div>
+
+              <div className="inline-flex p-1 bg-[#F3EDE7] rounded-xl gap-1">
+                <button
+                  type="button"
+                  onClick={() => setView('grid')}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    view === 'grid' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
+                  }`}
+                  aria-label="Grid view"
+                >
+                  <Grid2X2 size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('list')}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                    view === 'list' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
+                  }`}
+                  aria-label="List view"
+                >
+                  <List size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-[#EFEAE4] pb-2">
+            {tabs.map((tab) => {
+              const isActive = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#FFAAA6] text-[#7A3C3A] shadow-xs'
+                      : 'text-[#534342] hover:bg-[#F3EDE7]'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`px-2 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-white/70 text-[#7A3C3A]' : 'bg-[#E7E1DC] text-[#534342]'}`}>
+                    {counts[tab.id]}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Project Cards Grid */}
+          {visibleProjects.length > 0 ? (
+            <div className={`grid gap-6 ${view === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
+              {visibleProjects.map((p) => (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  menuOpen={openMenuId === p.id}
+                  deleting={deletingId === p.id}
+                  onOptions={id => setOpenMenuId(current => current === id ? null : id)}
+                  onDelete={handleDeleteProject}
+                  onSelect={handleSelectProject}
+                />
+              ))}
+
+              {/* Start Something New Card */}
+              <Link
+                to="/projects/new/setup"
+                className="group border-2 border-dashed border-[#D8C1C0] hover:border-[#8E4B49] rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-3 transition-all hover:bg-[#FFFDFB] no-underline"
+              >
+                <div className="w-12 h-12 rounded-full bg-[#FFAAA6]/30 text-[#8E4B49] flex items-center justify-center transition-transform group-hover:scale-110">
+                  <Plus size={24} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1D1B18] font-['Plus_Jakarta_Sans'] group-hover:text-[#8E4B49] transition-colors">
+                    Start something new
+                  </h3>
+                  <p className="text-xs text-[#534342] mt-1 max-w-xs">
+                    Bring an idea and we&apos;ll help you shape the complete flight plan.
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-[#8E4B49]">
+                  <span>Create a project</span>
+                  <ArrowRight size={14} />
+                </span>
+              </Link>
+            </div>
+          ) : (
+            <div className="bg-white rounded-3xl p-12 text-center border border-[#EFEAE4] space-y-3">
+              <div className="w-12 h-12 rounded-full bg-[#F3EDE7] flex items-center justify-center mx-auto text-[#7C766F]">
+                <Search size={22} />
+              </div>
+              <h2 className="text-base font-bold text-[#1D1B18]">
+                {activeTab === 'archived' ? 'No archived projects yet' : 'No matching projects found'}
+              </h2>
+              <p className="text-xs text-[#534342] max-w-sm mx-auto">
+                {activeTab === 'archived'
+                  ? 'Completed projects you archive will be saved here safely.'
+                  : 'Try searching for a different keyword or resetting your filters.'}
+              </p>
+              <button
+                type="button"
+                onClick={() => { setSearch(''); setCategory('All Types'); setActiveTab('all') }}
+                className="px-4 py-2 rounded-full bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors"
+              >
+                Show all projects
+              </button>
+            </div>
+          )}
+
+          {/* Toast Notice */}
+          {notice && (
+            <div className={`fixed bottom-6 right-6 z-50 ${noticeIsError ? 'bg-[#8E4B49]' : 'bg-[#1D1B18]'} text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-3 text-xs font-bold animate-fadeIn`} role={noticeIsError ? 'alert' : 'status'}>
+              <span>{notice}</span>
+              <button
+                type="button"
+                onClick={() => setNotice('')}
+                className="text-[#FFAAA6] hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
-  </div>
+  )
 }

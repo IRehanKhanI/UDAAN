@@ -25,7 +25,7 @@
   padding: 0 24px;
   height: 52px;
   background: #fff;
-  border-bottom: 1px solid #e2eae3;
+  border-bottom: 1px solid #fff1ed;
   position: sticky;
   top: 0;
   z-index: 10;
@@ -55,7 +55,7 @@
   flex: 1;
 }
 
-.vr-topbar-icon { color: #176b45; }
+.vr-topbar-icon { color: #8e4b49; }
 
 .vr-topbar-actions {
   display: flex;
@@ -65,7 +65,7 @@
 
 .vr-project-picker {
   font-size: 12px;
-  border: 1px solid #e2eae3;
+  border: 1px solid #fff1ed;
   border-radius: 7px;
   padding: 5px 8px;
   background: #f7f8fa;
@@ -80,16 +80,16 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 500;
-  border: 1px solid #e2eae3;
+  border: 1px solid #fff1ed;
   border-radius: 7px;
   padding: 6px 12px;
   background: #fff;
-  color: #176b45;
+  color: #8e4b49;
   cursor: pointer;
   transition: background 0.15s;
 }
 
-.vr-refresh-btn:hover:not(:disabled) { background: #e9f5ee; }
+.vr-refresh-btn:hover:not(:disabled) { background: #fff8f3; }
 .vr-refresh-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* ─── Main content ──────────────────────────────────────────────────────────── */
@@ -104,7 +104,7 @@
 /* ─── Hero summary ──────────────────────────────────────────────────────────── */
 .vr-hero {
   background: #fff;
-  border: 1px solid #e2eae3;
+  border: 1px solid #fff1ed;
   border-radius: 12px;
   padding: 24px;
   display: flex;
@@ -132,7 +132,7 @@
 .vr-hero-status-label {
   font-size: 12px;
   font-weight: 600;
-  color: #176b45;
+  color: #8e4b49;
 }
 
 .vr-hero-sub {
@@ -153,7 +153,7 @@
   flex-direction: column;
   align-items: center;
   background: #f7f8fa;
-  border: 1px solid #e2eae3;
+  border: 1px solid #fff1ed;
   border-radius: 9px;
   padding: 10px 18px;
   min-width: 64px;
@@ -173,7 +173,7 @@
   letter-spacing: 0.04em;
 }
 
-.vr-stat-pass .vr-stat-num { color: #176b45; }
+.vr-stat-pass .vr-stat-num { color: #8e4b49; }
 .vr-stat-warn .vr-stat-num { color: #9a5c00; }
 .vr-stat-fail .vr-stat-num { color: #8b2020; }
 .vr-stat-total .vr-stat-num { color: #1f2328; }
@@ -193,7 +193,7 @@
   line-height: 1.5;
 }
 
-.vr-verdict-pass { background: #e9f5ee; color: #176b45; }
+.vr-verdict-pass { background: #fff8f3; color: #8e4b49; }
 .vr-verdict-warn { background: #fdf1d7; color: #9a5c00; }
 .vr-verdict-fail { background: #fde8e8; color: #8b2020; }
 
@@ -232,7 +232,7 @@
   text-align: center;
 }
 
-.vr-empty a { color: #176b45; font-weight: 600; }
+.vr-empty a { color: #8e4b49; font-weight: 600; }
 
 /* ─── Categories ────────────────────────────────────────────────────────────── */
 .vr-categories {
@@ -243,7 +243,7 @@
 
 .vr-category {
   background: #fff;
-  border: 1px solid #e2eae3;
+  border: 1px solid #fff1ed;
   border-radius: 12px;
   overflow: hidden;
 }
@@ -253,7 +253,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 18px;
-  border-bottom: 1px solid #e2eae3;
+  border-bottom: 1px solid #fff1ed;
   background: #f7f8fa;
 }
 
@@ -288,7 +288,7 @@
   border-radius: 20px;
 }
 
-.vr-cat-score-pass { background: #e9f5ee; color: #176b45; }
+.vr-cat-score-pass { background: #fff8f3; color: #8e4b49; }
 .vr-cat-score-warn { background: #fdf1d7; color: #9a5c00; }
 .vr-cat-score-fail { background: #fde8e8; color: #8b2020; }
 
@@ -299,7 +299,7 @@
 }
 
 .vr-check-item {
-  border-bottom: 1px solid #e2eae3;
+  border-bottom: 1px solid #fff1ed;
 }
 
 .vr-check-item:last-child { border-bottom: none; }
@@ -330,8 +330,8 @@
 .vr-check-badge {
   font-size: 10px;
   color: #57706a;
-  background: #f0f4f0;
-  border: 1px solid #e2eae3;
+  background: #fff8f3;
+  border: 1px solid #fff1ed;
   border-radius: 20px;
   padding: 2px 8px;
   white-space: nowrap;
@@ -354,26 +354,26 @@
   gap: 5px;
   font-size: 11px;
   font-weight: 600;
-  color: #176b45;
+  color: #8e4b49;
   text-decoration: none;
-  background: #e9f5ee;
+  background: #fff8f3;
   border-radius: 6px;
   padding: 4px 10px;
 }
 
-.vr-fix-link:hover { background: #d0eedd; }
+.vr-fix-link:hover { background: #fff1ed; }
 
 /* ─── Status icons ──────────────────────────────────────────────────────────── */
-.vr-icon-pass { color: #176b45; flex-shrink: 0; }
+.vr-icon-pass { color: #8e4b49; flex-shrink: 0; }
 .vr-icon-warn { color: #9a5c00; flex-shrink: 0; }
 .vr-icon-fail { color: #8b2020; flex-shrink: 0; }
-.vr-icon-na   { color: #b8c8be; flex-shrink: 0; }
+.vr-icon-na   { color: #f0dedb; flex-shrink: 0; }
 
 /* ─── Passport CTA ──────────────────────────────────────────────────────────── */
 .vr-passport-cta {
   margin-top: 24px;
   background: #fff;
-  border: 1px solid #c8e8d4;
+  border: 1px solid #fff1ed;
   border-radius: 12px;
   padding: 18px 22px;
   display: flex;
@@ -390,7 +390,7 @@
   flex: 1;
 }
 
-.vr-passport-cta-icon { color: #176b45; flex-shrink: 0; margin-top: 2px; }
+.vr-passport-cta-icon { color: #8e4b49; flex-shrink: 0; margin-top: 2px; }
 
 .vr-passport-cta-content strong {
   display: block;
@@ -412,7 +412,7 @@
   font-size: 12px;
   font-weight: 600;
   color: #fff;
-  background: #176b45;
+  background: #8e4b49;
   border-radius: 8px;
   padding: 8px 16px;
   text-decoration: none;
@@ -420,7 +420,7 @@
   transition: background 0.15s;
 }
 
-.vr-passport-cta-btn:hover { background: #1a7d51; }
+.vr-passport-cta-btn:hover { background: #8e4b49; }
 
 /* ─── Spinner ───────────────────────────────────────────────────────────────── */
 .vr-spin {

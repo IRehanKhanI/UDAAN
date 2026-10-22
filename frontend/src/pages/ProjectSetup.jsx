@@ -10,13 +10,13 @@ import {
   Github,
   Layers,
   LoaderCircle,
-  Menu,
   RefreshCw,
   Sparkles,
   Trash2,
 } from 'lucide-react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
+import Header from '../layouts/Header.jsx'
 import {
   associateProjectRepository,
   detectTechnologies,
@@ -158,172 +158,97 @@ export default function ProjectSetup() {
       const branches = await fetchRepositoryBranches(owner, name)
 
       // Handle empty repo (no branches)
-      if (branches.length === 0) {
+      if (!branches || branches.length === 0) {
         setInspectedRepo({
           owner,
           name,
-          fullName: metadata.full_name || `${owner}/${name}`,
+          fullName: `${owner}/${name}`,
           url: metadata.html_url || `https://github.com/${owner}/${name}`,
-          branches: [],
-          selectedBranch: '',
-          commitSha: '',
+          defaultBranch: 'main',
+          branches: ['main'],
+          fileCount: 0,
+          technologies: [],
+          description: metadata.description || '',
+          isPrivate: metadata.private || false,
           isEmpty: true,
-          detectedTechs: [],
         })
         setStatus('ready')
         return
       }
 
-      // Determine initial branch
-      const defaultBranch = branches.some(b => b.name === metadata.default_branch)
-        ? metadata.default_branch
-        : branches[0].name
-      const branchSha = branches.find(b => b.name === defaultBranch)?.sha || ''
-
-      // Fetch file tree
-      const treeResult = await fetchRepositoryTree(owner, name, defaultBranch)
-
-      if (treeResult.empty || treeResult.entries.length === 0) {
-        setInspectedRepo({
-          owner,
-          name,
-          fullName: metadata.full_name || `${owner}/${name}`,
-          url: metadata.html_url || `https://github.com/${owner}/${name}`,
-          branches,
-          selectedBranch: defaultBranch,
-          commitSha: treeResult.sha || branchSha,
-          isEmpty: true,
-          detectedTechs: [],
-        })
-        setStatus('ready')
-        return
-      }
-
-      // Has code: fetch manifests and detect technologies
-      const manifests = await fetchManifests(owner, name, defaultBranch, treeResult.entries)
-      const detectedTechs = detectTechnologies(metadata, treeResult.entries, manifests)
+      const defaultBranch = metadata.default_branch || branches[0].name || 'main'
+      const tree = await fetchRepositoryTree(owner, name, defaultBranch).catch(() => [])
+      const manifests = await fetchManifests(owner, name, defaultBranch, tree).catch(() => ({}))
+      const technologies = detectTechnologies(tree, manifests)
 
       setInspectedRepo({
         owner,
         name,
-        fullName: metadata.full_name || `${owner}/${name}`,
+        fullName: `${owner}/${name}`,
         url: metadata.html_url || `https://github.com/${owner}/${name}`,
-        branches,
-        selectedBranch: defaultBranch,
-        commitSha: treeResult.sha || branchSha,
+        defaultBranch,
+        branches: branches.map(b => b.name),
+        fileCount: tree.length,
+        technologies,
+        description: metadata.description || '',
+        isPrivate: metadata.private || false,
         isEmpty: false,
-        detectedTechs,
-        entries: treeResult.entries,
       })
       setStatus('ready')
-    } catch (caught) {
-      setError(caught?.message || 'Could not access that repository. Check the address and try again.')
+    } catch (err) {
+      setError(err.message || 'Could not reach or parse this repository URL. Ensure it is public or you have granted access.')
       setStatus('error')
     }
   }
 
-  // Branch change handler
-  async function handleBranchChange(branchName) {
-    if (!inspectedRepo || inspectedRepo.selectedBranch === branchName) return
-    const branchSha = inspectedRepo.branches.find(b => b.name === branchName)?.sha || ''
-
-    setStatus('inspecting')
-    try {
-      const treeResult = await fetchRepositoryTree(inspectedRepo.owner, inspectedRepo.name, branchName)
-      if (treeResult.empty || treeResult.entries.length === 0) {
-        setInspectedRepo(prev => ({
-          ...prev,
-          selectedBranch: branchName,
-          commitSha: treeResult.sha || branchSha,
-          isEmpty: true,
-          detectedTechs: [],
-        }))
-      } else {
-        const manifests = await fetchManifests(inspectedRepo.owner, inspectedRepo.name, branchName, treeResult.entries)
-        const detectedTechs = detectTechnologies(inspectedRepo, treeResult.entries, manifests)
-        setInspectedRepo(prev => ({
-          ...prev,
-          selectedBranch: branchName,
-          commitSha: treeResult.sha || branchSha,
-          isEmpty: false,
-          detectedTechs,
-          entries: treeResult.entries,
-        }))
-      }
-      setStatus('ready')
-    } catch {
-      setInspectedRepo(prev => ({
-        ...prev,
-        selectedBranch: branchName,
-        commitSha: branchSha,
-      }))
-      setStatus('ready')
-    }
-  }
-
-  // Connect & persist association to Django
-  async function handleConnect() {
-    if (!inspectedRepo || !projectDraft.projectId) return
+  // Connect inspected repo to project in Django and storage
+  async function handleConnectRepository() {
+    if (!inspectedRepo) return
     setStatus('connecting')
     setError('')
 
-    const payload = {
-      owner: inspectedRepo.owner,
-      name: inspectedRepo.name,
-      repo_url: inspectedRepo.url,
-      selected_branch: inspectedRepo.selectedBranch,
-      connection_status: inspectedRepo.isEmpty ? 'empty' : 'connected',
-      last_synced_sha: inspectedRepo.commitSha,
-      last_synced_at: new Date().toISOString(),
-      detected_technologies: inspectedRepo.detectedTechs,
-      is_empty: inspectedRepo.isEmpty,
-    }
-
     try {
-      // Ensure draft is saved in Django
-      await saveProjectDraft(
-        projectDraft,
-        projectDraft.understanding || { project_name: '', problem_statement: '', target_users: '', expected_outcome: '' },
-        projectDraft.workflow || {},
-        'understanding'
-      ).catch(() => {})
+      const payload = {
+        repo_owner: inspectedRepo.owner,
+        repo_name: inspectedRepo.name,
+        repo_url: inspectedRepo.url,
+        selected_branch: inspectedRepo.defaultBranch,
+        is_private: inspectedRepo.isPrivate,
+      }
 
-      // Persist repository association
-      const saved = await associateProjectRepository(projectDraft.projectId, payload)
+      // Associate in backend
+      const result = await associateProjectRepository(projectDraft.projectId, payload)
 
-      // Also update local storage for the standalone Repository page
+      // Save locally as active
       saveConnectedRepoLocally({
         owner: inspectedRepo.owner,
         name: inspectedRepo.name,
         fullName: inspectedRepo.fullName,
         url: inspectedRepo.url,
-        branch: inspectedRepo.selectedBranch,
-        language: inspectedRepo.detectedTechs[0]?.name || '',
-        visibility: 'public',
-        syncedAt: new Date().toISOString(),
-        revision: inspectedRepo.commitSha,
-        truncated: false,
-        tree: inspectedRepo.entries || [],
+        branch: inspectedRepo.defaultBranch,
+        isPrivate: inspectedRepo.isPrivate,
+        technologies: inspectedRepo.technologies,
       })
 
-      setConnectedRepo(saved)
+      setConnectedRepo(result)
       setStatus('success')
-    } catch (caught) {
-      setError(caught?.message || 'Could not save the repository association. Please retry.')
+    } catch (err) {
+      setError(err.message || 'Failed to link repository with your project.')
       setStatus('error')
     }
   }
 
-  // Disconnect repository
-  async function handleDisconnect() {
+  // Disconnect repo from project
+  async function handleDisconnectRepository() {
     if (!projectDraft.projectId) return
     try {
       await disconnectProjectRepository(projectDraft.projectId).catch(() => {})
-    } finally {
       setConnectedRepo(null)
       setInspectedRepo(null)
       setStatus('idle')
       setUrlInput('')
+    } catch (err) {
+      setError(err.message || 'Failed to disconnect repository.')
     }
   }
 
@@ -338,37 +263,19 @@ export default function ProjectSetup() {
     })
   }
 
-  // Navigate to Repository page
-  function handleGoToRepository() {
-    navigate('/repository')
-  }
-
   const projectName = projectDraft.understanding?.project_name?.trim() || 'New Project'
 
   return (
-    <div className="ud-dashboard ps-page">
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} activePage="projects" />
-      <div className="ud-work-area">
-        <header className="ud-topbar">
-          <div className="ud-topbar-left">
-            <button
-              className="ud-mobile-menu ud-icon-button"
-              aria-label="Open navigation"
-              onClick={() => setMenuOpen(true)}
-            >
-              <Menu size={20} />
-            </button>
-            <span className="ud-topbar-title">Project Setup</span>
-          </div>
-          <div className="ud-topbar-actions">
-            <span className="ud-avatar ud-top-avatar">TS</span>
-          </div>
-        </header>
+    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] ps-page">
+      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
+      
+      <div className="lg:pl-80 flex-1 flex flex-col min-w-0">
+        <Header onToggleMobileMenu={() => setMenuOpen(!menuOpen)} />
 
-        <main className="ud-main ps-main">
+        <main className="ps-main">
           <div className="ps-content">
             <Link className="ps-back-link" to="/">
-              <ArrowLeft size={14} /> Back to idea input
+              <ArrowLeft size={14} /> Back to studio dashboard
             </Link>
 
             <section className="ps-header">
@@ -376,342 +283,220 @@ export default function ProjectSetup() {
                 <Sparkles size={14} /> Project Initialization · Step 1 of 2
               </span>
               <h1>Connect a GitHub Repository</h1>
-              <p>
+              <p className="ps-subtitle">
                 Optionally link your codebase now so UDAAN can inspect components, detect frameworks, and prepare for Flight Plan verification.
               </p>
             </section>
 
             {/* Project Summary Card */}
-            <section className="ps-project-summary">
-              <div className="ps-project-info">
-                <span className="ps-project-kicker">Draft Project</span>
-                <h3 className="ps-project-name">{projectName}</h3>
-                <p className="ps-project-idea">{projectDraft.idea || 'No idea description entered.'}</p>
+            <section className="ps-idea-recap">
+              <div className="ps-idea-recap-left">
+                <span className="ps-idea-recap-label">Draft Project: {projectName}</span>
+                <p className="ps-idea-recap-text">{projectDraft.idea || 'No idea description entered.'}</p>
               </div>
-              <span className="ps-type-badge">{projectDraft.projectType}</span>
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#FFAAA6]/40 text-[#7A3C3A] self-start">
+                {projectDraft.projectType}
+              </span>
             </section>
 
             {/* Main Repository Connection Card */}
             <div className="ps-card">
               {loadingInitial ? (
-                <div className="ps-state-box ps-state-loading">
-                  <LoaderCircle size={18} className="ps-spin" />
+                <div className="flex items-center gap-2 text-xs text-[#7C766F] py-4">
+                  <LoaderCircle size={18} className="animate-spin text-[#8E4B49]" />
                   <span>Loading project and integration details…</span>
                 </div>
-              ) : status === 'success' && connectedRepo ? (
-                /* Connected State */
-                <div className="ps-connected-box">
-                  <div className="ps-connected-head">
-                    <span className="ps-badge-connected">
-                      <Check size={14} /> Repository Connected
-                    </span>
+              ) : connectedRepo ? (
+                /* Already connected state */
+                <div className="space-y-4">
+                  <div className="ps-connected-banner">
+                    <div className="ps-connected-left">
+                      <div className="ps-connected-icon">
+                        <Check size={18} />
+                      </div>
+                      <div className="ps-connected-meta">
+                        <span className="ps-connected-label">Repository Linked</span>
+                        <span className="ps-connected-name">
+                          {connectedRepo.repo_full_name || `${connectedRepo.repo_owner}/${connectedRepo.repo_name}`}
+                        </span>
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      className="ps-btn-ghost"
-                      onClick={handleDisconnect}
-                      title="Disconnect repository"
+                      className="ps-disconnect-btn"
+                      onClick={handleDisconnectRepository}
                     >
-                      <Trash2 size={14} /> Disconnect
+                      <Trash2 size={13} /> Disconnect
                     </button>
                   </div>
 
-                  <div className="ps-repo-meta">
-                    <div className="ps-repo-id">
-                      <Github size={22} />
-                      <div>
-                        <strong>{connectedRepo.repo_full_name}</strong>
-                        {connectedRepo.selected_branch && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 11, color: '#556b59' }}>
-                            <GitBranch size={12} />
-                            <span>branch: <b>{connectedRepo.selected_branch}</b></span>
-                            {connectedRepo.last_synced_sha && (
-                              <span className="ps-sha-pill">
-                                {connectedRepo.last_synced_sha.slice(0, 7)}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {connectedRepo.repo_url && (
-                      <a
-                        href={connectedRepo.repo_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ps-repo-link"
-                      >
-                        GitHub <ExternalLink size={12} />
-                      </a>
-                    )}
-                  </div>
-
-                  {connectedRepo.is_empty ? (
-                    <div className="ps-empty-repo-banner">
-                      <Code2 size={16} />
-                      <div className="ps-empty-repo-copy">
-                        <strong>Repository connected — no source files detected yet.</strong>
-                        <p>You can start building your codebase and sync with UDAAN whenever you push commits.</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 650, color: '#415546', marginBottom: 6 }}>
-                        Detected Technologies
-                      </div>
-                      <div className="ps-tech-list">
-                        {(connectedRepo.detected_technologies || []).length ? (
-                          connectedRepo.detected_technologies.map(tech => (
-                            <span className="ps-tech-pill" key={tech.name}>
-                              <Layers size={11} />
-                              <b>{tech.name}</b>
-                              {tech.evidence && <small>({tech.evidence})</small>}
-                            </span>
-                          ))
-                        ) : (
-                          <span style={{ fontSize: 11, color: '#738677' }}>
-                            No specific frameworks detected in repository manifests.
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="ps-actions-row">
-                    <button
-                      type="button"
-                      className="ps-btn-secondary"
-                      onClick={handleGoToRepository}
-                    >
-                      <Code2 size={14} /> Open Repository Analysis
-                    </button>
-                    <button
-                      type="button"
-                      className="ps-btn-primary"
-                      onClick={handleContinueToAnalysis}
-                    >
-                      Continue to Idea Planning <ArrowRight size={15} />
-                    </button>
-                  </div>
+                  <p className="ps-card-desc">
+                    Your codebase is linked to this project. Architecture Visualizer and Flight Plan evidence tracking are active.
+                  </p>
                 </div>
               ) : (
-                /* Connect / Form State */
-                <>
-                  <div className="ps-repo-form">
-                    <label htmlFor="repo-url-input" className="ps-section-title">
-                      Connect GitHub Repository
-                    </label>
-                    <div className="ps-input-group">
-                      <div className="ps-repo-input">
-                        <Github size={18} />
-                        <input
-                          id="repo-url-input"
-                          type="text"
-                          value={urlInput}
-                          onChange={e => {
-                            setUrlInput(e.target.value)
-                            if (error) setError('')
-                          }}
-                          placeholder="e.g. owner/repository or https://github.com/..."
-                          disabled={status === 'inspecting' || status === 'connecting'}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              if (urlInput.trim()) inspectRepository(urlInput)
-                            }
-                          }}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        className="ps-btn-primary"
-                        onClick={() => inspectRepository(urlInput)}
-                        disabled={!urlInput.trim() || status === 'inspecting' || status === 'connecting'}
-                      >
-                        {status === 'inspecting' ? (
-                          <>
-                            <LoaderCircle size={15} className="ps-spin" /> Checking…
-                          </>
-                        ) : (
-                          <>
-                            Inspect <ArrowRight size={15} />
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    <small style={{ color: '#7a8c7e', fontSize: 11, lineHeight: 1.5 }}>
-                      Connect an existing public GitHub repository. No private tokens are needed or exposed.
-                    </small>
+                /* Connect new repository form */
+                <div className="space-y-4">
+                  <div className="ps-card-header">
+                    <h2 className="ps-card-title">
+                      <Github size={18} /> Link GitHub Codebase
+                    </h2>
+                    <p className="ps-card-desc">
+                      Enter any public repository link or your own GitHub repository URL (e.g. <code>https://github.com/owner/repo</code> or <code>owner/repo</code>).
+                    </p>
                   </div>
 
-                  {/* Existing Repositories Quick List */}
-                  {existingRepos.length > 0 && status !== 'ready' && (
-                    <div className="ps-quick-list">
-                      <span>Recently connected repositories:</span>
-                      <div className="ps-quick-chips">
-                        {existingRepos.slice(0, 4).map(repo => (
+                  <div className="ps-input-row">
+                    <div className="ps-input-wrap">
+                      <Github size={16} className="ps-input-icon" />
+                      <input
+                        type="text"
+                        className="ps-url-input"
+                        placeholder="https://github.com/owner/repository"
+                        value={urlInput}
+                        onChange={(e) => setUrlInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && urlInput.trim()) {
+                            inspectRepository(urlInput.trim())
+                          }
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="ps-inspect-btn"
+                      disabled={!urlInput.trim() || status === 'inspecting'}
+                      onClick={() => inspectRepository(urlInput.trim())}
+                    >
+                      {status === 'inspecting' ? (
+                        <>
+                          <LoaderCircle size={14} className="animate-spin" /> Inspecting…
+                        </>
+                      ) : (
+                        <>
+                          <Code2 size={14} /> Inspect
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Existing Repos Suggestions */}
+                  {existingRepos.length > 0 && (
+                    <div className="ps-existing-repos">
+                      <span className="ps-existing-title">Or select a recent workspace repository:</span>
+                      <div className="ps-repo-chips">
+                        {existingRepos.map((repo) => (
                           <button
                             key={repo.repo_full_name}
                             type="button"
-                            className="ps-chip"
+                            className="ps-repo-chip"
                             onClick={() => {
                               setUrlInput(repo.repo_full_name)
                               inspectRepository(repo.repo_full_name)
                             }}
                           >
                             <Github size={12} />
-                            {repo.repo_full_name}
+                            <span>{repo.repo_full_name}</span>
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Error State with Retry */}
+                  {/* Error Box */}
                   {error && (
-                    <div className="ps-state-box ps-state-error">
-                      <AlertCircle size={17} style={{ flex: '0 0 auto' }} />
-                      <div style={{ flex: 1 }}>{error}</div>
-                      <button
-                        type="button"
-                        className="ps-btn-secondary"
-                        style={{ height: 32, padding: '0 10px', fontSize: 11 }}
-                        onClick={() => inspectRepository(urlInput)}
-                      >
-                        <RefreshCw size={12} /> Retry
-                      </button>
+                    <div className="p-3 bg-[#FFAAA6]/30 border border-[#FFAAA6] rounded-xl flex items-center gap-2 text-xs text-[#8E4B49]">
+                      <AlertCircle size={15} className="shrink-0" />
+                      <span>{error}</span>
                     </div>
                   )}
 
-                  {/* Inspected Repository Preview */}
-                  {inspectedRepo && status === 'ready' && (
-                    <div className="ps-inspected-card">
-                      <div className="ps-repo-meta">
-                        <div className="ps-repo-id">
-                          <Github size={20} />
-                          <div>
-                            <strong>{inspectedRepo.fullName}</strong>
-                            <div style={{ fontSize: 11, color: '#687d6d', marginTop: 2 }}>
-                              Status: {inspectedRepo.isEmpty ? 'Empty repository' : 'Ready to connect'}
-                            </div>
-                          </div>
-                        </div>
-                        <a
-                          href={inspectedRepo.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="ps-repo-link"
-                        >
-                          View on GitHub <ExternalLink size={12} />
-                        </a>
+                  {/* Inspected Preview Card */}
+                  {inspectedRepo && (
+                    <div className="ps-preview-box animate-fadeIn">
+                      <div className="ps-preview-header">
+                        <span className="ps-repo-name">
+                          <Github size={16} /> {inspectedRepo.fullName}
+                        </span>
+                        <span className="ps-visibility-badge">
+                          {inspectedRepo.isPrivate ? 'Private' : 'Public'}
+                        </span>
                       </div>
 
-                      {/* Branch selector if branches exist */}
-                      {inspectedRepo.branches.length > 0 && (
-                        <div className="ps-branch-selector">
-                          <GitBranch size={15} />
-                          <label htmlFor="ps-branch-select">Branch:</label>
-                          <select
-                            id="ps-branch-select"
-                            value={inspectedRepo.selectedBranch}
-                            onChange={e => handleBranchChange(e.target.value)}
-                          >
-                            {inspectedRepo.branches.map(branch => (
-                              <option key={branch.name} value={branch.name}>
-                                {branch.name}
-                              </option>
-                            ))}
-                          </select>
-                          {inspectedRepo.commitSha && (
-                            <span className="ps-sha-pill" title="Latest revision commit SHA">
-                              {inspectedRepo.commitSha.slice(0, 7)}
-                            </span>
-                          )}
-                        </div>
+                      {inspectedRepo.description && (
+                        <p className="text-xs text-[#534342]">{inspectedRepo.description}</p>
                       )}
 
-                      {/* Empty vs Code detection display */}
-                      {inspectedRepo.isEmpty ? (
-                        <div className="ps-empty-repo-banner">
-                          <Code2 size={16} />
-                          <div className="ps-empty-repo-copy">
-                            <strong>Repository connected — no source files detected yet.</strong>
-                            <p>You can start building and sync again later. No languages or test checks were fabricated.</p>
-                          </div>
+                      <div className="ps-meta-grid">
+                        <div className="ps-meta-item">
+                          <span className="ps-meta-label">Default Branch</span>
+                          <span className="ps-meta-val">{inspectedRepo.defaultBranch}</span>
                         </div>
-                      ) : (
-                        <div>
-                          <div style={{ fontSize: 11, fontWeight: 650, color: '#384c3c', marginBottom: 6 }}>
-                            Detected Languages & Frameworks
-                          </div>
-                          <div className="ps-tech-list">
-                            {inspectedRepo.detectedTechs.length ? (
-                              inspectedRepo.detectedTechs.map(tech => (
-                                <span className="ps-tech-pill" key={tech.name}>
-                                  <Layers size={11} />
-                                  <b>{tech.name}</b>
-                                  {tech.evidence && <small>({tech.evidence})</small>}
-                                </span>
-                              ))
-                            ) : (
-                              <span style={{ fontSize: 11, color: '#7a8e80' }}>
-                                Code files found; no standard manifest frameworks detected.
+                        <div className="ps-meta-item">
+                          <span className="ps-meta-label">Source Files</span>
+                          <span className="ps-meta-val">{inspectedRepo.fileCount} items</span>
+                        </div>
+                        <div className="ps-meta-item">
+                          <span className="ps-meta-label">Branches</span>
+                          <span className="ps-meta-val">{inspectedRepo.branches.length} detected</span>
+                        </div>
+                      </div>
+
+                      {inspectedRepo.technologies && inspectedRepo.technologies.length > 0 && (
+                        <div className="ps-tech-section">
+                          <span className="ps-tech-title">Detected Technologies:</span>
+                          <div className="ps-tech-chips">
+                            {inspectedRepo.technologies.map((t) => (
+                              <span key={t} className="ps-tech-chip">
+                                {t}
                               </span>
-                            )}
+                            ))}
                           </div>
                         </div>
                       )}
 
-                      <div className="ps-actions-row">
+                      <div className="ps-action-row">
                         <button
                           type="button"
-                          className="ps-btn-secondary"
-                          onClick={() => {
-                            setInspectedRepo(null)
-                            setUrlInput('')
-                          }}
-                        >
-                          Choose another
-                        </button>
-                        <button
-                          type="button"
-                          className="ps-btn-primary"
-                          onClick={handleConnect}
+                          className="ps-connect-btn"
                           disabled={status === 'connecting'}
+                          onClick={handleConnectRepository}
                         >
                           {status === 'connecting' ? (
                             <>
-                              <LoaderCircle size={15} className="ps-spin" /> Connecting…
-                            </>
-                          ) : inspectedRepo.isEmpty ? (
-                            <>
-                              Connect Empty Repository & Continue <ArrowRight size={15} />
+                              <LoaderCircle size={14} className="animate-spin" /> Linking Codebase…
                             </>
                           ) : (
                             <>
-                              Connect Repository <ArrowRight size={15} />
+                              <Check size={15} /> Confirm & Link to Project
                             </>
                           )}
                         </button>
                       </div>
                     </div>
                   )}
-
-                  {/* Skip Option Footer */}
-                  <div className="ps-actions-row" style={{ marginTop: 12 }}>
-                    <span style={{ fontSize: 11, color: '#748677' }}>
-                      Don’t have a repository ready? You can connect it at any time.
-                    </span>
-                    <button
-                      type="button"
-                      className="ps-btn-secondary"
-                      onClick={handleContinueToAnalysis}
-                    >
-                      Skip for now <ArrowRight size={14} />
-                    </button>
-                  </div>
-                </>
+                </div>
               )}
+            </div>
+
+            {/* Navigation / Proceed Row */}
+            <div className="ps-proceed-row">
+              <button
+                type="button"
+                className="ps-skip-btn"
+                onClick={handleContinueToAnalysis}
+              >
+                Skip repository connection for now
+              </button>
+
+              <button
+                type="button"
+                className="ps-next-btn"
+                onClick={handleContinueToAnalysis}
+              >
+                <span>Continue to Idea Breakdown</span>
+                <ArrowRight size={16} />
+              </button>
             </div>
           </div>
         </main>

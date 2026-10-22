@@ -17,13 +17,13 @@ import {
 import './MissionControl.css'
 
 // ─── Colour maps ──────────────────────────────────────────────────────────────
-const BAND_COLOR  = { green: '#176b45', blue: '#1d5c9b', amber: '#9a5c00', red: '#8b2020', grey: '#57706a' }
-const BAND_BG     = { green: '#e9f5ee', blue: '#e5eef9', amber: '#fdf1d7', red: '#fde8e8', grey: '#f0f4f0' }
-const BAND_TRACK  = { green: '#c8e8d4', blue: '#c2d9f2', amber: '#f5dfa0', red: '#f5c0c0', grey: '#d8e0da' }
+const BAND_COLOR  = { green: '#8e4b49', blue: '#1d5c9b', amber: '#9a5c00', red: '#8b2020', grey: '#57706a' }
+const BAND_BG     = { green: '#fff8f3', blue: '#e5eef9', amber: '#fdf1d7', red: '#fde8e8', grey: '#fff8f3' }
+const BAND_TRACK  = { green: '#fff1ed', blue: '#c2d9f2', amber: '#f5dfa0', red: '#f5c0c0', grey: '#fff1ed' }
 const CONF_LABEL  = { high: 'High confidence', medium: 'Partial evidence', low: 'Not verified' }
-const CONF_DOT    = { high: '#176b45', medium: '#9a5c00', low: '#8b2020' }
-const PRI_COLOR   = { high: '#8b2020', medium: '#9a5c00', low: '#176b45' }
-const PRI_BG      = { high: '#fde8e8', medium: '#fdf1d7', low: '#e9f5ee' }
+const CONF_DOT    = { high: '#8e4b49', medium: '#9a5c00', low: '#8b2020' }
+const PRI_COLOR   = { high: '#8b2020', medium: '#9a5c00', low: '#8e4b49' }
+const PRI_BG      = { high: '#fde8e8', medium: '#fdf1d7', low: '#fff8f3' }
 
 // ─── SVG Circular Gauge ──────────────────────────────────────────────────────
 function Gauge({ score, band, size = 160 }) {
@@ -33,7 +33,7 @@ function Gauge({ score, band, size = 160 }) {
   const color = BAND_COLOR[statusClass(band)] ?? '#57706a'
   return (
     <svg viewBox="0 0 160 160" width={size} height={size} aria-hidden="true" className="mc-gauge-svg">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#2a3d32" strokeWidth="12" />
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#8e4b49" strokeWidth="12" />
       <circle
         cx={cx} cy={cy} r={r} fill="none"
         stroke={color} strokeWidth="12" strokeLinecap="round"
@@ -44,7 +44,7 @@ function Gauge({ score, band, size = 160 }) {
       <text x={cx} y={cy - 6} textAnchor="middle" fill="#fff" fontSize="32" fontWeight="700" fontFamily="inherit">
         {score !== null ? score : '—'}
       </text>
-      <text x={cx} y={cy + 16} textAnchor="middle" fill="#8da898" fontSize="11" fontFamily="inherit">/ 100</text>
+      <text x={cx} y={cy + 16} textAnchor="middle" fill="#d8a09a" fontSize="11" fontFamily="inherit">/ 100</text>
     </svg>
   )
 }
@@ -69,13 +69,13 @@ function Sparkline({ history }) {
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
         <defs>
           <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#176b45" stopOpacity=".28" />
-            <stop offset="100%" stopColor="#176b45" stopOpacity="0" />
+            <stop offset="0%" stopColor="#8e4b49" stopOpacity=".28" />
+            <stop offset="100%" stopColor="#8e4b49" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={area} fill="url(#sparkGrad)" />
-        <polyline points={pts} fill="none" stroke="#176b45" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-        <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="4" fill="#176b45" />
+        <polyline points={pts} fill="none" stroke="#8e4b49" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="4" fill="#8e4b49" />
       </svg>
       <div className="mc-sparkline-meta">
         <span className="mc-sparkline-label">Score over time ({scores.length} snapshot{scores.length !== 1 ? 's' : ''})</span>
