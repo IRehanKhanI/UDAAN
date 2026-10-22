@@ -1,6 +1,7 @@
 from django.urls import path, include
 from .idea_views import (
     IdeaAnalysisView,
+    GlimpseGenerateView,
     IdeaWorkflowStageView,
     ProjectDraftView,
     ProjectDraftCollectionView,
@@ -35,6 +36,7 @@ urlpatterns = [
     path('health/', health, name='health'),
     path('projects/', ProjectDraftCollectionView.as_view(), name='project-draft-list'),
     path('ideas/analyze/', IdeaAnalysisView.as_view(), name='idea-analysis'),
+    path('glimpse/generate/', GlimpseGenerateView.as_view(), name='glimpse-generate'),
     path('ideas/workflow-stage/', IdeaWorkflowStageView.as_view(), name='idea-workflow-stage'),
     path('projects/drafts/<uuid:draft_id>/', ProjectDraftView.as_view(), name='project-draft'),
     path('projects/drafts/<uuid:draft_id>/learning/', ProjectLearningStateView.as_view(), name='project-learning-state'),

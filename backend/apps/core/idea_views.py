@@ -28,6 +28,7 @@ from .gemini_service import (
     analyze_idea,
     explain_repository_finding,
     explain_roadmap_task_assessment,
+    generate_glimpse_response,
     generate_idea_stage,
     tutor_learning_question,
     recommend_learning_path,
@@ -62,6 +63,54 @@ class IdeaAnalysisView(APIView):
             return Response({'error': str(error)}, status=status.HTTP_502_BAD_GATEWAY)
 
         return Response({'analysis': result}, status=status.HTTP_200_OK)
+
+
+class GlimpseInputSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(choices=['generate', 'edit', 'mvp_prompt'])
+    prompt = serializers.CharField(max_length=3000, required=False, allow_blank=True, default='')
+    conversation = serializers.ListField(
+        child=serializers.DictField(), required=False, default=list, max_length=8
+    )
+    website = serializers.JSONField(required=False, default=dict)
+
+    def validate(self, attrs):
+        if attrs['action'] != 'mvp_prompt' and not attrs['prompt'].strip():
+            raise serializers.ValidationError({'prompt': 'Describe the website or the change you want.'})
+        if not isinstance(attrs['website'], dict):
+            raise serializers.ValidationError({'website': 'Website context must be an object.'})
+        if len(str(attrs['website'])) > 50000:
+            raise serializers.ValidationError({'website': 'Website context is too large.'})
+        conversation = attrs['conversation']
+        for message in conversation:
+            if message.get('role') not in {'user', 'assistant'} or not isinstance(message.get('content'), str):
+                raise serializers.ValidationError({'conversation': 'Conversation messages must have a role and text content.'})
+            if len(message['content']) > 2000:
+                raise serializers.ValidationError({'conversation': 'A conversation message is too long.'})
+        if attrs['action'] in {'edit', 'mvp_prompt'} and not attrs['website']:
+            raise serializers.ValidationError({'website': 'Generate a website before requesting edits or an MVP prompt.'})
+        return attrs
+
+
+class GlimpseGenerateView(APIView):
+    authentication_classes = []
+    permission_classes = []
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'glimpse_ai'
+
+    def post(self, request):
+        serializer = GlimpseInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {'error': 'Check the Glimpse request and try again.', 'fields': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            result = generate_glimpse_response(**serializer.validated_data)
+        except GeminiConfigurationError as error:
+            return Response({'error': str(error), 'code': 'ai_not_configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except GeminiRequestError as error:
+            return Response({'error': str(error), 'code': 'ai_generation_failed'}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class IdeaWorkflowInputSerializer(serializers.Serializer):

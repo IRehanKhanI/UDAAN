@@ -10,7 +10,6 @@ import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import InviteMakerModal from '../components/modals/InviteMakerModal.jsx'
 import AddTaskModal from '../components/modals/AddTaskModal.jsx'
-import MissionControl from './MissionControl.jsx'
 import { saveProjectDraft } from '../services/ideaWorkflowService.js'
 import { useAuth } from '../app/AuthContext.jsx'
 import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
@@ -537,13 +536,6 @@ export default function MainDashboard() {
               </div>
             </div>
 
-            <section id="mission-control" className="scroll-mt-24 space-y-3" aria-label="Project health and readiness">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8E4B49]">Project Diagnostics</p>
-                <h2 className="text-xl font-extrabold text-[#1D1B18] font-['Plus_Jakarta_Sans']">Project health &amp; readiness</h2>
-              </div>
-              <MissionControl embedded selectedProjectId={projects.length ? currentProject.id : ''} />
-            </section>
         </main>
       </div>
 

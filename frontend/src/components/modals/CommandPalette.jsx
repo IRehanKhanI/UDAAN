@@ -51,10 +51,10 @@ const SCREENS = [
   { label: 'My Projects & Workspaces', path: '/projects', icon: 'folder_open' },
   { label: 'Flight Plan & Visual Roadmap', path: '/flight-plan', icon: 'map' },
   { label: 'Repository & Architecture', path: '/repository', icon: 'code_blocks' },
-  { label: 'Project Health & Readiness', path: '/#mission-control', icon: 'troubleshoot' },
   { label: 'TestPilot (AI Testing Agent)', path: '/testpilot', icon: 'local_fire_department' },
   { label: 'Team Workspace & Allocations', path: '/team', icon: 'group' },
   { label: 'Marketing Studio', path: '/marketing-studio', icon: 'campaign' },
+  { label: 'Glimpse AI Website Builder', path: '/glimpse', icon: 'web' },
   { label: 'Developer Profile & GitHub', path: '/profile', icon: 'account_circle' },
   { label: 'New Project Setup', path: '/projects/new/setup', icon: 'add_circle' },
 ]

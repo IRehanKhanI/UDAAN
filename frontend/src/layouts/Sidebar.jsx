@@ -17,6 +17,7 @@ const navigation = [
   { label: 'TestPilot', icon: Flame, to: '/testpilot' },
   { label: 'Team Workspace', icon: Users, to: '/team' },
   { label: 'Marketing Studio', icon: Megaphone, to: '/marketing-studio' },
+  { label: 'Glimpse', icon: Sparkles, to: '/glimpse' },
 ]
 
 export default function Sidebar({ open = false, onClose = () => {} }) {

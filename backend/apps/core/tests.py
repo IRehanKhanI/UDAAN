@@ -8,7 +8,10 @@ from apps.projects.models import ProjectDraft, ProjectRepository, RoadmapAssessm
 from apps.teams.models import TeamMember
 from apps.roadmaps.models import ProjectTask
 
-from .gemini_service import GeminiConfigurationError, GeminiRequestError, _parse_json_candidate, generate_idea_stage, _validate_stage_result
+from .gemini_service import (
+    GeminiConfigurationError, GeminiRequestError, _parse_json_candidate,
+    generate_idea_stage, _validate_stage_result,
+)
 
 
 def valid_result(stage):
@@ -39,18 +42,78 @@ def valid_result(stage):
 
 
 class GeminiWorkflowTests(SimpleTestCase):
-    @patch.dict(os.environ, {'GEMINI_API_KEY': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': '', 'GROQ_API_KEY': ''})
     def test_missing_gemini_key_returns_actionable_configuration_error(self):
-        with self.assertRaisesRegex(GeminiConfigurationError, 'GEMINI_API_KEY'):
+        with self.assertRaisesRegex(GeminiConfigurationError, 'GEMINI_API_KEY.*GROQ_API_KEY'):
             generate_idea_stage(stage='research', idea='An idea', project_type='Startup', project_details={})
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': '', 'GROQ_API_KEY': ''})
     def test_missing_key_is_reported_as_service_unavailable(self):
         response = APIClient().post('/api/ideas/workflow-stage/', {
             'stage': 'research', 'idea': 'An idea', 'project_type': 'Startup',
         }, format='json')
         self.assertEqual(response.status_code, 503)
         self.assertIn('GEMINI_API_KEY', response.json()['error'])
+
+    @patch.dict(os.environ, {
+        'GEMINI_API_KEY': 'gemini-test-key',
+        'GEMINI_MODEL': 'test-model',
+        'GEMINI_FALLBACK_MODELS': '',
+        'GROQ_API_KEY': 'groq-test-key',
+    })
+    @patch('apps.core.gemini_service._generate_groq_content')
+    @patch('apps.core.gemini_service._generate_content')
+    def test_groq_is_used_when_gemini_request_fails(self, generate, groq_generate):
+        output = valid_result('research')
+        body = {'candidates': [{'content': {'parts': [{'text': json.dumps(output)}]}, 'finishReason': 'STOP'}]}
+        generate.side_effect = GeminiRequestError('Gemini unavailable', retryable=True)
+        groq_generate.return_value = body
+
+        result = generate_idea_stage(stage='research', idea='Taxi booking', project_type='Startup', project_details={})
+
+        self.assertEqual(result, output)
+        self.assertEqual(generate.call_count, 2)
+        groq_generate.assert_called_once()
+
+    @patch.dict(os.environ, {'GEMINI_API_KEY': '', 'GROQ_API_KEY': 'groq-test-key'})
+    @patch('apps.core.gemini_service._generate_groq_content')
+    @patch('apps.core.gemini_service._generate_content')
+    def test_groq_is_used_when_gemini_is_not_configured(self, generate, groq_generate):
+        groq_generate.return_value = {
+            'candidates': [{'content': {'parts': [{'text': 'A generated test plan.'}]}, 'finishReason': 'STOP'}],
+        }
+
+        from .gemini_service import call_gemini
+        self.assertEqual(call_gemini('Create a test plan.'), 'A generated test plan.')
+
+        generate.assert_not_called()
+        groq_generate.assert_called_once()
+
+    @patch('apps.core.gemini_service.urlopen')
+    def test_groq_adapter_preserves_structured_json_mode(self, urlopen_mock):
+        from .gemini_service import _generate_groq_content
+        response = urlopen_mock.return_value.__enter__.return_value
+        response.read.return_value = json.dumps({
+            'choices': [{'message': {'content': '{"summary":"ready"}'}, 'finish_reason': 'stop'}],
+        }).encode()
+        payload = {
+            'contents': [{'role': 'user', 'parts': [{'text': 'Return JSON.'}]}],
+            'generationConfig': {
+                'temperature': 0.2,
+                'maxOutputTokens': 500,
+                'responseMimeType': 'application/json',
+                'responseSchema': {'type': 'object', 'properties': {'summary': {'type': 'string'}}},
+            },
+        }
+
+        body = _generate_groq_content(payload, 'test-model', 'test-key')
+
+        request = urlopen_mock.call_args.args[0]
+        sent = json.loads(request.data.decode())
+        self.assertEqual(sent['response_format'], {'type': 'json_object'})
+        self.assertEqual(sent['max_tokens'], 500)
+        self.assertIn(json.dumps(payload['generationConfig']['responseSchema']), sent['messages'][0]['content'])
+        self.assertEqual(_parse_json_candidate(body), {'summary': 'ready'})
 
     def test_parser_uses_final_text_not_thought_parts(self):
         result = _parse_json_candidate({
@@ -64,7 +127,7 @@ class GeminiWorkflowTests(SimpleTestCase):
         })
         self.assertEqual(result['summary'], 'Focus')
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'primary-model', 'GEMINI_FALLBACK_MODELS': 'fallback-model'})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'primary-model', 'GEMINI_FALLBACK_MODELS': 'fallback-model', 'GROQ_API_KEY': ''})
     @patch('apps.core.gemini_service.time.sleep')
     @patch('apps.core.gemini_service._generate_content')
     def test_busy_primary_retries_then_uses_fallback(self, generate, _sleep):
@@ -95,6 +158,211 @@ class GeminiWorkflowTests(SimpleTestCase):
             with self.assertRaises(GeminiRequestError):
                 _validate_stage_result(stage, {'summary': 'partial'})
 
+
+class GlimpseGenerationTests(SimpleTestCase):
+    @patch.dict(os.environ, {
+        'GEMINI_API_KEY': 'gemini-test-key',
+        'GEMINI_MODEL': 'test-model',
+        'GEMINI_FALLBACK_MODELS': '',
+        'GROQ_API_KEY': 'groq-test-key',
+        'GROQ_MODEL': 'test-groq-model',
+    })
+    @patch('apps.core.gemini_service._generate_groq_content')
+    @patch('apps.core.gemini_service._generate_content')
+    def test_chat_uses_groq_when_gemini_fails(self, gemini, groq):
+        from .gemini_service import generate_glimpse_response
+        expected = {
+            'title': 'Habit Studio',
+            'explanation': 'Generated with the fallback provider.',
+            'html': '<html><body><h1>Habit Studio</h1></body></html>',
+            'css': 'body { color: #222; }',
+            'js': '',
+            'assumptions': [],
+        }
+        gemini.side_effect = GeminiRequestError('Gemini unavailable', retryable=True)
+        groq.return_value = {
+            'candidates': [{
+                'content': {'parts': [{'text': json.dumps(expected)}]},
+                'finishReason': 'STOP',
+            }],
+        }
+
+        result = generate_glimpse_response(
+            action='generate',
+            prompt='Build a habit tracking website.',
+            conversation=[],
+            website={},
+        )
+
+        self.assertEqual(result, expected)
+        gemini.assert_called_once()
+        groq.assert_called_once()
+        self.assertEqual(groq.call_args.args[1], 'test-groq-model')
+        self.assertEqual(groq.call_args.args[2], 'groq-test-key')
+
+    @patch.dict(os.environ, {
+        'GEMINI_API_KEY': 'gemini-test-key',
+        'GEMINI_MODEL': 'test-model',
+        'GEMINI_FALLBACK_MODELS': '',
+        'GROQ_API_KEY': 'groq-test-key',
+        'GROQ_MODEL': 'test-groq-model',
+    })
+    @patch('apps.core.gemini_service._generate_groq_content')
+    @patch('apps.core.gemini_service._generate_content')
+    def test_chat_retries_gemini_when_groq_fallback_fails(self, gemini, groq):
+        from .gemini_service import generate_glimpse_response
+        expected = {
+            'title': 'Habit Studio',
+            'explanation': 'Generated after retrying Gemini.',
+            'html': '<html><body><h1>Habit Studio</h1></body></html>',
+            'css': 'body { color: #222; }',
+            'js': '',
+            'assumptions': [],
+        }
+        gemini.side_effect = [
+            GeminiRequestError('Gemini temporarily unavailable', retryable=True),
+            {'candidates': [{
+                'content': {'parts': [{'text': json.dumps(expected)}]},
+                'finishReason': 'STOP',
+            }]},
+        ]
+        groq.side_effect = GeminiRequestError('Groq rate limit reached', retryable=True)
+
+        result = generate_glimpse_response(
+            action='generate',
+            prompt='Build a habit tracking website.',
+            conversation=[],
+            website={},
+        )
+
+        self.assertEqual(result, expected)
+        self.assertEqual(gemini.call_count, 2)
+        groq.assert_called_once()
+
+    @patch.dict(os.environ, {
+        'GEMINI_API_KEY': 'gemini-test-key',
+        'GEMINI_MODEL': 'test-model',
+        'GEMINI_FALLBACK_MODELS': '',
+        'GROQ_API_KEY': '',
+    })
+    @patch('apps.core.gemini_service._generate_content')
+    def test_initial_request_returns_validated_website_files(self, generate):
+        from .gemini_service import generate_glimpse_response
+        website = {
+            'title': 'Habit Studio',
+            'explanation': 'Created a responsive landing page.',
+            'html': '<!doctype html><html><body><main><h1>Habits</h1></main></body></html>',
+            'css': 'body { color: #222; }',
+            'js': 'document.querySelector("h1").textContent = "Habit Studio";',
+            'assumptions': [],
+        }
+        generate.return_value = {
+            'candidates': [{
+                'content': {'parts': [{'text': json.dumps(website)}]},
+                'finishReason': 'STOP',
+            }],
+        }
+
+        result = generate_glimpse_response(
+            action='generate',
+            prompt='Build a habit tracker landing page.',
+            conversation=[],
+            website={},
+        )
+
+        self.assertEqual(result, website)
+        payload = generate.call_args.args[0]
+        prompt = payload['contents'][-1]['parts'][0]['text']
+        self.assertIn('vanilla JavaScript only', prompt)
+        self.assertIn('Build a habit tracker landing page.', prompt)
+
+    @patch.dict(os.environ, {
+        'GEMINI_API_KEY': 'gemini-test-key',
+        'GEMINI_MODEL': 'test-model',
+        'GEMINI_FALLBACK_MODELS': '',
+        'GROQ_API_KEY': '',
+    })
+    @patch('apps.core.gemini_service._generate_content')
+    def test_mvp_action_returns_prompt_only(self, generate):
+        from .gemini_service import generate_glimpse_response
+        prompt = 'Build this prototype as a production MVP with auth and persistent data.'
+        generate.return_value = {
+            'candidates': [{
+                'content': {'parts': [{'text': json.dumps({'mvp_prompt': prompt})}]},
+                'finishReason': 'STOP',
+            }],
+        }
+
+        result = generate_glimpse_response(
+            action='mvp_prompt',
+            prompt='',
+            conversation=[],
+            website={'title': 'Prototype', 'html': '<main>Demo</main>', 'css': '', 'js': ''},
+        )
+
+        self.assertEqual(result, {'mvp_prompt': prompt})
+
+    @patch.dict(os.environ, {
+        'GEMINI_API_KEY': 'gemini-test-key',
+        'GEMINI_MODEL': 'test-model',
+        'GEMINI_FALLBACK_MODELS': '',
+        'GROQ_API_KEY': '',
+    })
+    @patch('apps.core.gemini_service._generate_content')
+    def test_edit_request_includes_previous_files_and_conversation(self, generate):
+        from .gemini_service import generate_glimpse_response
+        updated = {
+            'title': 'Habit Studio',
+            'explanation': 'Added pricing without changing the existing tracker.',
+            'html': '<html><body><main><h1>Habit tracker</h1><section>Pricing</section></main></body></html>',
+            'css': 'main { color: #222; }',
+            'js': 'window.trackerReady = true;',
+            'assumptions': [],
+        }
+        generate.return_value = {
+            'candidates': [{
+                'content': {'parts': [{'text': json.dumps(updated)}]},
+                'finishReason': 'STOP',
+            }],
+        }
+
+        result = generate_glimpse_response(
+            action='edit',
+            prompt='Add pricing but keep the tracker working.',
+            conversation=[{'role': 'assistant', 'content': 'The tracker is ready.'}],
+            website={
+                'title': 'Habit Studio',
+                'html': '<main>Existing tracker</main>',
+                'css': 'main { color: #222; }',
+                'js': 'window.trackerReady = true;',
+            },
+        )
+
+        prompt = generate.call_args.args[0]['contents']
+        self.assertEqual(result['title'], 'Habit Studio')
+        self.assertEqual(prompt[0]['role'], 'model')
+        self.assertIn('Existing tracker', prompt[-1]['parts'][0]['text'])
+        self.assertIn('Add pricing but keep the tracker working.', prompt[-1]['parts'][0]['text'])
+
+    @patch('apps.core.idea_views.generate_glimpse_response')
+    def test_glimpse_endpoint_validates_and_returns_generated_site(self, generate):
+        client = APIClient()
+        generate.return_value = {'title': 'Demo', 'html': '<main>Demo</main>', 'css': '', 'js': ''}
+        response = client.post('/api/glimpse/generate/', {
+            'action': 'generate', 'prompt': 'Build a demo',
+        }, format='json', HTTP_HOST='127.0.0.1')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['title'], 'Demo')
+
+    def test_glimpse_endpoint_requires_prompt_before_generation(self):
+        response = APIClient().post(
+            '/api/glimpse/generate/',
+            {'action': 'generate', 'prompt': '  '},
+            format='json',
+            HTTP_HOST='127.0.0.1',
+        )
+        self.assertEqual(response.status_code, 400)
 
 class ProjectDraftPersistenceTests(TestCase):
     def test_draft_create_and_refresh_read(self):
@@ -229,7 +497,7 @@ class ProjectLearningTests(TestCase):
         response = self.client.post(url, {'task_key': '8-4', 'resources': []}, format='json')
         self.assertEqual(response.status_code, 404)
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': '', 'GROQ_API_KEY': ''})
     def test_tutor_reports_missing_gemini_without_breaking_learning_state(self):
         url = f'/api/projects/drafts/{self.draft.id}/learning/tutor/'
         response = self.client.post(url, {'question': 'What is an API?', 'level': 'beginner', 'task': {}}, format='json')
@@ -777,7 +1045,7 @@ class RepositoryFindingExplanationTests(SimpleTestCase):
         }, format='json')
         self.assertEqual(response.status_code, 400)
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': '', 'GROQ_API_KEY': ''})
     def test_missing_gemini_key_leaves_deterministic_results_available(self):
         response = APIClient().post(self.endpoint, {
             'repository': 'sample/app', 'title': 'Finding', 'category': 'Integration', 'severity': 'medium',
@@ -832,7 +1100,7 @@ class GeminiPayloadFormatTests(SimpleTestCase):
         def fake_generate(payload, model, api_key):
             captured['payload'] = payload
             return body
-        with patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'}):
+        with patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GROQ_API_KEY': ''}):
             with patch('apps.core.gemini_service._generate_content', side_effect=fake_generate):
                 from .gemini_service import generate_idea_stage
                 generate_idea_stage(stage=stage, idea='Taxi app', project_type='Startup', project_details={})
@@ -855,7 +1123,7 @@ class GeminiPayloadFormatTests(SimpleTestCase):
         mime = self._capture_payload('feasibility').get('generationConfig', {}).get('responseMimeType', '')
         self.assertEqual(mime, mime.lower())
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key'})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GROQ_API_KEY': ''})
     @patch('apps.core.gemini_service._generate_content')
     def test_explain_finding_payload_uses_correct_format(self, generate):
         from .gemini_service import explain_repository_finding
@@ -879,7 +1147,7 @@ class GeminiPayloadFormatTests(SimpleTestCase):
 
 
 class GeminiTaskAllocationTests(SimpleTestCase):
-    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'test-model', 'GEMINI_FALLBACK_MODELS': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'test-model', 'GEMINI_FALLBACK_MODELS': '', 'GROQ_API_KEY': ''})
     @patch('apps.core.gemini_service._generate_content')
     def test_structured_allocation_is_validated_against_real_task_and_member_ids(self, generate):
         from .gemini_service import generate_task_allocation
@@ -891,7 +1159,7 @@ class GeminiTaskAllocationTests(SimpleTestCase):
         self.assertEqual(config['responseMimeType'], 'application/json')
         self.assertIn('responseSchema', config)
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'test-model', 'GEMINI_FALLBACK_MODELS': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'test-model', 'GEMINI_FALLBACK_MODELS': '', 'GROQ_API_KEY': ''})
     @patch('apps.core.gemini_service._generate_content')
     def test_gemini_cannot_assign_a_non_member(self, generate):
         from .gemini_service import generate_task_allocation
@@ -1602,7 +1870,7 @@ class MarketingGenerationServiceTests(SimpleTestCase):
         import json
         return {'candidates': [{'content': {'parts': [{'text': json.dumps(result)}]}}]}
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'test-model', 'GEMINI_FALLBACK_MODELS': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'test-model', 'GEMINI_FALLBACK_MODELS': '', 'GROQ_API_KEY': ''})
     @patch('apps.core.gemini_service._generate_content')
     def test_social_requires_three_distinct_structured_variations(self, generate):
         from apps.core.gemini_service import generate_marketing_content
@@ -1614,7 +1882,7 @@ class MarketingGenerationServiceTests(SimpleTestCase):
         with self.assertRaisesRegex(GeminiRequestError, 'repeated a social variation'):
             generate_marketing_content(mode='social', inputs={'topic': 'A useful topic'})
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'test-model', 'GEMINI_FALLBACK_MODELS': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': 'test-key', 'GEMINI_MODEL': 'test-model', 'GEMINI_FALLBACK_MODELS': '', 'GROQ_API_KEY': ''})
     @patch('apps.core.gemini_service._generate_content')
     def test_campaign_days_and_repurpose_format_choices_are_validated(self, generate):
         from apps.core.gemini_service import generate_marketing_content
@@ -1628,7 +1896,7 @@ class MarketingGenerationServiceTests(SimpleTestCase):
         with self.assertRaisesRegex(GeminiRequestError, 'formats that do not match'):
             generate_marketing_content(mode='repurpose', inputs={'formats': ['Demo narration']})
 
-    @patch.dict(os.environ, {'GEMINI_API_KEY': ''})
+    @patch.dict(os.environ, {'GEMINI_API_KEY': '', 'GROQ_API_KEY': ''})
     def test_missing_gemini_configuration_is_actionable(self):
         from apps.core.gemini_service import GeminiConfigurationError, generate_marketing_content
         with self.assertRaisesRegex(GeminiConfigurationError, 'GEMINI_API_KEY'):

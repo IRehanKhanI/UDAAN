@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Glimpse — AI Website Workspace</title>
+    <link rel="stylesheet" href="/glimpse/styles.css">
+  </head>
+  <body>
+    <main class="workspace">
+      <section class="preview-column" aria-label="Website preview workspace">
+        <header class="workspace-bar">
+          <div class="brand-lockup">
+            <span class="brand-mark" aria-hidden="true">G</span>
+            <div><strong>Glimpse</strong><span>AI website workspace</span></div>
+          </div>
+          <div class="workspace-actions">
+            <button id="code-button" class="tool-button" type="button" disabled>Code</button>
+            <button id="export-button" class="tool-button" type="button" disabled>Export</button>
+            <button id="mvp-button" class="tool-button tool-button-accent" type="button" disabled>Turn into an MVP</button>
+          </div>
+        </header>
+
+        <section class="browser">
+          <header class="browser-toolbar">
+            <div class="browser-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+            <div class="address-bar"><span aria-hidden="true">◉</span><span id="preview-address">Your live preview</span></div>
+            <div class="browser-tools">
+              <div class="device-switch" role="group" aria-label="Preview size">
+                <button type="button" class="device-button selected" data-device="desktop" aria-pressed="true" aria-label="Desktop preview">Desktop</button>
+                <button type="button" class="device-button" data-device="tablet" aria-pressed="false" aria-label="Tablet preview">Tablet</button>
+                <button type="button" class="device-button" data-device="mobile" aria-pressed="false" aria-label="Mobile preview">Mobile</button>
+              </div>
+              <button id="refresh-button" class="icon-button" type="button" aria-label="Refresh preview" title="Refresh preview">↻</button>
+              <button id="fullscreen-button" class="icon-button" type="button" aria-label="Fullscreen preview" title="Fullscreen preview">⛶</button>
+            </div>
+          </header>
+          <div id="preview-stage" class="preview-stage">
+            <div id="welcome" class="welcome">
+              <div class="welcome-orbit" aria-hidden="true"><span>✦</span><i></i><b></b></div>
+              <p class="eyebrow">A blank canvas, a big idea</p>
+              <h1>Build a website<br><em>by describing it.</em></h1>
+              <p class="welcome-copy">Tell Glimpse what you have in mind. Your first version appears here, ready to shape together.</p>
+              <div class="examples" aria-label="Example prompts">
+                <button type="button" class="example" data-prompt="Build a modern SaaS landing page for a mindful habit-tracking app, with a clear hero, feature cards, pricing, and a responsive navigation.">Modern SaaS landing page <span>↗</span></button>
+                <button type="button" class="example" data-prompt="Create a polished analytics dashboard for tracking personal fitness goals, with interactive progress cards, charts built with CSS, and date filters.">Fitness analytics dashboard <span>↗</span></button>
+                <button type="button" class="example" data-prompt="Design a premium online sneaker store with a product grid, category filters, search, and an interactive shopping bag.">Premium sneaker storefront <span>↗</span></button>
+                <button type="button" class="example" data-prompt="Build a personal portfolio with an editorial layout, project cards, contact form, and an accessible dark mode toggle.">Portfolio with dark mode <span>↗</span></button>
+              </div>
+            </div>
+            <div id="loading" class="loading-state" hidden aria-live="polite">
+              <div class="loader-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+              <strong id="loading-title">Building your website</strong>
+              <p>Designing the page and wiring up its interactions…</p>
+              <div class="loading-line"><i></i></div>
+            </div>
+            <iframe id="site-preview" title="Generated website preview" sandbox="allow-scripts" hidden></iframe>
+            <div id="preview-error" class="preview-error" hidden role="alert"></div>
+          </div>
+          <footer class="preview-footer">
+            <span><i class="status-dot"></i><span id="preview-status">Ready for your first idea</span></span>
+            <span class="sandbox-note">Isolated preview · external services are blocked</span>
+          </footer>
+        </section>
+      </section>
+
+      <aside class="chat-panel" aria-label="Glimpse AI conversation">
+        <header class="chat-header">
+          <div class="chat-avatar" aria-hidden="true">✳</div>
+          <div><strong>Your design partner</strong><span>Describe it. Refine it. Make it yours.</span></div>
+          <span class="online-dot" title="AI service available when configured"></span>
+        </header>
+        <div id="messages" class="messages" role="log" aria-live="polite" aria-relevant="additions text">
+          <div class="welcome-message">
+            <span class="message-time">GLIMPSE · HERE TO HELP</span>
+            <p>What should we create today? Describe a website, dashboard, storefront, or anything else you can imagine.</p>
+            <span class="message-hint">Tip: you can ask for changes at any time.</span>
+          </div>
+        </div>
+        <div id="chat-error" class="chat-error" hidden role="alert"></div>
+        <div class="composer-wrap">
+          <label class="sr-only" for="prompt-input">Describe a website or requested change</label>
+          <textarea id="prompt-input" rows="3" maxlength="3000" placeholder="Describe the website you want to build…" spellcheck="true"></textarea>
+          <div class="composer-bottom">
+            <span>Enter to send · Shift + Enter for a new line</span>
+            <button id="send-button" class="send-button" type="button" aria-label="Send message"><span>Build</span><b aria-hidden="true">↑</b></button>
+          </div>
+        </div>
+        <p class="chat-disclaimer">AI-generated code runs in an isolated preview. Review before using in production.</p>
+      </aside>
+    </main>
+
+    <dialog id="code-dialog" class="modal">
+      <div class="modal-heading"><div><span class="eyebrow">YOUR WEBSITE SOURCE</span><h2>Code inspection</h2></div><button class="icon-button close-dialog" type="button" aria-label="Close code inspection">×</button></div>
+      <div class="code-tabs" role="tablist" aria-label="Website files">
+        <button type="button" role="tab" class="active" data-code-tab="html" aria-selected="true">index.html</button>
+        <button type="button" role="tab" data-code-tab="css" aria-selected="false">styles.css</button>
+        <button type="button" role="tab" data-code-tab="js" aria-selected="false">script.js</button>
+      </div>
+      <div class="code-toolbar"><span id="code-filename">index.html</span><button id="copy-code-button" type="button" class="small-button">Copy file</button></div>
+      <pre class="code-view"><code id="code-content"></code></pre>
+    </dialog>
+
+    <dialog id="mvp-dialog" class="modal mvp-modal">
+      <div class="modal-heading"><div><span class="eyebrow">PROTOTYPE → PRODUCT</span><h2>Your MVP conversion prompt</h2></div><button class="icon-button close-dialog" type="button" aria-label="Close MVP prompt">×</button></div>
+      <p class="modal-intro">A detailed specification based on the website you built. This prompt is a handoff—not an implemented backend or production MVP.</p>
+      <div id="mvp-loading" class="mvp-loading" hidden><span class="loader-small"></span>Analyzing your website and preparing the handoff…</div>
+      <pre id="mvp-content" class="mvp-content" tabindex="0"></pre>
+      <div class="modal-actions"><span id="mvp-status" role="status"></span><button id="copy-mvp-button" class="primary-button" type="button" disabled>Copy prompt</button></div>
+    </dialog>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/glimpse/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,56 @@
+.glimpse-page {
+  height: 100dvh;
+  min-height: 680px;
+  overflow: hidden;
+}
+
+.glimpse-layout {
+  height: 100%;
+  min-height: 0;
+}
+
+.glimpse-main {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  padding-top: 6rem;
+  padding-bottom: 1.25rem;
+}
+
+.glimpse-frame {
+  display: block;
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+@media (max-width: 1023px) {
+  .glimpse-page {
+    height: 100dvh;
+  }
+}
+
+@media (max-width: 680px) {
+  .glimpse-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .glimpse-layout {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .glimpse-main {
+    flex: none;
+    min-height: 100dvh;
+    padding-top: 6rem;
+    padding-bottom: 1rem;
+  }
+
+  .glimpse-frame {
+    flex: none;
+    height: max(760px, calc(100dvh - 7rem));
+  }
+}

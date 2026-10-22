@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowDownToLine, ArrowRight, Bookmark, Check, ChevronDown, Copy, FileText, Megaphone, Menu, MessageSquareText, Pencil, RefreshCw, Search, Send, Sparkles, WandSparkles, X } from 'lucide-react'
+import { ArrowRight, Bookmark, Check, ChevronDown, Copy, FileText, Megaphone, MessageSquareText, Pencil, RefreshCw, Search, Sparkles, WandSparkles, X } from 'lucide-react'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
@@ -10,10 +10,7 @@ import { deleteMarketingContent, generateMarketingContent, listMarketingContent,
 import './MarketingStudio.css'
 
 const tabs = [
-  { id: 'create', label: 'Create content', mode: 'social', icon: Sparkles },
-  { id: 'showcase', label: 'Project showcase', mode: 'showcase', icon: Megaphone },
-  { id: 'repurpose', label: 'Repurpose', mode: 'repurpose', icon: RefreshCw },
-  { id: 'campaign', label: 'Campaign planner', mode: 'campaign', icon: FileText },
+  { id: 'create', label: 'Create content', mode: null, icon: Sparkles },
   { id: 'saved', label: 'Saved content', mode: null, icon: Bookmark },
 ]
 const contentTypes = [
@@ -28,7 +25,7 @@ const tones = ['Professional', 'Conversational', 'Storytelling', 'Educational', 
 const formats = ['LinkedIn post', 'Instagram caption', '5–8 slide carousel outline', '30–60 second video script', 'X post or thread', 'Demo narration', 'Promotional email']
 const showcaseTypes = ['Project launch announcement', 'Build-in-public update', 'Portfolio description', 'Hackathon introduction', 'Demo-day announcement', 'Feature launch', 'Team achievement', 'GitHub repository description', 'README introduction', 'Elevator pitch']
 const toolTypes = ['Product description', 'Landing-page copy', 'Startup elevator pitch', 'Event announcement', 'Personal brand introduction', 'Educational post', 'Internship announcement', 'Achievement announcement', 'Demo-day script', 'Promotional email', 'Audience-specific messaging', 'Call to action variations', 'Headline variations', 'Custom request']
-const navCopy = { create: 'Social post', showcase: 'Project showcase', repurpose: 'Repurpose', campaign: 'Campaign', tool: 'Marketing tool' }
+const navCopy = { social: 'Social post', showcase: 'Project showcase', repurpose: 'Repurpose', campaign: 'Campaign', tool: 'Marketing tool' }
 
 function normalizeProject(project) {
   const understanding = project.understanding || {}
@@ -175,16 +172,6 @@ export default function MarketingStudio() {
     try { await navigator.clipboard.writeText(item.body); setCopying(item.localKey || item.id); setNotice('Content copied to clipboard.') }
     catch { setError('Clipboard access was blocked by the browser. Select the text and copy it manually.') }
   }
-  const downloadResult = item => {
-    try {
-      const file = new Blob([`${item.title}\n\n${item.body}`], { type: 'text/plain;charset=utf-8' })
-      const url = URL.createObjectURL(file)
-      const link = document.createElement('a')
-      link.href = url; link.download = `${(item.title || 'marketing-draft').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'marketing-draft'}.txt`
-      link.click(); URL.revokeObjectURL(url); setNotice('Draft downloaded as a text file.')
-    } catch { setError('The browser could not download this draft.') }
-  }
-
   const saveResult = async item => {
     setError(''); setNotice('')
     const payload = { title: item.title || 'Untitled draft', body: item.body, content_type: item.content_type || mode, platform: item.platform || item.format || '', project_id: item.project || selectedProject?.id || null, generation_inputs: item.generation_inputs || generationInputs, status: 'saved' }
@@ -280,13 +267,10 @@ export default function MarketingStudio() {
                     <div className="ms-form-foot"><span><Sparkles size={14} /> {selectedProject ? 'Uses your saved project details and repository evidence.' : 'Custom mode supports unrelated creative requests.'} No live trend research is configured.</span><button className="ms-primary" type="submit" disabled={generationBusy}>{generationBusy ? <><span className="ms-spinner" /> Creating drafts…</> : <><Sparkles size={15} /> Generate content <ArrowRight size={15} /></>}</button></div>
                   </form>
                 </div>
-                <aside className="ms-side-panel"><div className="ms-side-card"><span className="ms-eyebrow">QUICK START</span><h3>Start with a format</h3><p>Pick a useful output, then tailor the brief.</p>{contentTypes.map(type => <button className="ms-quick-action" key={type.mode} onClick={() => { setMode(type.mode); setActiveTab(type.mode === 'showcase' ? 'showcase' : type.mode === 'repurpose' ? 'repurpose' : type.mode === 'campaign' ? 'campaign' : 'create') }}><span><type.icon size={15} /></span><b>{type.title}</b><ArrowRight size={13} /></button>)}</div>
-                  <div className="ms-side-card ms-recent-card"><div className="ms-side-head"><div><span className="ms-eyebrow">RECENTLY SAVED</span><h3>Your library</h3></div><button onClick={() => switchTab('saved')}>View all <ArrowRight size={13} /></button></div>{library.slice(0, 3).length ? library.slice(0, 3).map(item => <button className="ms-recent-item" key={item.id} onClick={() => openSaved(item)}><span>{item.title}</span><small>{item.project_name || 'Custom content'} · {dateLabel(item.updated_at)}</small></button>) : <p className="ms-recent-empty">Your saved drafts will appear here.</p>}</div>
-                </aside>
               </section>
               {mode === 'repurpose' && activeTab === 'repurpose' && <p className="ms-repurpose-hint">Choose the formats above. UDAAN will create one draft for each selected format, preserving the original source meaning.</p>}
               {approach && results.length > 0 && <div className="ms-approach"><Sparkles size={15} /><div><b>Creative direction</b><span>{approach}</span></div></div>}
-              {results.length > 0 && <section className="ms-results"><div className="ms-results-heading"><div><span className="ms-eyebrow">YOUR DRAFTS</span><h2>Review, edit and choose a favorite</h2><p>{results.length} editable option{results.length === 1 ? '' : 's'} · nothing is published automatically</p></div><button className="ms-secondary" onClick={generate} disabled={generationBusy}><RefreshCw size={14} /> Regenerate set</button></div><div className="ms-result-grid">{results.map((item, index) => <ResultCard key={item.localKey || item.id || index} item={item} index={index} busy={refineBusy} copying={copying} tone={inputs.tone} onChange={(key, value) => setResults(current => current.map(row => row === item ? { ...row, [key]: value } : row))} onCopy={() => void copyResult(item)} onDownload={() => downloadResult(item)} onSave={() => void saveResult(item)} onRefine={action => void refine(item, action)} onRepurpose={() => repurposeResult(item)} />)}</div></section>}
+              {results.length > 0 && <section className="ms-results"><div className="ms-results-heading"><div><span className="ms-eyebrow">YOUR DRAFTS</span><h2>Review, edit and choose a favorite</h2><p>{results.length} editable option{results.length === 1 ? '' : 's'} · nothing is published automatically</p></div><button className="ms-secondary" onClick={generate} disabled={generationBusy}><RefreshCw size={14} /> Regenerate set</button></div>              <div className="ms-result-grid">{results.map((item, index) => <ResultCard key={item.localKey || item.id || index} item={item} index={index} busy={refineBusy} copying={copying} tone={inputs.tone} onChange={(key, value) => setResults(current => current.map(row => row === item ? { ...row, [key]: value } : row))} onCopy={() => void copyResult(item)} onSave={() => void saveResult(item)} onRefine={action => void refine(item, action)} onRepurpose={() => repurposeResult(item)} />)}</div></section>}
             </>}
           </div>
         </main>
@@ -297,15 +281,15 @@ export default function MarketingStudio() {
 
 function ContentTypeCard({ item, selected, onClick }) { const Icon = item.icon; return <button type="button" className={`ms-type-card ${selected ? 'selected' : ''}`} onClick={onClick}><span className="ms-type-icon"><Icon size={17} /></span><b>{item.title}</b><small>{item.subtitle}</small></button> }
 function EmptyState({ title, copy }) { return <div className="ms-empty"><span className="ms-empty-icon"><Bookmark size={19} /></span><h3>{title}</h3><p>{copy}</p></div> }
-function ResultCard({ item, index, busy, copying, tone, onChange, onCopy, onDownload, onSave, onRefine, onRepurpose }) {
+function ResultCard({ item, index, busy, copying, tone, onChange, onCopy, onSave, onRefine, onRepurpose }) {
   const key = item.localKey || item.id
   const refinements = [['improve hook', 'Improve hook'], ['shorten', 'Shorten'], ['expand', 'Expand'], ['change tone', 'Change tone']]
-  return <article className="ms-result-card"><header><div><span className="ms-result-kicker">{item.day ? `DAY ${item.day}` : `OPTION ${index + 1}`}</span><span className="ms-result-platform">{item.platform || item.format}</span></div><button type="button" className={`ms-favorite ${item.favorite ? 'selected' : ''}`} title={item.favorite ? 'Favorite' : 'Mark favorite'} onClick={() => onChange('favorite', !item.favorite)}><span>{item.favorite ? '★' : '☆'}</span></button></header>
+  return <article className="ms-result-card"><header><div><span className="ms-result-kicker">{item.day ? `DAY ${item.day}` : `OPTION ${index + 1}`}</span><span className="ms-result-platform">{item.platform || item.format}</span></div></header>
     <label className="ms-result-title"><span>Title / hook</span><input value={item.title || ''} onChange={event => onChange('title', event.target.value)} /></label>
     {item.objective && <span className="ms-objective">{item.objective}</span>}
     <label className="ms-result-body"><span>Editable content</span><textarea rows={Math.min(18, Math.max(7, (item.body || '').split('\n').length + 3))} value={item.body || ''} onChange={event => onChange('body', event.target.value)} /></label>
     {item.rationale && <p className="ms-rationale"><Sparkles size={12} />{item.rationale}</p>}
-    <div className="ms-result-actions"><button onClick={onCopy}><Copy size={13} />{copying === key ? 'Copied' : 'Copy'}</button><button onClick={onDownload}><ArrowDownToLine size={13} /> Export</button><button className="ms-save-draft" onClick={onSave}><Bookmark size={13} />{item.id ? 'Save edits' : item.saved ? 'Saved' : 'Save to library'}</button></div>
+    <div className="ms-result-actions"><button onClick={onCopy}><Copy size={13} />{copying === key ? 'Copied' : 'Copy'}</button><button className="ms-save-draft" onClick={onSave}><Bookmark size={13} />{item.id ? 'Save edits' : item.saved ? 'Saved' : 'Save to library'}</button></div>
     <details className="ms-refine"><summary><WandSparkles size={13} /> Refine this draft</summary><div>{refinements.map(([action, label]) => <button key={action} disabled={busy === `${key}:${action}`} onClick={() => onRefine(action)}>{busy === `${key}:${action}` ? <span className="ms-spinner" /> : <Sparkles size={12} />}{label}</button>)}<button disabled={busy === `${key}:regenerate`} onClick={() => onRefine('regenerate')}><RefreshCw size={12} />Regenerate</button><button onClick={onRepurpose}><ArrowRight size={12} />Repurpose</button></div><small>Change tone uses the selected “{tone}” tone. Original request settings are retained.</small></details>
   </article>
 }

@@ -250,7 +250,7 @@ function buildChecklist(health, passport, runs) {
     detail: passport?.is_published
       ? `Published at: ${passport.public_url}`
       : 'Publish your Project Passport so judges can view your verified score.',
-    fixLink: '/#mission-control',
+    fixLink: '/',
   })
 
   // Overall score item
@@ -452,8 +452,8 @@ export default function Verification() {
                   <p>Share a verified, tamper-proof snapshot of your project with judges and stakeholders.</p>
                 </div>
               </div>
-              <Link to="/#mission-control" className="vr-passport-cta-btn">
-                View Project Health <ArrowRight size={14} />
+              <Link to="/" className="vr-passport-cta-btn">
+                Back to Overview <ArrowRight size={14} />
               </Link>
             </section>
           )}

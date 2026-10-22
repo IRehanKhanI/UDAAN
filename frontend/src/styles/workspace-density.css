@@ -1,0 +1,81 @@
+@media (min-width: 1024px) {
+  main.ud-main,
+  main[class*="max-w-7xl"] {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .ud-content.ud-home-content,
+  .mp-content,
+  .tw-content,
+  .ud-analysis-main,
+  .fp-content,
+  .learn-content,
+  .ms-content,
+  .tp-content,
+  .rp-content,
+  .dp-content,
+  .vr-main,
+  .ps-content,
+  .mc-content {
+    width: 100% !important;
+    max-width: none !important;
+    box-sizing: border-box;
+  }
+
+  .ud-content.ud-home-content {
+    padding: 46px clamp(28px, 3.2vw, 58px) 54px !important;
+  }
+
+  .mp-content,
+  .tw-content,
+  .ud-analysis-main,
+  .fp-content,
+  .learn-content,
+  .ms-content,
+  .tp-content,
+  .rp-content,
+  .dp-content,
+  .vr-main,
+  .ps-content,
+  .mc-content {
+    padding-right: clamp(28px, 3vw, 54px) !important;
+    padding-left: clamp(28px, 3vw, 54px) !important;
+  }
+}
+
+@media (min-width: 681px) {
+  main :is(button, input, select, textarea, label, p, small) {
+    font-size: max(1em, 12px) !important;
+  }
+
+  main :is(h1, h2, h3) {
+    line-height: 1.25;
+  }
+}
+
+@media (max-width: 1023px) and (min-width: 681px) {
+  main.ud-main,
+  main[class*="max-w-7xl"] {
+    width: 100%;
+    max-width: none;
+  }
+
+  .ud-content.ud-home-content,
+  .mp-content,
+  .tw-content,
+  .ud-analysis-main,
+  .fp-content,
+  .learn-content,
+  .ms-content,
+  .tp-content,
+  .rp-content,
+  .dp-content,
+  .vr-main,
+  .ps-content,
+  .mc-content {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+  }
+}
