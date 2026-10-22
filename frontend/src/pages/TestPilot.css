@@ -14,7 +14,7 @@
 }
 
 /* ── Layout ──────────────────────────────────────────────────────────────── */
-.tp-main { padding-top: 72px; }
+.tp-main { padding-top: 0; }
 .tp-content {
   width: min(1160px, calc(100% - 48px));
   margin: 0 auto;

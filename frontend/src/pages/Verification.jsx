@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
+import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { getHealthScore, refreshHealthScore, getPassport, statusLabel, statusClass } from '../services/healthService.js'
 import { listRuns } from '../services/testPilotService.js'
@@ -53,7 +54,7 @@ function CheckItem({ item, expanded, onToggle }) {
       <button className="vr-check-header" onClick={() => onToggle(item.key)} aria-expanded={expanded}>
         <StatusIcon status={item.status} />
         <span className="vr-check-label">{item.label}</span>
-        <span className="vr-check-badge vr-badge-${item.status}">{item.badgeText}</span>
+        <span className={`vr-check-badge vr-badge-${item.status}`}>{item.badgeText}</span>
         {item.detail ? (expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />) : <span style={{ width: 14 }} />}
       </button>
       {expanded && item.detail && (
@@ -249,7 +250,7 @@ function buildChecklist(health, passport, runs) {
     detail: passport?.is_published
       ? `Published at: ${passport.public_url}`
       : 'Publish your Project Passport so judges can view your verified score.',
-    fixLink: '/issues',
+    fixLink: '/#mission-control',
   })
 
   // Overall score item
@@ -331,47 +332,19 @@ export default function Verification() {
   const failCount = allItems.filter(i => i.status === 'fail').length
   const totalValid = allItems.filter(i => i.status !== 'na').length
 
-  return (
-    <div className="vr-root">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="vr-body">
-        {/* ── Topbar ── */}
-        <header className="vr-topbar">
-          <button className="vr-menu-btn" aria-label="Open navigation" onClick={() => setSidebarOpen(true)}>
-            <Menu size={20} />
-          </button>
-          <div className="vr-topbar-title">
-            <ShieldCheck size={18} className="vr-topbar-icon" />
-            <span>Verification &amp; Readiness</span>
-          </div>
-          <div className="vr-topbar-actions">
-            {projects.length > 1 && (
-              <select
-                className="vr-project-picker"
-                value={projectId || ''}
-                onChange={e => setSearchParams({ project: e.target.value })}
-                aria-label="Select project"
-              >
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.understanding?.project_name || p.name || 'Untitled'}
-                  </option>
-                ))}
-              </select>
-            )}
-            <button
-              className="vr-refresh-btn"
-              onClick={handleRefresh}
-              disabled={refreshing || !projectId}
-              aria-label="Refresh health score"
-            >
-              <RefreshCw size={14} className={refreshing ? 'vr-spin' : ''} />
-              {refreshing ? 'Refreshing…' : 'Refresh'}
-            </button>
-          </div>
-        </header>
+  const currentProject = projects.find(p => p.id === projectId) || projects[0] || null
 
-        <main className="vr-main">
+  return (
+    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] vr-root">
+      <Sidebar activePage="verification" open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="lg:pl-80 flex-1 flex flex-col min-w-0 vr-body">
+        <Header
+          currentProject={currentProject}
+          onToggleMobileMenu={() => setSidebarOpen(!sidebarOpen)}
+          onProjectSelect={(p) => setSearchParams({ project: p.id })}
+        />
+
+        <main className="vr-main flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
           {/* ── Summary hero ── */}
           <section className="vr-hero">
             <div className="vr-hero-ring">
@@ -479,8 +452,8 @@ export default function Verification() {
                   <p>Share a verified, tamper-proof snapshot of your project with judges and stakeholders.</p>
                 </div>
               </div>
-              <Link to="/issues" className="vr-passport-cta-btn">
-                Go to Mission Control <ArrowRight size={14} />
+              <Link to="/#mission-control" className="vr-passport-cta-btn">
+                View Project Health <ArrowRight size={14} />
               </Link>
             </section>
           )}

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, Bookmark, BookOpen, Check, CheckCircle2, ChevronDown, Clock3, Code2, ExternalLink, GraduationCap, Lightbulb, LoaderCircle, Menu, MessageCircle, Play, Search, Sparkles, Target, Youtube } from 'lucide-react'
+import { ArrowRight, Bookmark, BookOpen, Check, CheckCircle2, ChevronDown, Clock3, Code2, Copy, ExternalLink, GraduationCap, Lightbulb, LoaderCircle, Menu, MessageCircle, Play, Search, Sparkles, Target, Youtube } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
+import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { askLearningTutor, getLearningProject, getLearningRecommendations, getLearningState, listLearningProjects, saveLearningState } from '../services/learningService.js'
 import './Learning.css'
@@ -42,6 +43,144 @@ const resources = [
 const categories = [
   ['all', 'All resources'], ['youtube', 'YouTube tutorials'], ['documentation', 'Official documentation'], ['guide', 'Articles & guides'], ['interactive', 'Interactive exercises'], ['example', 'Practical examples'],
 ]
+
+// ─── Jargon Buster (from main branch StudioGuides) ───────────────────────────
+const JARGON_TERMS = [
+  {
+    id: 'api',
+    term: 'API',
+    category: 'core',
+    plainEnglishSummary: 'A menu for computers: a friendly way for one app to ask another app for information politely.',
+    analogy: "Just like you point at an item on a cafe counter menu instead of barging into the kitchen to cook it yourself, your studio shop uses the Stripe API to say: 'Please collect $45 from this buyer and let me know when they are done.'",
+    inUdaanContext: 'No coding required in Udaan · Auto-wired'
+  },
+  {
+    id: 'env-var',
+    term: 'Environment Variable / Key',
+    category: 'security',
+    plainEnglishSummary: "A secret master key stored in a locked drawer so you don't paste it directly on the studio shop window.",
+    analogy: "If you put your private password directly in public website code, anyone could inspect the page and steal it. Storing it as an 'Environment Key' keeps it safely in a sealed lockbox on the cloud server.",
+    inUdaanContext: 'Udaan hides these automatically in sealed cloud secrets'
+  },
+  {
+    id: 'webhook',
+    term: 'Webhook',
+    category: 'payments',
+    plainEnglishSummary: 'A digital doorbell: when someone pays, the doorbell rings to automatically trigger your order printer.',
+    analogy: 'Instead of you manually refreshing Stripe 500 times a day to check if a customer bought a print, Stripe rings your webhook doorbell the split second an order clears so your studio can instantly fire a thank-you note.',
+    inUdaanContext: 'Tested with 1-click simulations'
+  },
+  {
+    id: 'ssl-https',
+    term: 'SSL / HTTPS',
+    category: 'security',
+    plainEnglishSummary: 'A tamper-proof sealed envelope ensuring nobody peeks at customer credit cards while in transit.',
+    analogy: 'HTTP is like sending a postcard where any mail carrier can read the message. HTTPS (with that friendly green padlock) wraps every customer interaction in high-grade cryptographic wax that only you and the bank can open.',
+    inUdaanContext: 'Always active on all Udaan links'
+  },
+  {
+    id: 'dns',
+    term: 'DNS & Custom Domains',
+    category: 'cloud',
+    plainEnglishSummary: "The studio street sign in the city directory so customers can find your front door.",
+    analogy: 'A-Record is the exact GPS coordinate of your workshop. CNAME is a forwarding nickname that points www.yourstudio.com directly to your main building.',
+    inUdaanContext: 'Zero command line needed · Verified DNS propagation'
+  },
+  {
+    id: 'smtp',
+    term: 'SMTP & Sender Identity',
+    category: 'payments',
+    plainEnglishSummary: 'The studio wax seal that proves your confirmation emails actually came from you, not an imposter.',
+    analogy: 'Sending order updates from a personal Gmail often lands in spam. A verified studio sender address acts like official letterhead so inboxes trust your receipts.',
+    inUdaanContext: 'Includes 1-click Resend & Postmark setup'
+  }
+]
+
+function JargonBusterSection() {
+  const [jargonQuery, setJargonQuery] = useState('')
+  const [jargonCategory, setJargonCategory] = useState('all')
+  const [copiedTermId, setCopiedTermId] = useState(null)
+
+  const handleCopy = (term) => {
+    navigator.clipboard.writeText(`${term.term}: ${term.plainEnglishSummary}\n\n${term.analogy}`)
+    setCopiedTermId(term.id)
+    setTimeout(() => setCopiedTermId(null), 2000)
+  }
+
+  const filtered = JARGON_TERMS.filter(t => {
+    const matchesCat = jargonCategory === 'all' || t.category === jargonCategory
+    const q = jargonQuery.toLowerCase().trim()
+    const matchesQ = !q || t.term.toLowerCase().includes(q) || t.plainEnglishSummary.toLowerCase().includes(q) || t.analogy.toLowerCase().includes(q)
+    return matchesCat && matchesQ
+  })
+
+  return (
+    <section className="learn-library mt-10">
+      <div className="learn-section-heading">
+        <div>
+          <p className="learn-eyebrow">PLAIN ENGLISH TRANSLATOR</p>
+          <h2>Jargon Buster Dictionary</h2>
+          <p>Complex tech concepts translated into plain English metaphors with real-world analogies.</p>
+        </div>
+        <span className="learn-progress-pill">{filtered.length} terms</span>
+      </div>
+
+      <div className="learn-library-controls mb-5">
+        <label className="learn-search">
+          <Search size={15} />
+          <input
+            value={jargonQuery}
+            onChange={(e) => setJargonQuery(e.target.value)}
+            placeholder="Search tech terms (e.g. Webhook, SSL, API)..."
+          />
+        </label>
+        <div className="learn-categories" role="tablist">
+          {[['all', 'All Terms'], ['payments', 'Payments'], ['security', 'Security'], ['cloud', 'Cloud & DNS'], ['core', 'Core Web']].map(([id, label]) => (
+            <button
+              key={id}
+              role="tab"
+              className={jargonCategory === id ? 'active' : ''}
+              onClick={() => setJargonCategory(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {filtered.map((item) => (
+          <article key={item.id} className="bg-white p-6 rounded-3xl border border-[#EFEAE4] shadow-xs flex flex-col justify-between space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-[#FFF8F3] text-[#8E4B49] px-2.5 py-0.5 rounded-full border border-[#FFAAA6]/30">
+                  {item.category}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(item)}
+                  className="text-xs text-[#8E4B49] hover:text-[#1D1B18] flex items-center gap-1"
+                >
+                  {copiedTermId === item.id ? <><Check size={13} /> Copied</> : <><Copy size={13} /> Copy</>}
+                </button>
+              </div>
+              <h3 className="text-lg font-bold text-[#1D1B18] font-['Plus_Jakarta_Sans']">{item.term}</h3>
+              <p className="text-xs text-[#534342] mt-2 font-medium leading-relaxed">{item.plainEnglishSummary}</p>
+              <div className="bg-[#FFF8F3] p-3 rounded-2xl border border-[#FFAAA6]/20 mt-3 text-[11px] text-[#8E4B49] leading-relaxed">
+                <span className="font-bold">Analogy: </span>
+                {item.analogy}
+              </div>
+            </div>
+            <div className="pt-2 border-t border-[#EFEAE4] text-[10px] text-[#A35A53] flex items-center gap-1 font-semibold">
+              <span className="material-symbols-outlined text-[14px]">verified</span>
+              <span>{item.inUdaanContext}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
 
 const text = value => typeof value === 'string' ? value : ''
 function normalizeProject(project) {
@@ -269,74 +408,86 @@ export default function Learning() {
   }
   const progressCount = path.filter(step => learningState.step_status?.[step.id] === 'completed').length
 
-  return <div className="ud-dashboard learn-page">
-    <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-    <div className="ud-work-area">
-      <header className="ud-topbar"><div className="ud-topbar-left"><button className="ud-mobile-menu ud-icon-button" aria-label="Open navigation" onClick={() => setMenuOpen(true)}><Menu size={20} /></button><span className="ud-topbar-title">Learning</span></div><div className="learn-header-right"><span><GraduationCap size={15} /> Project learning</span></div></header>
-      <main className="ud-main learn-main"><div className="learn-content">
-        {!project ? <section className="learn-empty"><span className="learn-empty-icon"><BookOpen size={23} /></span><p className="learn-eyebrow">LEARN BY BUILDING</p><h1>Make progress on a real project.</h1><p>Your learning plan will connect roadmap tasks, skills and resources here. Create or save a project to get started.</p><Link to="/" className="learn-primary">Start a project <ArrowRight size={15} /></Link></section> : <>
-          <section className="learn-heading">
-            <div className="learn-heading-top"><div><p className="learn-eyebrow">YOUR PROJECT LEARNING</p><h1>Learn what moves your project forward.</h1><p>Focused lessons and practice for the task in front of you.</p></div>
-              <label className="learn-project-select"><span>Project</span><select aria-label="Choose a project" value={project.id} onChange={event => { setSelectedId(event.target.value); setSearchParams({ project: event.target.value }) }}>
-                {projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select><ChevronDown size={15} /></label>
-            </div>
-            <div className="learn-focus">
-              <div className="learn-focus-icon"><Target size={18} /></div><div className="learn-focus-copy"><span>{currentTask ? `UP NEXT · ${currentMilestone}` : currentMilestone.toUpperCase()}</span><strong>{currentTask?.title || (tasks.length ? 'You have completed the current roadmap tasks' : 'Your roadmap is ready for learning')}</strong><p>{currentTask?.acceptance_criteria || (currentTask ? 'Explore the skills and resources that support this roadmap task.' : tasks.length ? 'Review the project skills below or reopen a task from Flight Plan.' : 'Add milestones and tasks in Flight Plan to build a tailored learning path.')}</p></div>
-              {currentTask && <Link className="learn-focus-action" to={`/flight-plan?project=${encodeURIComponent(project.id)}&task=${encodeURIComponent(currentTask.key)}`}>Return to task <ArrowRight size={14} /></Link>}
-            </div>
-            <div className="learn-context-meta"><span>{stack.length ? <><Code2 size={13} />{stack.join(' · ')}</> : 'No technology stack detected yet'}</span><span>{project.repository ? <><CheckCircle2 size={13} /> Repository analysis available</> : 'Repository context not connected'}</span></div>
-          </section>
+  return (
+    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] learn-page">
+      <Sidebar activePage="learning" open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <div className="lg:pl-80 flex-1 flex flex-col min-w-0">
+        <Header
+          currentProject={project}
+          onToggleMobileMenu={() => setMenuOpen(!menuOpen)}
+          onProjectSelect={(p) => { setSelectedId(p.id); setSearchParams({ project: p.id }) }}
+        />
 
-          {stateError && <div className="learn-error" role="status">{stateError}</div>}
-          <section className="learn-path-section">
-            <div className="learn-section-heading"><div><p className="learn-eyebrow">A CLEAR NEXT STEP</p><h2>Your learning path</h2><p>Study a concept, try the exercise, then decide when you’re ready to continue.</p></div>{path.length > 0 && <span className="learn-progress-pill">{progressCount} of {path.length} completed</span>}</div>
-            {pathStatus === 'loading' && <div className="learn-loading"><LoaderCircle className="learn-spin" size={17} /> Tailoring a path to the selected task…</div>}
-            {pathStatus === 'fallback' && <div className="learn-note"><Lightbulb size={15} /> Showing a starter path from the project’s roadmap and available skills. AI recommendations are temporarily unavailable.</div>}
-            {path.length > 0 ? <div className="learn-path-list">{path.map((step, index) => {
-              const stepId = step.id || slug(step.concept)
-              const status = learningState.step_status?.[stepId] || 'not_started'
-              const linkedResources = (step.resource_ids || []).map(id => resources.find(resource => resource.id === id)).filter(Boolean)
-              return <article className={`learn-step ${status === 'completed' ? 'is-complete' : ''}`} key={stepId}>
-                <div className="learn-step-number">{status === 'completed' ? <Check size={15} /> : String(index + 1).padStart(2, '0')}</div>
-                <div className="learn-step-body"><div className="learn-step-head"><div><span className="learn-step-status">{status.replace('_', ' ')}</span><h3>{step.concept}</h3></div><span className="learn-duration"><Clock3 size={13} />{step.minutes || 25} min</span></div>
-                  <p className="learn-objective">{step.objective}</p><p className="learn-why"><b>Why it matters:</b> {step.why}</p>
-                  {!!step.prerequisites?.length && <p className="learn-prerequisites"><b>Before you start:</b> {step.prerequisites.join(' · ')}</p>}
-                  <div className="learn-exercise"><span><Lightbulb size={13} /> PRACTICE</span><p>{step.exercise}</p></div>
-                  {!!linkedResources.length && <div className="learn-step-resources">{linkedResources.map(resource => <a key={resource.id} href={resource.url} target="_blank" rel="noreferrer" onClick={() => openResource(resource)}>{resource.title}<ExternalLink size={12} /></a>)}</div>}
-                  <div className="learn-step-actions"><button type="button" className="learn-step-primary" onClick={() => setStepStatus(step, status === 'completed' ? 'in_progress' : 'completed')}>{status === 'completed' ? 'Revisit step' : <><CheckCircle2 size={14} /> Mark complete</>}</button><button type="button" className="learn-step-secondary" onClick={() => setStepStatus(step, status === 'in_progress' ? 'not_started' : 'in_progress')}>{status === 'in_progress' ? 'Reset status' : 'In progress'}</button></div>
+        <main className="ud-main learn-main flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
+          <div className="learn-content w-full">
+            {!project ? <section className="learn-empty"><span className="learn-empty-icon"><BookOpen size={23} /></span><p className="learn-eyebrow">LEARN BY BUILDING</p><h1>Make progress on a real project.</h1><p>Your learning plan will connect roadmap tasks, skills and resources here. Create or save a project to get started.</p><Link to="/" className="learn-primary">Start a project <ArrowRight size={15} /></Link></section> : <>
+              <section className="learn-heading">
+                <div className="learn-heading-top"><div><p className="learn-eyebrow">YOUR PROJECT LEARNING</p><h1>Learn what moves your project forward.</h1><p>Focused lessons and practice for the task in front of you.</p></div>
+                  <label className="learn-project-select"><span>Project</span><select aria-label="Choose a project" value={project.id} onChange={event => { setSelectedId(event.target.value); setSearchParams({ project: event.target.value }) }}>
+                    {projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select><ChevronDown size={15} /></label>
                 </div>
-              </article>
-            })}</div> : pathStatus !== 'loading' && <div className="learn-inline-empty">{tasks.length ? 'No pending roadmap task. Reopen a task from Flight Plan to study its concepts.' : 'Add a Flight Plan task to generate a learning path specific to work you need to do.'}</div>}
-          </section>
+                <div className="learn-focus">
+                  <div className="learn-focus-icon"><Target size={18} /></div><div className="learn-focus-copy"><span>{currentTask ? `UP NEXT · ${currentMilestone}` : currentMilestone.toUpperCase()}</span><strong>{currentTask?.title || (tasks.length ? 'You have completed the current roadmap tasks' : 'Your roadmap is ready for learning')}</strong><p>{currentTask?.acceptance_criteria || (currentTask ? 'Explore the skills and resources that support this roadmap task.' : tasks.length ? 'Review the project skills below or reopen a task from Flight Plan.' : 'Add milestones and tasks in Flight Plan to build a tailored learning path.')}</p></div>
+                  {currentTask && <Link className="learn-focus-action" to={`/flight-plan?project=${encodeURIComponent(project.id)}&task=${encodeURIComponent(currentTask.key)}`}>Return to task <ArrowRight size={14} /></Link>}
+                </div>
+                <div className="learn-context-meta"><span>{stack.length ? <><Code2 size={13} />{stack.join(' · ')}</> : 'No technology stack detected yet'}</span><span>{project.repository ? <><CheckCircle2 size={13} /> Repository analysis available</> : 'Repository context not connected'}</span></div>
+              </section>
 
-          <section className="learn-recommendations"><div className="learn-section-heading"><div><p className="learn-eyebrow">CURATED FROM REAL SOURCES</p><h2>Recommended for your next task</h2><p>Links are from official documentation or established learning providers. Recommendations use your project’s task and detected stack.</p></div></div>
-            <div className="learn-resource-grid">{rankedResources.slice(0, 3).map(resource => <ResourceCard key={resource.id} resource={resource} saved={savedResourceIds.includes(resource.id)} onSave={saveResource} onOpen={openResource} />)}{!matchedResources.length && <div className="learn-inline-empty">No stack or task context is available yet. Add a Flight Plan task or connect a repository to improve recommendations.</div>}</div>
-          </section>
+              {stateError && <div className="learn-error" role="status">{stateError}</div>}
+              <section className="learn-path-section">
+                <div className="learn-section-heading"><div><p className="learn-eyebrow">A CLEAR NEXT STEP</p><h2>Your learning path</h2><p>Study a concept, try the exercise, then decide when you’re ready to continue.</p></div>{path.length > 0 && <span className="learn-progress-pill">{progressCount} of {path.length} completed</span>}</div>
+                {pathStatus === 'loading' && <div className="learn-loading"><LoaderCircle className="learn-spin" size={17} /> Tailoring a path to the selected task…</div>}
+                {pathStatus === 'fallback' && <div className="learn-note"><Lightbulb size={15} /> Showing a starter path from the project’s roadmap and available skills. AI recommendations are temporarily unavailable.</div>}
+                {path.length > 0 ? <div className="learn-path-list">{path.map((step, index) => {
+                  const stepId = step.id || slug(step.concept)
+                  const status = learningState.step_status?.[stepId] || 'not_started'
+                  const linkedResources = (step.resource_ids || []).map(id => resources.find(resource => resource.id === id)).filter(Boolean)
+                  return <article className={`learn-step ${status === 'completed' ? 'is-complete' : ''}`} key={stepId}>
+                    <div className="learn-step-number">{status === 'completed' ? <Check size={15} /> : String(index + 1).padStart(2, '0')}</div>
+                    <div className="learn-step-body"><div className="learn-step-head"><div><span className="learn-step-status">{status.replace('_', ' ')}</span><h3>{step.concept}</h3></div><span className="learn-duration"><Clock3 size={13} />{step.minutes || 25} min</span></div>
+                      <p className="learn-objective">{step.objective}</p><p className="learn-why"><b>Why it matters:</b> {step.why}</p>
+                      {!!step.prerequisites?.length && <p className="learn-prerequisites"><b>Before you start:</b> {step.prerequisites.join(' · ')}</p>}
+                      <div className="learn-exercise"><span><Lightbulb size={13} /> PRACTICE</span><p>{step.exercise}</p></div>
+                      {!!linkedResources.length && <div className="learn-step-resources">{linkedResources.map(resource => <a key={resource.id} href={resource.url} target="_blank" rel="noreferrer" onClick={() => openResource(resource)}>{resource.title}<ExternalLink size={12} /></a>)}</div>}
+                      <div className="learn-step-actions"><button type="button" className="learn-step-primary" onClick={() => setStepStatus(step, status === 'completed' ? 'in_progress' : 'completed')}>{status === 'completed' ? 'Revisit step' : <><CheckCircle2 size={14} /> Mark complete</>}</button><button type="button" className="learn-step-secondary" onClick={() => setStepStatus(step, status === 'in_progress' ? 'not_started' : 'in_progress')}>{status === 'in_progress' ? 'Reset status' : 'In progress'}</button></div>
+                    </div>
+                  </article>
+                })}</div> : pathStatus !== 'loading' && <div className="learn-inline-empty">{tasks.length ? 'No pending roadmap task. Reopen a task from Flight Plan to study its concepts.' : 'Add a Flight Plan task to generate a learning path specific to work you need to do.'}</div>}
+              </section>
 
-          <section className="learn-library"><div className="learn-section-heading"><div><p className="learn-eyebrow">LEARN AT YOUR PACE</p><h2>Resource library</h2><p>{matchedResources.length ? 'Resources matched to this project\'s task context and detected stack.' : 'Curated resources from official docs, trusted guides and YouTube tutorials.'}</p></div>{visibleResources.length > 0 && <span className="learn-progress-pill">{visibleResources.length} resource{visibleResources.length === 1 ? '' : 's'}</span>}</div>
-            <div className="learn-library-controls"><label className="learn-search"><Search size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={matchedResources.length ? "Search this project's resources" : 'Search all resources'} aria-label="Search resources" /></label><div className="learn-categories" role="tablist" aria-label="Resource category">{categories.map(([id, label]) => <button key={id} role="tab" aria-selected={category === id} className={category === id ? 'active' : ''} onClick={() => setCategory(id)}>{label}</button>)}</div></div>
-            <div className="learn-resource-grid">{visibleResources.map(resource => <ResourceCard key={resource.id} resource={resource} saved={savedResourceIds.includes(resource.id)} onSave={saveResource} onOpen={openResource} />)}{!visibleResources.length && <div className="learn-inline-empty">No resources match this search and category. Try another filter.</div>}</div>
-          </section>
+              <section className="learn-recommendations"><div className="learn-section-heading"><div><p className="learn-eyebrow">CURATED FROM REAL SOURCES</p><h2>Recommended for your next task</h2><p>Links are from official documentation or established learning providers. Recommendations use your project’s task and detected stack.</p></div></div>
+                <div className="learn-resource-grid">{rankedResources.slice(0, 3).map(resource => <ResourceCard key={resource.id} resource={resource} saved={savedResourceIds.includes(resource.id)} onSave={saveResource} onOpen={openResource} />)}{!matchedResources.length && <div className="learn-inline-empty">No stack or task context is available yet. Add a Flight Plan task or connect a repository to improve recommendations.</div>}</div>
+              </section>
 
-          <section className="learn-bottom-grid">
-            <div className="learn-tutor"><div className="learn-tutor-heading"><span><MessageCircle size={16} /></span><div><p className="learn-eyebrow">ASK WITH CONTEXT</p><h2>AI learning assistant</h2><p>Ask about the concept, task or code you’re working through.</p></div></div>
-              <form onSubmit={askTutor}><div className="learn-tutor-controls"><label>Level<select value={tutorLevel} onChange={event => setTutorLevel(event.target.value)}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label></div><label className="sr-only" htmlFor="learn-question">Your question</label><textarea id="learn-question" value={tutorQuestion} onChange={event => setTutorQuestion(event.target.value)} maxLength={1500} placeholder={currentTask ? `How does this concept help with “${currentTask.title}”?` : 'What would you like to understand?'} required /><details className="learn-code-context"><summary><Code2 size={13} /> Add code or an error for context (optional)</summary><textarea value={codeContext} onChange={event => setCodeContext(event.target.value)} maxLength={5000} placeholder="Paste a small relevant snippet or error message. Avoid secrets." /></details><button className="learn-primary" type="submit" disabled={tutorBusy || !tutorQuestion.trim()}>{tutorBusy ? <><LoaderCircle className="learn-spin" size={15} /> Thinking…</> : <><Sparkles size={15} /> Ask the tutor</>}</button></form>
-              {tutorError && <div className="learn-error" role="alert">{tutorError}</div>}
-              {tutorAnswer && <div className="learn-answer"><p className="learn-eyebrow">TUTOR RESPONSE</p><h3>Explanation</h3><p>{tutorAnswer.answer?.explanation}</p><h3>Example</h3><pre>{tutorAnswer.answer?.example}</pre><h3>Try it</h3><p>{tutorAnswer.answer?.exercise}</p>{tutorAnswer.repository_evidence_available && <span className="learn-evidence-note">Repository analysis was available as context. Examples may still be illustrative.</span>}{tutorAnswer.answer?.quiz?.map((item, index) => <div className="learn-quiz" key={`${index}-${item.question}`}><b>Quick check {index + 1}</b><p>{item.question}</p><button type="button" onClick={() => setRevealedQuiz(value => ({ ...value, [index]: !value[index] }))}>{revealedQuiz[index] ? 'Hide answer' : 'Show answer'}</button>{revealedQuiz[index] && <p className="learn-quiz-answer"><b>{item.answer}</b><br />{item.explanation}</p>}</div>)}</div>}
-            </div>
+              <section className="learn-library"><div className="learn-section-heading"><div><p className="learn-eyebrow">LEARN AT YOUR PACE</p><h2>Resource library</h2><p>{matchedResources.length ? 'Resources matched to this project\'s task context and detected stack.' : 'Curated resources from official docs, trusted guides and YouTube tutorials.'}</p></div>{visibleResources.length > 0 && <span className="learn-progress-pill">{visibleResources.length} resource{visibleResources.length === 1 ? '' : 's'}</span>}</div>
+                <div className="learn-library-controls"><label className="learn-search"><Search size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={matchedResources.length ? "Search this project's resources" : 'Search all resources'} aria-label="Search resources" /></label><div className="learn-categories" role="tablist" aria-label="Resource category">{categories.map(([id, label]) => <button key={id} role="tab" aria-selected={category === id} className={category === id ? 'active' : ''} onClick={() => setCategory(id)}>{label}</button>)}</div></div>
+                <div className="learn-resource-grid">{visibleResources.map(resource => <ResourceCard key={resource.id} resource={resource} saved={savedResourceIds.includes(resource.id)} onSave={saveResource} onOpen={openResource} />)}{!visibleResources.length && <div className="learn-inline-empty">No resources match this search and category. Try another filter.</div>}</div>
+              </section>
 
-            <div className="learn-history"><div className="learn-section-heading"><div><p className="learn-eyebrow">YOUR LIBRARY</p><h2>Saved & recently viewed</h2></div></div><h3><Bookmark size={14} /> Saved resources</h3><ResourceList items={(learningState.saved_resources || []).map(value => { const [taskKey, resourceId] = value.includes('::') ? value.split('::', 2) : ['project', value]; const resource = resources.find(item => item.id === resourceId); const task = tasks.find(item => item.key === taskKey); return resource ? { ...resource, context: task ? task.title : taskKey === 'project' ? 'Project resource' : `Roadmap task ${taskKey}` } : null }).filter(Boolean)} empty="Save a resource to keep it close by." onOpen={openResource} />
-              <h3><Clock3 size={14} /> Recently viewed</h3><ResourceList items={recentResources.slice(0, 5)} empty="Resources you open will appear here." onOpen={openResource} />
-            </div>
-          </section>
+              {/* ── Jargon Buster Dictionary (from main branch StudioGuides) ── */}
+              <JargonBusterSection />
 
-          {currentTask && <section className="learn-feedback"><div><p className="learn-eyebrow">APPLIED LEARNING</p><h2>Did this help with your task?</h2><p>This reflection is separate from roadmap completion. It never changes task status.</p></div><div className="learn-feedback-actions"><button className={learningState.task_feedback?.[currentTask.key]?.applied === true ? 'selected' : ''} onClick={() => saveTaskFeedback('applied', true)}><Check size={14} /> I applied it</button><button className={learningState.task_feedback?.[currentTask.key]?.applied === false ? 'selected' : ''} onClick={() => saveTaskFeedback('applied', false)}>Not yet</button><button className={learningState.task_feedback?.[currentTask.key]?.worked === true ? 'selected' : ''} onClick={() => saveTaskFeedback('worked', true)}>It worked</button><button className={learningState.task_feedback?.[currentTask.key]?.worked === false ? 'selected' : ''} onClick={() => saveTaskFeedback('worked', false)}>Still stuck</button></div></section>}
-          {currentTask && <Link className="learn-return-link" to={`/flight-plan?project=${encodeURIComponent(project.id)}&task=${encodeURIComponent(currentTask.key)}`}>Return to “{currentTask.title}” in Flight Plan <ArrowRight size={14} /></Link>}
-        </>}
-      </div></main>
+              <section className="learn-bottom-grid">
+                <div className="learn-tutor"><div className="learn-tutor-heading"><span><MessageCircle size={16} /></span><div><p className="learn-eyebrow">ASK WITH CONTEXT</p><h2>AI learning assistant</h2><p>Ask about the concept, task or code you’re working through.</p></div></div>
+                  <form onSubmit={askTutor}><div className="learn-tutor-controls"><label>Level<select value={tutorLevel} onChange={event => setTutorLevel(event.target.value)}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label></div><label className="sr-only" htmlFor="learn-question">Your question</label><textarea id="learn-question" value={tutorQuestion} onChange={event => setTutorQuestion(event.target.value)} maxLength={1500} placeholder={currentTask ? `How does this concept help with “${currentTask.title}”?` : 'What would you like to understand?'} required /><details className="learn-code-context"><summary><Code2 size={13} /> Add code or an error for context (optional)</summary><textarea value={codeContext} onChange={event => setCodeContext(event.target.value)} maxLength={5000} placeholder="Paste a small relevant snippet or error message. Avoid secrets." /></details><button className="learn-primary" type="submit" disabled={tutorBusy || !tutorQuestion.trim()}>{tutorBusy ? <><LoaderCircle className="learn-spin" size={15} /> Thinking…</> : <><Sparkles size={15} /> Ask the tutor</>}</button></form>
+                  {tutorError && <div className="learn-error" role="alert">{tutorError}</div>}
+                  {tutorAnswer && <div className="learn-answer"><p className="learn-eyebrow">TUTOR RESPONSE</p><h3>Explanation</h3><p>{tutorAnswer.answer?.explanation}</p><h3>Example</h3><pre>{tutorAnswer.answer?.example}</pre><h3>Try it</h3><p>{tutorAnswer.answer?.exercise}</p>{tutorAnswer.repository_evidence_available && <span className="learn-evidence-note">Repository analysis was available as context. Examples may still be illustrative.</span>}{tutorAnswer.answer?.quiz?.map((item, index) => <div className="learn-quiz" key={`${index}-${item.question}`}><b>Quick check {index + 1}</b><p>{item.question}</p><button type="button" onClick={() => setRevealedQuiz(value => ({ ...value, [index]: !value[index] }))}>{revealedQuiz[index] ? 'Hide answer' : 'Show answer'}</button>{revealedQuiz[index] && <p className="learn-quiz-answer"><b>{item.answer}</b><br />{item.explanation}</p>}</div>)}</div>}
+                </div>
+
+                <div className="learn-history"><div className="learn-section-heading"><div><p className="learn-eyebrow">YOUR LIBRARY</p><h2>Saved & recently viewed</h2></div></div><h3><Bookmark size={14} /> Saved resources</h3><ResourceList items={(learningState.saved_resources || []).map(value => { const [taskKey, resourceId] = value.includes('::') ? value.split('::', 2) : ['project', value]; const resource = resources.find(item => item.id === resourceId); const task = tasks.find(item => item.key === taskKey); return resource ? { ...resource, context: task ? task.title : taskKey === 'project' ? 'Project resource' : `Roadmap task ${taskKey}` } : null }).filter(Boolean)} empty="Save a resource to keep it close by." onOpen={openResource} />
+                  <h3><Clock3 size={14} /> Recently viewed</h3><ResourceList items={recentResources.slice(0, 5)} empty="Resources you open will appear here." onOpen={openResource} />
+                </div>
+              </section>
+
+              {currentTask && <section className="learn-feedback"><div><p className="learn-eyebrow">APPLIED LEARNING</p><h2>Did this help with your task?</h2><p>This reflection is separate from roadmap completion. It never changes task status.</p></div><div className="learn-feedback-actions"><button className={learningState.task_feedback?.[currentTask.key]?.applied === true ? 'selected' : ''} onClick={() => saveTaskFeedback('applied', true)}><Check size={14} /> I applied it</button><button className={learningState.task_feedback?.[currentTask.key]?.applied === false ? 'selected' : ''} onClick={() => saveTaskFeedback('applied', false)}>Not yet</button><button className={learningState.task_feedback?.[currentTask.key]?.worked === true ? 'selected' : ''} onClick={() => saveTaskFeedback('worked', true)}>It worked</button><button className={learningState.task_feedback?.[currentTask.key]?.worked === false ? 'selected' : ''} onClick={() => saveTaskFeedback('worked', false)}>Still stuck</button></div></section>}
+              {currentTask && <Link className="learn-return-link" to={`/flight-plan?project=${encodeURIComponent(project.id)}&task=${encodeURIComponent(currentTask.key)}`}>Return to “{currentTask.title}” in Flight Plan <ArrowRight size={14} /></Link>}
+            </>}
+          </div>
+        </main>
+      </div>
     </div>
-  </div>
+  )
 }
 
 function formatDuration(minutes) {

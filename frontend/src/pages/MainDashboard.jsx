@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, useReducedMotion } from 'framer-motion'
 import {
-  BriefcaseBusiness, Check, ChevronRight, Copy, GraduationCap,
+  BriefcaseBusiness, ChevronRight, Copy, GraduationCap,
   Github, Lightbulb, Paperclip, Plus, Rocket, Send, Sparkles, X
 } from 'lucide-react'
 import { createPortal } from 'react-dom'
@@ -10,11 +10,28 @@ import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import InviteMakerModal from '../components/modals/InviteMakerModal.jsx'
 import AddTaskModal from '../components/modals/AddTaskModal.jsx'
+import MissionControl from './MissionControl.jsx'
 import { saveProjectDraft } from '../services/ideaWorkflowService.js'
 import { useAuth } from '../app/AuthContext.jsx'
-import { readSavedProjects } from '../services/projectStorage.js'
+import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
 
 const draftKey = 'udaan:idea-draft'
+const paletteKey = 'udaan:studio-palette'
+const defaultPalette = ['#FFAA8A', '#FBE191', '#FFF1ED', '#EAE4F8']
+
+function readPalette() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(paletteKey) || 'null')
+    if (Array.isArray(saved)) {
+      const colors = saved.filter(color => typeof color === 'string' && /^#[\da-f]{6}$/i.test(color))
+      if (colors.length) return colors
+    }
+  } catch {
+    // Fall back to the default palette when saved preferences cannot be read.
+  }
+  return defaultPalette
+}
+
 function newUuid() {
   return globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
     const random = Math.random() * 16 | 0
@@ -74,14 +91,8 @@ export default function MainDashboard() {
   const flightPayload = useRef(null)
   const launching = submission.phase === 'flying'
 
-  // Tasks state for Today's Tasks workshop widget
   const [taskFilter, setTaskFilter] = useState('all')
-  const [copiedHex, setCopiedHex] = useState(null)
-  const [localTasks, setLocalTasks] = useState([
-    { id: 'task-1', title: 'Set up instant customer order confirmation flow', projectName: 'CERAMIC STUDIO', status: 'in_progress', lead: 'ER', estimatedMinutes: 20, dueToday: true },
-    { id: 'task-2', title: 'Publish 12 limited edition stoneware vase SKUs', projectName: 'CERAMIC STUDIO', status: 'not_started', lead: 'AK', estimatedMinutes: 35, dueToday: true },
-    { id: 'task-3', title: 'Connect repository evidence & build pipeline', projectName: 'CERAMIC STUDIO', status: 'done', lead: 'TS', estimatedMinutes: 15, dueToday: false },
-  ])
+  const [paletteColors, setPaletteColors] = useState(readPalette)
 
   // Saved projects
   const [projects, setProjects] = useState([])
@@ -103,44 +114,68 @@ export default function MainDashboard() {
     description: '12 bespoke stoneware vases collection',
   }
 
-  const displayedTasks = localTasks.filter(t => {
-    if (taskFilter === 'due_today') return t.dueToday
-    if (taskFilter === 'unassigned') return !t.lead
+  const completedTasks = currentProject.flightPlanProgress || currentProject.workflow?.flightPlanProgress || []
+  const workbenchTasks = (currentProject.workflow?.flight_plan?.milestones || []).flatMap((milestone, milestoneIndex) =>
+    (milestone.tasks || []).map((task, taskIndex) => ({
+      ...task,
+      id: `${milestoneIndex}-${taskIndex}`,
+      title: typeof task === 'string' ? task : task.title,
+      milestone: milestone.title,
+      dueToday: typeof task === 'object' && Boolean(task.due_today),
+      done: completedTasks.includes(`${milestoneIndex}-${taskIndex}`),
+    }))
+  )
+  const displayedTasks = workbenchTasks.filter(task => {
+    if (taskFilter === 'due_today') return task.dueToday
+    if (taskFilter === 'unassigned') return !task.lead
     return true
   })
 
-  const handleToggleTask = (id) => {
-    setLocalTasks(prev => prev.map(t => {
-      if (t.id === id) {
-        const nextStatus = t.status === 'done' ? 'in_progress' : 'done'
-        return { ...t, status: nextStatus }
-      }
-      return t
+  const addWorkbenchTask = partial => {
+    const project = projects.find(item => String(item.id) === String(currentProject.id))
+    if (!project) return
+    const plan = project.workflow?.flight_plan || { milestones: [] }
+    const milestones = [...(plan.milestones || [])]
+    if (!milestones.length) {
+      milestones.push({
+        title: 'Workbench',
+        category: 'Milestone',
+        outcome: '',
+        start_date: '',
+        target_date: '',
+        tasks: [],
+      })
+    }
+    const firstMilestone = milestones[0]
+    const newTask = {
+      title: partial.title,
+      category: partial.category,
+      estimated_minutes: partial.estimatedMinutes || 25,
+      lead: partial.lead || 'TS',
+      due_today: partial.dueToday ?? true,
+      difficulty: 'medium',
+      subtasks: [],
+    }
+    const updatedPlan = {
+      ...plan,
+      milestones: milestones.map((milestone, index) =>
+        index === 0 ? { ...firstMilestone, tasks: [...(firstMilestone.tasks || []), newTask] } : milestone
+      ),
+    }
+    updateSavedProject(project.id, current => ({
+      ...current,
+      workflow: { ...current.workflow, flight_plan: updatedPlan },
     }))
+    setProjects(readSavedProjects())
   }
 
-  const handleAddNewTask = (newTask) => {
-    setLocalTasks(prev => [{
-      id: `task-${Date.now()}`,
-      projectName: currentProject.name.toUpperCase().slice(0, 16),
-      ...newTask,
-    }, ...prev])
-  }
+  useEffect(() => {
+    localStorage.setItem(paletteKey, JSON.stringify(paletteColors))
+  }, [paletteColors])
 
-  const copyPaletteHex = (hex) => {
-    navigator.clipboard.writeText(hex)
-    setCopiedHex(hex)
-    setTimeout(() => setCopiedHex(null), 1800)
+  const updatePaletteColor = (index, hex) => {
+    setPaletteColors(colors => colors.map((color, colorIndex) => colorIndex === index ? hex.toUpperCase() : color))
   }
-
-  const paletteColors = [
-    { hex: '#FFAA8A', label: '#FFAA' },
-    { hex: '#FBE191', label: '#FBE1' },
-    { hex: '#fff1ed', label: '#D7F5' },
-    { hex: '#EAE4F8', label: '#EAE4' },
-    { hex: '#8e4b49', label: '#4A65' },
-    { hex: '#1D1B18', label: '#1D1B' },
-  ]
 
   async function addAttachment(event) {
     const file = event.target.files?.[0]
@@ -222,72 +257,6 @@ export default function MainDashboard() {
               </Link>
             </div>
           )}
-
-          {/* Metrics Bar */}
-          <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-[#FFFFFF] p-4 rounded-2xl shadow-[0_1px_4px_rgba(31,29,26,0.03)] border border-[#EFEAE4] flex flex-col justify-between">
-              <span className="text-[11px] font-bold text-[#7C766F] uppercase tracking-wider">
-                Focus Time
-              </span>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-2xl font-extrabold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
-                  14
-                </span>
-                <span className="text-xs text-[#534342] font-semibold">hours logged</span>
-              </div>
-            </div>
-
-            <div className="bg-[#FFFFFF] p-4 rounded-2xl shadow-[0_1px_4px_rgba(31,29,26,0.03)] border border-[#EFEAE4] flex flex-col justify-between">
-              <span className="text-[11px] font-bold text-[#7C766F] uppercase tracking-wider">
-                Tasks in Progress
-              </span>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-2xl font-extrabold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
-                  {localTasks.filter(t => t.status === 'in_progress').length}
-                </span>
-                <span className="text-xs text-[#534342] font-semibold">active pods</span>
-              </div>
-            </div>
-
-            <div className="bg-[#FFFFFF] p-4 rounded-2xl shadow-[0_1px_4px_rgba(31,29,26,0.03)] border border-[#EFEAE4] flex flex-col justify-between">
-              <span className="text-[11px] font-bold text-[#7C766F] uppercase tracking-wider">
-                Milestones Verified
-              </span>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-2xl font-extrabold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
-                  3/5
-                </span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#fff1ed] text-[#8e4b49]">
-                  60%
-                </span>
-              </div>
-            </div>
-
-            <div className="bg-[#FFFFFF] p-4 rounded-2xl shadow-[0_1px_4px_rgba(31,29,26,0.03)] border border-[#EFEAE4] flex items-center justify-between">
-              <div className="flex items-center -space-x-2">
-                <div className="w-7 h-7 rounded-full bg-[#FBE191] text-[#705D1B] flex items-center justify-center text-[10px] font-bold ring-2 ring-white">
-                  LC
-                </div>
-                <div className="w-7 h-7 rounded-full bg-[#FFAAA6] text-[#7A3C3A] flex items-center justify-center text-[10px] font-bold ring-2 ring-white">
-                  AV
-                </div>
-                <div className="w-7 h-7 rounded-full bg-[#f0dedb] text-[#8e4b49] flex items-center justify-center text-[10px] font-bold ring-2 ring-white">
-                  MC
-                </div>
-                <div className="w-7 h-7 rounded-full bg-[#E7E1DC] text-[#534342] flex items-center justify-center text-[10px] font-bold ring-2 ring-white">
-                  +3
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setInviteModalOpen(true)}
-                className="flex items-center gap-1 text-xs font-bold text-[#8E4B49] hover:bg-[#FFAAA6]/20 px-3 py-1.5 rounded-full transition-colors cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[16px]">person_add</span>
-                <span>Invite maker</span>
-              </button>
-            </div>
-          </section>
 
           {/* Main Workshop Area */}
           <div className="space-y-6">
@@ -425,12 +394,12 @@ export default function MainDashboard() {
 
               </div>
 
-              {/* Today's Tasks Section from Main Studio */}
+              {/* Workbench tasks come from the selected project's saved flight plan. */}
               <div className="bg-[#FFFFFF] rounded-3xl p-6 border border-[#EFEAE4] shadow-[0_2px_12px_-2px_rgba(31,29,26,0.04)] space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <h2 className="text-base font-bold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
-                      Today&apos;s Workbench Tasks
+                      Workbench Task
                     </h2>
                     <span className="w-5 h-5 rounded-full bg-[#E7E1DC] text-[#1D1B18] text-xs font-bold flex items-center justify-center">
                       {displayedTasks.length}
@@ -455,82 +424,65 @@ export default function MainDashboard() {
                       ))}
                     </div>
 
+                    <Link
+                      to="/flight-plan"
+                      className="px-3 py-1.5 rounded-full bg-[#1D1B18] text-white text-xs font-bold no-underline hover:bg-black"
+                    >
+                      Open Flight Plan
+                    </Link>
                     <button
                       type="button"
                       onClick={() => setAddTaskModalOpen(true)}
-                      className="p-1 text-[#8E4B49] hover:bg-[#FFAAA6]/30 rounded-full transition-colors cursor-pointer"
-                      title="Add task"
+                      disabled={!projects.length}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#8E4B49] text-white text-xs font-bold hover:bg-[#723B39] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Plus size={18} />
+                      <Plus size={14} />
+                      Add task
                     </button>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  {displayedTasks.map((task) => {
-                    const isDone = task.status === 'done'
-                    return (
-                      <div
-                        key={task.id}
-                        className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
-                          isDone
-                            ? 'border-[#E7E1DC] bg-[#FAF8F5] opacity-75'
-                            : 'border-[#EFEAE4] bg-[#FFF8F3]/60 hover:bg-[#FFF8F3]'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1.5 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#7C766F]">
-                                {task.projectName}
-                              </span>
-                              {task.status === 'in_progress' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fff1ed] text-[#8e4b49] text-[10px] font-bold">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#8e4b49]"></span>
-                                  In Progress
-                                </span>
-                              )}
-                              {task.status === 'not_started' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FBE191] text-[#705D1B] text-[10px] font-bold">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#705D1B]"></span>
-                                  New
-                                </span>
-                              )}
-                              {task.status === 'done' && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E7E1DC] text-[#534342] text-[10px] font-bold">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#8e4b49]"></span>
-                                  Done
-                                </span>
-                              )}
-                            </div>
-
-                            <p className={`text-xs font-bold leading-snug ${isDone ? 'line-through text-[#7C766F]' : 'text-[#1D1B18]'}`}>
-                              {task.title}
-                            </p>
-
-                            <div className="flex items-center gap-3 text-[11px] text-[#7C766F] font-semibold">
-                              <span>~{task.estimatedMinutes} mins</span>
-                              <span>•</span>
-                              <span>Lead: {task.lead || 'Unassigned'}</span>
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleToggleTask(task.id)}
-                            className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-colors shrink-0 cursor-pointer ${
-                              isDone
-                                ? 'bg-[#8e4b49] border-[#8e4b49] text-white'
-                                : 'border-[#D8C1C0] hover:border-[#8E4B49]'
-                            }`}
-                            aria-label={`Mark ${task.title} as ${isDone ? 'incomplete' : 'done'}`}
-                          >
-                            {isDone && <Check size={14} strokeWidth={3} />}
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
+                  {displayedTasks.length ? displayedTasks.map(task => (
+                    <Link
+                      key={task.id}
+                      to={`/flight-plan?project=${encodeURIComponent(currentProject.id)}&task=${encodeURIComponent(task.id)}`}
+                      className="flex items-start justify-between gap-3 p-3.5 sm:p-4 rounded-2xl border border-[#EFEAE4] bg-[#FFF8F3]/60 hover:bg-[#FFF8F3] no-underline"
+                    >
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2 flex-wrap">
+                          {task.milestone && (
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#7C766F]">
+                              {task.milestone}
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${task.done ? 'bg-[#E7E1DC] text-[#534342]' : 'bg-[#FBE191] text-[#705D1B]'}`}>
+                            {task.done ? 'Done' : 'Planned'}
+                          </span>
+                        </span>
+                        <span className={`block mt-1.5 text-xs font-bold leading-snug ${task.done ? 'line-through text-[#7C766F]' : 'text-[#1D1B18]'}`}>
+                          {task.title}
+                        </span>
+                        {(task.lead || task.effort_estimate) && (
+                          <span className="block mt-1 text-[11px] text-[#7C766F] font-semibold">
+                            {[task.lead && `Lead: ${task.lead}`, task.effort_estimate].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </span>
+                      <ChevronRight size={16} className="mt-1 shrink-0 text-[#7C766F]" />
+                    </Link>
+                  )) : (
+                    <div className="rounded-2xl border border-dashed border-[#D8C1C0] bg-[#FFF8F3]/60 px-4 py-6 text-center">
+                      <p className="text-sm font-bold text-[#1D1B18]">
+                        {workbenchTasks.length ? 'No tasks match this filter.' : 'No roadmap tasks yet.'}
+                      </p>
+                      <p className="mt-1 text-xs text-[#7C766F]">
+                        {workbenchTasks.length
+                          ? 'Choose another filter to see this project’s tasks.'
+                          : 'Create tasks in this project’s Flight Plan to see them here.'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -542,26 +494,56 @@ export default function MainDashboard() {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
-                  {paletteColors.map((color) => (
-                    <button
-                      key={color.hex}
-                      type="button"
-                      onClick={() => copyPaletteHex(color.hex)}
-                      className="group relative flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-[#EFEAE4] hover:border-[#8E4B49] text-[11px] font-mono font-semibold transition-all cursor-pointer"
-                      title={`Copy ${color.hex}`}
+                  {paletteColors.map((color, index) => (
+                    <div
+                      key={index}
+                      className="inline-flex items-center rounded-full border border-[#EFEAE4] hover:border-[#8E4B49] transition-colors"
                     >
-                      <span className="w-3 h-3 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: color.hex }}></span>
-                      <span>{color.hex}</span>
-                    </button>
+                      <label
+                        className="relative inline-flex items-center gap-1.5 pl-2.5 py-1 text-[11px] font-mono font-semibold cursor-pointer"
+                        title={`Change color ${color}`}
+                      >
+                        <span className="w-3 h-3 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: color }}></span>
+                        <span>{color}</span>
+                        <input
+                          type="color"
+                          value={color}
+                          onChange={event => updatePaletteColor(index, event.target.value)}
+                          aria-label={`Choose color ${index + 1}`}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setPaletteColors(colors => colors.filter((_, colorIndex) => colorIndex !== index))}
+                        className="inline-flex items-center justify-center w-7 h-7 mr-0.5 rounded-full text-[#7C766F] hover:bg-[#FFAAA6]/25 hover:text-[#8E4B49] cursor-pointer"
+                        aria-label={`Delete color ${color}`}
+                        title={`Delete ${color}`}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   ))}
-                  {copiedHex && (
-                    <span className="text-[11px] text-[#8e4b49] bg-[#fff1ed] px-2 py-0.5 rounded-full font-bold animate-fadeIn">
-                      Copied {copiedHex}!
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setPaletteColors(colors => [...colors, defaultPalette[colors.length % defaultPalette.length]])}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-dashed border-[#D8C1C0] text-[#8E4B49] hover:bg-[#FFAAA6]/20 transition-colors cursor-pointer"
+                    aria-label="Add color swatch"
+                    title="Add color"
+                  >
+                    <Plus size={16} />
+                  </button>
                 </div>
               </div>
             </div>
+
+            <section id="mission-control" className="scroll-mt-24 space-y-3" aria-label="Project health and readiness">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-[#8E4B49]">Project Diagnostics</p>
+                <h2 className="text-xl font-extrabold text-[#1D1B18] font-['Plus_Jakarta_Sans']">Project health &amp; readiness</h2>
+              </div>
+              <MissionControl embedded selectedProjectId={projects.length ? currentProject.id : ''} />
+            </section>
         </main>
       </div>
 
@@ -622,7 +604,7 @@ export default function MainDashboard() {
       <AddTaskModal
         isOpen={addTaskModalOpen}
         onClose={() => setAddTaskModalOpen(false)}
-        onAddTask={handleAddNewTask}
+        onAddTask={addWorkbenchTask}
         projectName={currentProject.name}
       />
     </div>

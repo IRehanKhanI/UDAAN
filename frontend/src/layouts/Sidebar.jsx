@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
-  Activity, BookOpen, Code2, Flame, FolderOpen, Gauge, LogOut,
-  Megaphone, Rocket, ShieldCheck, Sparkles, UserRound, Users, X
+  Code2, Flame, FolderOpen, Gauge, LogOut,
+  Megaphone, Rocket, Sparkles, UserRound, Users, X
 } from 'lucide-react'
 import { NavLink, Link } from 'react-router-dom'
 import './Sidebar.css'
@@ -14,11 +14,8 @@ const navigation = [
   { label: 'My Projects', icon: FolderOpen, to: '/projects' },
   { label: 'Flight Plan', icon: Rocket, to: '/flight-plan' },
   { label: 'Repository', icon: Code2, to: '/repository' },
-  { label: 'Mission Control', icon: Activity, to: '/issues' },
   { label: 'TestPilot', icon: Flame, to: '/testpilot' },
   { label: 'Team Workspace', icon: Users, to: '/team' },
-  { label: 'Learning & Guides', icon: BookOpen, to: '/learning' },
-  { label: 'Verification & Readiness', icon: ShieldCheck, to: '/verification' },
   { label: 'Marketing Studio', icon: Megaphone, to: '/marketing-studio' },
 ]
 

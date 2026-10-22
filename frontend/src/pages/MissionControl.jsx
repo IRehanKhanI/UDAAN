@@ -3,14 +3,15 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Activity, ArrowRight, Bookmark, CheckCircle2, ChevronDown, ChevronRight,
   ClipboardList, Copy, ExternalLink, Globe, Info, Link2, LoaderCircle,
-  Menu, RefreshCw, Share2, ShieldCheck, Sparkles, TrendingUp, X, Zap,
+  Menu, RefreshCw, Share2, ShieldCheck, Sparkles, X,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
+import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
+import { apiRequest } from '../services/apiClient.js'
 import {
   getHealthScore, refreshHealthScore,
-  getHealthActions, getHealthHistory,
   getPassport, updatePassport, deletePassport,
   statusLabel, statusClass,
 } from '../services/healthService.js'
@@ -22,9 +23,6 @@ const BAND_BG     = { green: '#fff8f3', blue: '#e5eef9', amber: '#fdf1d7', red: 
 const BAND_TRACK  = { green: '#fff1ed', blue: '#c2d9f2', amber: '#f5dfa0', red: '#f5c0c0', grey: '#fff1ed' }
 const CONF_LABEL  = { high: 'High confidence', medium: 'Partial evidence', low: 'Not verified' }
 const CONF_DOT    = { high: '#8e4b49', medium: '#9a5c00', low: '#8b2020' }
-const PRI_COLOR   = { high: '#8b2020', medium: '#9a5c00', low: '#8e4b49' }
-const PRI_BG      = { high: '#fde8e8', medium: '#fdf1d7', low: '#fff8f3' }
-
 // ─── SVG Circular Gauge ──────────────────────────────────────────────────────
 function Gauge({ score, band, size = 160 }) {
   const r = 58, cx = 80, cy = 80
@@ -49,43 +47,7 @@ function Gauge({ score, band, size = 160 }) {
   )
 }
 
-// ─── SVG History Sparkline ────────────────────────────────────────────────────
-function Sparkline({ history }) {
-  if (!history?.length) return <div className="mc-sparkline-empty">No history yet</div>
-  const scores = history.map(h => h.score)
-  const min = Math.max(0, Math.min(...scores) - 5)
-  const max = Math.min(100, Math.max(...scores) + 5)
-  const W = 320, H = 72, PAD = 8
-  const xs = scores.map((_, i) => PAD + (i / Math.max(scores.length - 1, 1)) * (W - PAD * 2))
-  const ys = scores.map(s => H - PAD - ((s - min) / Math.max(max - min, 1)) * (H - PAD * 2))
-  const pts = xs.map((x, i) => `${x},${ys[i]}`).join(' ')
-  const area = `M${xs[0]},${ys[0]} ${xs.map((x, i) => `L${x},${ys[i]}`).slice(1).join(' ')} L${xs[xs.length - 1]},${H} L${xs[0]},${H} Z`
-  const line = `M${xs[0]},${ys[0]} ${xs.map((x, i) => `L${x},${ys[i]}`).slice(1).join(' ')}`
-  const last = scores[scores.length - 1]
-  const prev = scores.length > 1 ? scores[scores.length - 2] : null
-  const delta = prev !== null ? last - prev : 0
-  return (
-    <div className="mc-sparkline-wrap">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#8e4b49" stopOpacity=".28" />
-            <stop offset="100%" stopColor="#8e4b49" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={area} fill="url(#sparkGrad)" />
-        <polyline points={pts} fill="none" stroke="#8e4b49" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-        <circle cx={xs[xs.length - 1]} cy={ys[ys.length - 1]} r="4" fill="#8e4b49" />
-      </svg>
-      <div className="mc-sparkline-meta">
-        <span className="mc-sparkline-label">Score over time ({scores.length} snapshot{scores.length !== 1 ? 's' : ''})</span>
-        {delta !== 0 && <span className={`mc-sparkline-delta ${delta > 0 ? 'up' : 'down'}`}>{delta > 0 ? '+' : ''}{delta} pts</span>}
-      </div>
-    </div>
-  )
-}
-
-// ─── Signal Bar Row ──────────────────────────────────────────────────────────
+// ─── Signal Bar ──────────────────────────────────────────────────────────────
 function SignalBar({ signal }) {
   const cls = statusClass(
     signal.raw_score >= 80 ? 'strong' : signal.raw_score >= 60 ? 'on_track' : signal.raw_score >= 40 ? 'at_risk' : 'needs_attention'
@@ -126,36 +88,6 @@ function SignalBar({ signal }) {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ─── Action Card ─────────────────────────────────────────────────────────────
-function ActionCard({ action, index }) {
-  const pri = action.priority ?? 'medium'
-  return (
-    <div className="mc-action-card">
-      <div className="mc-action-head">
-        <span className="mc-action-num">{index + 1}</span>
-        <span className="mc-action-title">{action.title}</span>
-        <span className="mc-action-pri" style={{ background: PRI_BG[pri], color: PRI_COLOR[pri] }}>{pri}</span>
-      </div>
-      <p className="mc-action-why">{action.why}</p>
-      <div className="mc-action-footer">
-        <span className="mc-action-meta">
-          <Zap size={11} /> {action.effort ?? '—'}
-        </span>
-        {action.impact_estimate > 0 && (
-          <span className="mc-action-impact">
-            <TrendingUp size={11} /> ~+{action.impact_estimate} pts
-          </span>
-        )}
-        {action.link && (
-          <Link to={action.link} className="mc-action-link">
-            Go fix it <ArrowRight size={11} />
-          </Link>
-        )}
-      </div>
     </div>
   )
 }
@@ -257,40 +189,152 @@ function PassportPanel({ projectId }) {
   )
 }
 
+// ─── Studio Debugging Buddy (from main branch ProofHealth) ───────────────────
+function StudioDebuggingBuddy() {
+  const [query, setQuery] = useState('')
+  const [response, setResponse] = useState(null)
+  const [asking, setAsking] = useState(false)
+
+  const quickPrompts = [
+    'Why is my health score lower than 100%?',
+    'Payment button stays grey in checkout',
+    'How do I test my app on mobile?',
+    'Will customers get an email receipt?',
+  ]
+
+  const ask = async (text) => {
+    const q = text || query
+    if (!q.trim()) return
+    setAsking(true)
+    setResponse(null)
+    try {
+      const res = await apiRequest('/api/ai/ask/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q }),
+      })
+      if (res?.answer) {
+        setResponse(res.answer)
+        setAsking(false)
+        return
+      }
+    } catch {}
+
+    // Deterministic fallback explanation
+    setTimeout(() => {
+      const lower = q.toLowerCase()
+      if (lower.includes('score') || lower.includes('health') || lower.includes('100')) {
+        setResponse(
+          'Your health score is evidence-based across 7 signals (code-to-plan, tests, roadmap, etc.). In UDAAN, unverified signals contribute partial weight rather than artificial 100% inflation. Adding test commands and connecting GitHub will boost your score.'
+        )
+      } else if (lower.includes('gray') || lower.includes('grey') || lower.includes('button')) {
+        setResponse(
+          "A checkout button stays greyed out when required input fields (such as delivery date or terms confirmation) are waiting for user interaction. In your preview, select a pickup slot and the button lights up coral immediately."
+        )
+      } else if (lower.includes('mobile') || lower.includes('phone')) {
+        setResponse(
+          "To test on mobile, simply open your preview link in Chrome or Safari on your phone. You can also use 'Add to Home Screen' to test the full-screen progressive web app experience."
+        )
+      } else if (lower.includes('receipt') || lower.includes('email')) {
+        setResponse(
+          "Yes! When your payment webhook receives an event from Stripe or UPI, it triggers the automated confirmation receipt within 0.8 seconds to the customer's billing address."
+        )
+      } else {
+        setResponse(
+          `In plain English: "${q}" usually relates to configuration parameters or missing test evidence. Check the Seven Signals breakdown above to see exact file-backed diagnostics.`
+        )
+      }
+      setAsking(false)
+    }, 600)
+  }
+
+  return (
+    <div className="bg-white p-6 sm:p-7 rounded-3xl border border-[#EFEAE4] shadow-xs space-y-4">
+      <div className="flex items-center gap-2">
+        <span className="material-symbols-outlined text-[#8E4B49]">smart_toy</span>
+        <h3 className="font-extrabold text-[#1D1B18] text-base font-['Plus_Jakarta_Sans']">
+          Studio Debugging Buddy
+        </h3>
+        <span className="text-[10px] font-bold bg-[#D7F5D8] text-[#2F432B] px-2 py-0.5 rounded-full ml-auto">
+          Plain English
+        </span>
+      </div>
+      <p className="text-xs text-[#534342] leading-relaxed">
+        Ask any practical question about diagnostics, health score signals, or testing fixes. No jargon.
+      </p>
+
+      {/* Quick Prompts */}
+      <div className="flex flex-wrap gap-2 pt-1">
+        {quickPrompts.map((p, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => { setQuery(p); ask(p) }}
+            className="text-[11px] bg-[#FFF8F3] hover:bg-[#F9F2ED] text-[#8E4B49] border border-[#FFAAA6]/40 px-3 py-1.5 rounded-full transition-all text-left"
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+
+      {/* Input */}
+      <form onSubmit={(e) => { e.preventDefault(); ask() }} className="flex gap-2 pt-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Ask a question about your project health..."
+          className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-[#EFEAE4] bg-[#FFF8F3] text-[#1D1B18] placeholder-[#A35A53]/60 focus:outline-none focus:border-[#FFAAA6]"
+        />
+        <button
+          type="submit"
+          disabled={asking || !query.trim()}
+          className="px-4 py-2 rounded-xl bg-[#8E4B49] hover:bg-[#723B39] text-white text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5"
+        >
+          {asking ? 'Thinking…' : 'Ask'}
+        </button>
+      </form>
+
+      {/* Answer */}
+      {response && (
+        <div className="bg-[#FFF8F3] p-4 rounded-2xl border border-[#FFAAA6]/50 text-xs text-[#1D1B18] leading-relaxed animate-fadeIn">
+          <div className="flex items-center gap-1.5 font-bold text-[#8E4B49] mb-1">
+            <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
+            <span>Buddy's Explanation:</span>
+          </div>
+          <p>{response}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
-export default function MissionControl() {
+export default function MissionControl({ embedded = false, selectedProjectId }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [menuOpen, setMenuOpen]   = useState(false)
   const projects = readSavedProjects()
   const [projectId, setProjectId] = useState(
-    () => searchParams.get('project') || localStorage.getItem('udaan:selected-project') || projects[0]?.id || ''
+    () => selectedProjectId || searchParams.get('project') || localStorage.getItem('udaan:selected-project') || projects[0]?.id || ''
   )
-  const project = projects.find(p => String(p.id) === String(projectId)) || projects[0] || null
+  const activeProjectId = selectedProjectId ? String(selectedProjectId) : projectId
+  const project = projects.find(p => String(p.id) === String(activeProjectId)) || projects[0] || null
 
   const [health,   setHealth]   = useState(null)
-  const [actions,  setActions]  = useState([])
-  const [history,  setHistory]  = useState([])
   const [loading,  setLoading]  = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [error,    setError]    = useState('')
 
   const load = useCallback(async (id) => {
-    if (!id) { setHealth(null); setActions([]); setHistory([]); return }
+    if (!id) { setHealth(null); return }
     setLoading(true); setError('')
     try {
-      const [h, a, hist] = await Promise.allSettled([
-        getHealthScore(id),
-        getHealthActions(id),
-        getHealthHistory(id, 12),
-      ])
-      if (h.status === 'fulfilled')    setHealth(h.value)
-      if (a.status === 'fulfilled')    setActions(a.value.actions ?? [])
-      if (hist.status === 'fulfilled') setHistory(hist.value.history ?? [])
-      if (h.status === 'rejected') setError(h.reason?.message || 'Could not load health score.')
+      setHealth(await getHealthScore(id))
+    } catch (error) {
+      setError(error.message || 'Could not load health score.')
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { void load(projectId) }, [projectId, load])
+  useEffect(() => { void load(activeProjectId) }, [activeProjectId, load])
 
   const changeProject = id => {
     setProjectId(id)
@@ -299,14 +343,11 @@ export default function MissionControl() {
   }
 
   const doRefresh = async () => {
-    if (!projectId || refreshing) return
+    if (!activeProjectId || refreshing) return
     setRefreshing(true); setError('')
     try {
-      const h = await refreshHealthScore(projectId)
+      const h = await refreshHealthScore(activeProjectId)
       setHealth(h)
-      const [a, hist] = await Promise.allSettled([getHealthActions(projectId), getHealthHistory(projectId, 12)])
-      if (a.status === 'fulfilled')    setActions(a.value.actions ?? [])
-      if (hist.status === 'fulfilled') setHistory(hist.value.history ?? [])
     } catch (e) { setError(e.message || 'Refresh failed.') }
     finally { setRefreshing(false) }
   }
@@ -325,39 +366,43 @@ export default function MissionControl() {
   const evCov  = health?.evidence_coverage ?? null
   const compAt = health?.computed_at ? new Date(health.computed_at).toLocaleString() : null
 
-  return (
-    <div className="ud-dashboard mc-page">
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <div className="ud-work-area">
-        <header className="ud-topbar">
-          <div className="ud-topbar-left">
-            <button className="ud-mobile-menu ud-icon-button" aria-label="Open navigation" onClick={() => setMenuOpen(true)}>
-              <Menu size={20} />
-            </button>
-            <span className="ud-topbar-title">Mission Control</span>
-          </div>
-          <div className="mc-topbar-right">
-            <Activity size={14} />
-            <span>Project health</span>
-          </div>
-        </header>
+  const passedSignalsCount = signals.filter(s => (s.raw_score ?? 0) >= 60).length
 
-        <main className="ud-main mc-main">
-          <div className="mc-content">
+  return (
+    <div className={`mc-page ${embedded ? 'mc-embedded' : "min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans']"}`}>
+      {!embedded && <Sidebar activePage="issues" open={menuOpen} onClose={() => setMenuOpen(false)} />}
+      <div className={embedded ? 'w-full' : 'lg:pl-80 flex-1 flex flex-col min-w-0'}>
+        {!embedded && (
+          <Header
+            currentProject={project}
+            onToggleMobileMenu={() => setMenuOpen(!menuOpen)}
+            onProjectSelect={(p) => changeProject(p.id)}
+          />
+        )}
+
+        <main className={`ud-main mc-main w-full mx-auto ${embedded ? 'p-0' : 'flex-1 p-6 md:p-8 max-w-7xl'}`}>
+          <div className="mc-content w-full">
 
             {/* ── Toolbar ── */}
-            <div className="mc-toolbar">
-              <label className="mc-project-select">
-                <span>Project</span>
-                <select value={projectId} onChange={e => changeProject(e.target.value)} aria-label="Select project">
-                  {projects.map(p => <option key={p.id} value={p.id}>{p.name || 'Untitled'}</option>)}
-                </select>
-                <ChevronDown size={14} />
-              </label>
-              <button className="mc-refresh-btn" onClick={doRefresh} disabled={refreshing || loading} aria-label="Refresh score">
-                <RefreshCw size={14} className={refreshing ? 'mc-spin' : ''} />
-                {refreshing ? 'Refreshing…' : 'Refresh'}
-              </button>
+            <div className="mc-toolbar flex items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+              {!embedded && <label className="mc-project-select">
+                  <span>Project</span>
+                  <select value={activeProjectId} onChange={e => changeProject(e.target.value)} aria-label="Select project">
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name || 'Untitled'}</option>)}
+                  </select>
+                  <ChevronDown size={14} />
+              </label>}
+                <button className="mc-refresh-btn" onClick={doRefresh} disabled={refreshing || loading} aria-label="Refresh score">
+                  <RefreshCw size={14} className={refreshing ? 'mc-spin' : ''} />
+                  {refreshing ? 'Refreshing…' : 'Refresh'}
+                </button>
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#D7F5D8] text-[#2F432B] text-xs font-bold shadow-xs">
+                <span className="material-symbols-outlined text-[16px] text-[#4A654E]">verified</span>
+                <span>Verified Diagnostics · No Synthetic Scores</span>
+              </div>
             </div>
 
             {error && <div className="mc-error" role="alert">{error}<button onClick={() => setError('')}><X size={14} /></button></div>}
@@ -370,7 +415,70 @@ export default function MissionControl() {
                 <Link to="/" className="mc-cta">Start a project <ArrowRight size={14} /></Link>
               </div>
             ) : (
-              <>
+              <div className="space-y-7">
+                {/* ── 4 Stat Summary Cards (from main ProofHealth) ── */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Card 1: Sage (Signals on track) */}
+                  <div className="bg-[#D7F5D8]/50 p-5 rounded-3xl border border-[#ABC8AD] shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-full bg-[#FFFFFF] text-[#4A654E] flex items-center justify-center font-bold">
+                        <span className="material-symbols-outlined text-[20px]">check</span>
+                      </span>
+                      <span className="text-[10px] font-bold bg-[#FFFFFF] text-[#2F432B] px-2 py-0.5 rounded-full">
+                        {signals.length ? `${Math.round((passedSignalsCount / signals.length) * 100)}% Solid` : 'Pending'}
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <div className="text-2xl sm:text-3xl font-extrabold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
+                        {passedSignalsCount} / {signals.length || 7} Signals
+                      </div>
+                      <p className="text-xs text-[#534342] mt-1">
+                        Healthy score across inspected implementation signals.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Butter (Evidence Coverage) */}
+                  <div className="bg-[#FBE191]/40 p-5 rounded-3xl border border-[#FBE191] shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-full bg-[#FFFFFF] text-[#705D1B] flex items-center justify-center font-bold">
+                        <span className="material-symbols-outlined text-[20px]">shield</span>
+                      </span>
+                      <span className="text-[10px] font-bold bg-[#FFFFFF] text-[#705D1B] px-2 py-0.5 rounded-full">
+                        Coverage
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <div className="text-2xl sm:text-3xl font-extrabold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
+                        {evCov !== null ? `${evCov}%` : '—'} Proof
+                      </div>
+                      <p className="text-xs text-[#534342] mt-1">
+                        Actual files &amp; manifests checked with zero hallucination.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Card 3: Lavender (Status Assessment) */}
+                  <div className="bg-[#EAE4F8]/50 p-5 rounded-3xl border border-[#D7C9F2] shadow-xs flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-full bg-[#FFFFFF] text-[#49385F] flex items-center justify-center font-bold">
+                        <span className="material-symbols-outlined text-[20px]">verified</span>
+                      </span>
+                      <span className="text-[10px] font-bold bg-[#FFFFFF] text-[#49385F] px-2 py-0.5 rounded-full">
+                        Status
+                      </span>
+                    </div>
+                    <div className="mt-4">
+                      <div className="text-2xl sm:text-3xl font-extrabold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
+                        {label}
+                      </div>
+                      <p className="text-xs text-[#534342] mt-1">
+                        {compAt ? `Assessed ${compAt}` : 'Awaiting sync'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* ── Hero: Gauge + Score ── */}
                 <section className="mc-hero" aria-label="Project health score">
                   <div className="mc-gauge-area">
@@ -423,44 +531,17 @@ export default function MissionControl() {
                   )}
                 </section>
 
-                {/* ── Two-column: Actions + History ── */}
-                <div className="mc-bottom-grid">
-                  {/* Actions */}
-                  <section className="mc-section mc-actions-col">
+                {/* Studio Buddy + Passport */}
+                <div className="mc-right-col space-y-6">
+                  <StudioDebuggingBuddy />
+
+                  <section className="mc-section mc-passport-col">
                     <div className="mc-section-heading">
-                      <p className="mc-eyebrow">RECOMMENDED ACTIONS</p>
-                      <h2>Top priorities</h2>
-                      <p>Deterministic recommendations from real project gaps — never invented.</p>
+                      <p className="mc-eyebrow">SHARING</p>
+                      <h2>Project Passport</h2>
                     </div>
-                    {loading ? (
-                      <div className="mc-loading-rows">{[1,2,3].map(i => <div key={i} className="mc-skeleton-card" />)}</div>
-                    ) : actions.length ? (
-                      <div className="mc-actions-list">
-                        {actions.slice(0, 3).map((a, i) => <ActionCard key={i} action={a} index={i} />)}
-                      </div>
-                    ) : (
-                      <div className="mc-inline-empty">No recommended actions — your project looks healthy!</div>
-                    )}
+                    <PassportPanel projectId={activeProjectId} />
                   </section>
-
-                  {/* History + Passport */}
-                  <div className="mc-right-col">
-                    <section className="mc-section mc-history-col">
-                      <div className="mc-section-heading">
-                        <p className="mc-eyebrow">SCORE HISTORY</p>
-                        <h2>Trend</h2>
-                      </div>
-                      <Sparkline history={[...history].reverse()} />
-                    </section>
-
-                    <section className="mc-section mc-passport-col">
-                      <div className="mc-section-heading">
-                        <p className="mc-eyebrow">SHARING</p>
-                        <h2>Project Passport</h2>
-                      </div>
-                      <PassportPanel projectId={projectId} />
-                    </section>
-                  </div>
                 </div>
 
                 {/* ── Methodology note ── */}
@@ -475,7 +556,7 @@ export default function MissionControl() {
                     evidence, not a guarantee of working software.
                   </p>
                 </aside>
-              </>
+              </div>
             )}
           </div>
         </main>

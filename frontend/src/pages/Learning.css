@@ -1,5 +1,5 @@
 .learn-page { --learn-green: #8e4b49; --learn-deep: #8e4b49; --learn-ink: #8e4b49; --learn-muted: #758178; --learn-line: #fff1ed; --learn-sage: #fff8f3; }
-.learn-main { padding-top: 72px; }
+.learn-main { padding-top: 0; }
 .learn-content { width: min(1160px, calc(100% - 64px)); margin: 0 auto; padding: 34px 0 58px; color: var(--learn-ink); }
 .learn-header-right { color: #8e4b49; font-size: 11px; }
 .learn-header-right span { display: flex; align-items: center; gap: 7px; }

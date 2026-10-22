@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
+import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import {
   listRuns, createRun, getRun, controlRun, previewPlan,
@@ -448,28 +449,33 @@ export default function TestPilot() {
 
   const formatElapsed = (s) => s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`
 
-  return (
-    <div className="ud-dashboard tp-page">
-      <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-      <div className="ud-work-area">
-        <header className="ud-topbar">
-          <div className="ud-topbar-left">
-            <button className="ud-mobile-menu ud-icon-button" aria-label="Open navigation" onClick={() => setMenuOpen(true)}>
-              <Menu size={20} />
-            </button>
-            <span className="ud-topbar-title">TestPilot</span>
-          </div>
-          <div className="tp-topbar-right">
-            <Flame size={14} />
-            <span>AI browser testing</span>
-            {isActive && elapsed > 0 && (
-              <span className="tp-elapsed"><Clock3 size={11} />{formatElapsed(elapsed)}</span>
-            )}
-          </div>
-        </header>
+  const currentProject = projects.find(p => String(p.id) === String(projectId)) || (projectId ? { id: projectId, name: `Project ${projectId}` } : null)
 
-        <main className="ud-main tp-main">
-          <div className="tp-content">
+  return (
+    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] tp-page">
+      <Sidebar activePage="testpilot" open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <div className="lg:pl-80 flex-1 flex flex-col min-w-0">
+        <Header
+          currentProject={currentProject}
+          onToggleMobileMenu={() => setMenuOpen(!menuOpen)}
+          onProjectSelect={(proj) => {
+            if (proj?.id) setProjectId(proj.id)
+          }}
+        />
+        <main className="ud-main tp-main flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
+          <div className="tp-content" style={{ padding: 0, maxWidth: '100%' }}>
+            <div className="flex items-center justify-between gap-4 mb-6">
+              <div className="tp-intro-copy">
+                <span className="tp-eyebrow flex items-center gap-1.5"><Flame size={14} className="text-[#8E4B49]" /> AI BROWSER TESTING</span>
+                <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-[#1D1B18]">TestPilot Autonomous Verification</h1>
+                <p className="text-sm text-[#A35A53]">Autonomous, non-invasive browser verification driven by headless Playwright Chromium and Gemini.</p>
+              </div>
+              {isActive && elapsed > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFF1ED] text-[#8E4B49] rounded-full text-xs font-semibold">
+                  <Clock3 size={13} /> {formatElapsed(elapsed)}
+                </span>
+              )}
+            </div>
 
             {/* ── Setup form ── */}
             <section className="tp-setup-card">
