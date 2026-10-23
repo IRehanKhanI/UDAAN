@@ -10,9 +10,9 @@ import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import InviteMakerModal from '../components/modals/InviteMakerModal.jsx'
 import AddTaskModal from '../components/modals/AddTaskModal.jsx'
-import { saveProjectDraft } from '../services/ideaWorkflowService.js'
+import { saveProjectDraft, launchIdeaProject, fetchWorkspaceProjects } from '../services/ideaWorkflowService.js'
 import { useAuth } from '../app/AuthContext.jsx'
-import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
+import { readSavedProjects, updateSavedProject, syncBackendProjects } from '../services/projectStorage.js'
 
 const draftKey = 'udaan:idea-draft'
 const paletteKey = 'udaan:studio-palette'
@@ -193,34 +193,72 @@ export default function MainDashboard() {
     }
   }
 
-  function launch(event) {
-    event.preventDefault()
-    if (flightGuard.current || launching) return
+  const [isLaunching, setIsLaunching] = useState(false)
+  const [launchStage, setLaunchStage] = useState(1) // 1: Brave, 2: Tavily, 3: Gemini
+  const [launchElapsed, setLaunchElapsed] = useState(0)
+  const [launchError, setLaunchError] = useState('')
+  const launchTimer = useRef(null)
+
+  useEffect(() => {
+    fetchWorkspaceProjects().then(data => {
+      if (data?.results?.length) {
+        const synced = syncBackendProjects(data.results)
+        setProjects(synced)
+      }
+    }).catch(() => {})
+  }, [])
+
+  async function launch(event) {
+    if (event) event.preventDefault()
+    if (isLaunching) return
     if (!idea.trim()) {
-      setSubmission({ phase: 'error', message: 'Add a few words about your idea to get started.', payload: null, geometry: null })
+      setLaunchError('Add a few words about your idea to get started.')
       document.getElementById('idea-input-field')?.focus()
       return
     }
-    setSubmission({ phase: 'idle', message: '', payload: null, geometry: null })
-    const rect = launchButton.current?.getBoundingClientRect()
-    const origin = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth * .72, y: window.innerHeight * .8 }
-    const projectId = savedDraft?.projectId || newUuid()
-    const payload = { ...savedDraft, projectId, idea: idea.trim(), projectType: intent, attachment }
-    flightGuard.current = true
-    flightPayload.current = payload
-    sessionStorage.setItem(draftKey, JSON.stringify(payload))
-    localStorage.setItem(draftKey, JSON.stringify(payload))
-    saveProjectDraft(payload, savedDraft?.understanding || { project_name: '', problem_statement: '', target_users: '', expected_outcome: '' }, savedDraft?.workflow || {}, 'understanding').catch(() => {})
-    setSubmission({ phase: 'flying', message: '', payload, geometry: flightGeometry(origin, window.innerWidth, window.innerHeight) })
-  }
 
-  function completeFlight() {
-    const payload = flightPayload.current
-    if (!flightGuard.current || !payload) return
-    flightGuard.current = false
-    sessionStorage.setItem(draftKey, JSON.stringify(payload))
-    localStorage.setItem(draftKey, JSON.stringify(payload))
-    navigate('/projects/new/setup', { state: { projectId: payload.projectId, idea: payload.idea, projectType: payload.projectType } })
+    setLaunchError('')
+    setIsLaunching(true)
+    setLaunchStage(1)
+    setLaunchElapsed(0)
+
+    const timer = setInterval(() => {
+      setLaunchElapsed(prev => prev + 1)
+    }, 1000)
+    launchTimer.current = timer
+
+    const stage2Timer = setTimeout(() => setLaunchStage(2), 2200)
+    const stage3Timer = setTimeout(() => setLaunchStage(3), 4500)
+
+    try {
+      const res = await launchIdeaProject({
+        idea: idea.trim(),
+        projectType: intent,
+        attachmentName: attachment?.name || '',
+        attachmentText: attachment?.text || '',
+      })
+
+      clearInterval(timer)
+      clearTimeout(stage2Timer)
+      clearTimeout(stage3Timer)
+
+      if (res?.project) {
+        const synced = syncBackendProjects([res.project])
+        localStorage.setItem('udaan:selected-project', res.project.id)
+        setProjects(synced)
+        setSelectedProjectId(res.project.id)
+        navigate(`/flight-plan?project=${encodeURIComponent(res.project.id)}`)
+      } else {
+        throw new Error('Project generation did not return a valid result.')
+      }
+    } catch (err) {
+      clearInterval(timer)
+      clearTimeout(stage2Timer)
+      clearTimeout(stage3Timer)
+      setIsLaunching(false)
+      const msg = err.message || 'Could not complete web research or flight plan generation.'
+      setLaunchError(msg)
+    }
   }
 
   return (
@@ -362,13 +400,13 @@ export default function MainDashboard() {
                     <button
                       ref={launchButton}
                       type="submit"
-                      disabled={launching}
+                      disabled={isLaunching}
                       className="px-6 py-2.5 rounded-full bg-[#1D1B18] hover:bg-black text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
                     >
-                      {launching ? (
+                      {isLaunching ? (
                         <>
                           <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                          <span>Taking off...</span>
+                          <span>Researching & Launching ({launchElapsed}s)...</span>
                         </>
                       ) : (
                         <>
@@ -379,11 +417,91 @@ export default function MainDashboard() {
                     </button>
                   </div>
 
-                  {submission.phase === 'error' && (
-                    <p className="text-xs text-[#8E4B49] bg-[#FFAAA6]/30 px-3 py-2 rounded-xl font-semibold" role="alert">
-                      {submission.message}
-                    </p>
+                  {/* Multi-Stage Status Feedback (Heuristic #1: Visibility of System Status) */}
+                  {isLaunching && (
+                    <div className="bg-[#FFF8F3] border-2 border-[#FFAAA6] rounded-2xl p-4 shadow-sm space-y-3 animate-fadeIn">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#8E4B49] animate-pulse"></span>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-[#8E4B49]">
+                            Live Multi-Stage Pipeline Active
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono font-bold text-[#534342]">
+                            {launchElapsed}s elapsed
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (launchTimer.current) clearInterval(launchTimer.current)
+                              setIsLaunching(false)
+                            }}
+                            className="text-[10px] font-bold text-[#8E4B49] hover:text-black px-2.5 py-0.5 rounded-full bg-white border border-[#FFAAA6]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                        {[
+                          { stage: 1, title: 'Brave Discovery', desc: 'Scanning web competitors & pricing' },
+                          { stage: 2, title: 'Tavily Extraction', desc: 'Extracting user pain points & excerpts' },
+                          { stage: 3, title: 'Gemini Synthesis', desc: 'Shaping 4 Milestones & Mind Map' },
+                        ].map(({ stage, title, desc }) => {
+                          const isCurrent = launchStage === stage
+                          const isPassed = launchStage > stage
+                          return (
+                            <div
+                              key={stage}
+                              className={`p-2.5 rounded-xl border transition-all flex items-start gap-2.5 ${
+                                isCurrent
+                                  ? 'bg-[#FFF1ED] border-[#8E4B49] shadow-xs'
+                                  : isPassed
+                                  ? 'bg-[#F9F2ED] border-[#9FD8CB] opacity-90'
+                                  : 'bg-white border-[#EFEAE4] opacity-50'
+                              }`}
+                            >
+                              <div className="mt-0.5 shrink-0">
+                                {isPassed ? (
+                                  <span className="w-4 h-4 rounded-full bg-[#2A5D54] text-white flex items-center justify-center text-[10px] font-bold">✓</span>
+                                ) : isCurrent ? (
+                                  <span className="w-4 h-4 rounded-full border-2 border-[#8E4B49] border-t-transparent animate-spin block"></span>
+                                ) : (
+                                  <span className="w-4 h-4 rounded-full border border-[#D8C1C0] text-[#7C766F] flex items-center justify-center text-[9px] font-bold font-mono">{stage}</span>
+                                )}
+                              </div>
+                              <div className="space-y-0.5 min-w-0">
+                                <h4 className={`text-[11px] font-bold truncate ${isCurrent ? 'text-[#8E4B49]' : isPassed ? 'text-[#2A5D54]' : 'text-[#7C766F]'}`}>
+                                  {title}
+                                </h4>
+                                <p className="text-[10px] text-[#534342] leading-tight line-clamp-1">{desc}</p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
                   )}
+
+                  {/* Plain Language Error Recovery (Heuristic #9) */}
+                  {launchError && (
+                    <div className="bg-[#FFAAA6]/20 border border-[#FFAAA6] rounded-2xl p-4 flex items-center justify-between gap-3 text-xs text-[#7A3C3A]" role="alert">
+                      <div className="space-y-0.5">
+                        <strong className="font-bold">Launch Notice:</strong>
+                        <p>{launchError}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={launch}
+                        className="py-1 px-3 rounded-full bg-[#8E4B49] text-white text-xs font-bold hover:bg-black transition-colors shrink-0 cursor-pointer"
+                      >
+                        Retry Scan
+                      </button>
+                    </div>
+                  )}
+
                   {attachmentNotice && (
                     <p className="text-xs text-[#705D1B] bg-[#FBE191]/30 px-3 py-2 rounded-xl font-semibold">
                       {attachmentNotice}

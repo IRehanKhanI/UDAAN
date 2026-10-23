@@ -81,3 +81,63 @@ export async function saveProjectDraft(draft, understanding, workflow, currentSt
 export function fetchProjectDraft(projectId) {
   return apiRequest(`/api/projects/drafts/${encodeURIComponent(projectId)}/`)
 }
+
+export function launchIdeaProject({ idea, projectType, attachmentName = '', attachmentText = '' }) {
+  return apiRequest('/api/projects/launch/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      idea,
+      project_type: projectType,
+      attachment_name: attachmentName,
+      attachment_text: attachmentText,
+    }),
+  })
+}
+
+export function fetchWorkspaceProjects() {
+  return apiRequest('/api/projects/')
+}
+
+export function getMarketRadar(projectId) {
+  return apiRequest(`/api/projects/drafts/${encodeURIComponent(projectId)}/market-radar/`)
+}
+
+export function getMindMap(projectId) {
+  return apiRequest(`/api/projects/drafts/${encodeURIComponent(projectId)}/mindmap/`)
+}
+
+export function saveMindMap(projectId, { nodes, edges, layoutSettings }) {
+  return apiRequest(`/api/projects/drafts/${encodeURIComponent(projectId)}/mindmap/`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nodes,
+      edges,
+      layout_settings: layoutSettings,
+    }),
+  })
+}
+
+export function addExperimentToRoadmap(projectId, experiment) {
+  return apiRequest(`/api/projects/drafts/${encodeURIComponent(projectId)}/experiments/add/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ experiment }),
+  })
+}
+
+export function verifyProjectTask(projectId, { taskKey, taskTitle = '', proofType = 'manual_check', proofDetails = {}, xpAwarded = 150 }) {
+  return apiRequest(`/api/projects/drafts/${encodeURIComponent(projectId)}/verify-task/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      task_key: taskKey,
+      task_title: taskTitle,
+      proof_type: proofType,
+      proof_details: proofDetails,
+      xp_awarded: xpAwarded,
+    }),
+  })
+}
+

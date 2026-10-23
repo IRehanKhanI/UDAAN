@@ -7,8 +7,16 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from datetime import datetime, timedelta
+import logging
+logger = logging.getLogger(__name__)
+
 # pyrefly: ignore[missing-import]
-from apps.projects.models import ProjectDraft, ProjectStageGeneration, ProjectRepository, RoadmapAssessment, ProjectLearningState
+from apps.projects.models import (
+    ProjectDraft, ProjectStageGeneration, ProjectRepository, RoadmapAssessment,
+    ProjectLearningState, MarketRadarReport, MindMapGraph, TaskVerificationReceipt
+)
+from .market_radar_service import generate_market_radar_and_flight_plan
 from .stage_generation import STAGE_ORDER, enqueue_stage_generation, mark_draft_generation_changes, serialize_generation, stage_input_hash, stage_prerequisite_ready
 from .roadmap_matcher import compare_roadmap_with_repository
 
@@ -192,6 +200,8 @@ class ProjectDraftSerializer(serializers.ModelSerializer):
     current_stage = serializers.ChoiceField(choices=['understanding', 'research', 'feasibility', 'launch_timing', 'timing', 'flight_plan'])
     repository = serializers.SerializerMethodField()
     latest_assessment = serializers.SerializerMethodField()
+    market_radar = serializers.SerializerMethodField()
+    mindmap_graph = serializers.SerializerMethodField()
     team_size = serializers.IntegerField(min_value=1, max_value=50, required=False, allow_null=True)
 
     class Meta:
@@ -200,6 +210,7 @@ class ProjectDraftSerializer(serializers.ModelSerializer):
             'id', 'idea', 'project_type', 'attachment', 'understanding',
             'workflow', 'current_stage', 'start_date', 'deadline',
             'team_size', 'weekly_hours', 'schedule_metadata',
+            'xp_points', 'xp_level', 'market_radar', 'mindmap_graph',
             'repository', 'latest_assessment',
             'created_at', 'updated_at',
         ]
@@ -211,6 +222,35 @@ class ProjectDraftSerializer(serializers.ModelSerializer):
         if deadline and start and deadline <= start:
             raise serializers.ValidationError({'deadline': 'The deadline must be strictly after the start date.'})
         return attrs
+
+    def get_market_radar(self, obj):
+        try:
+            if hasattr(obj, 'market_radar') and obj.market_radar:
+                r = obj.market_radar
+                return {
+                    'summary': r.summary,
+                    'competitors': r.competitors,
+                    'customer_voice': r.customer_voice,
+                    'citations': r.citations,
+                    'validation_experiments': r.validation_experiments,
+                    'created_at': r.created_at.isoformat(),
+                }
+        except Exception:
+            pass
+        return (obj.workflow or {}).get('market_radar', None)
+
+    def get_mindmap_graph(self, obj):
+        try:
+            if hasattr(obj, 'mindmap_graph') and obj.mindmap_graph:
+                g = obj.mindmap_graph
+                return {
+                    'nodes': g.nodes,
+                    'edges': g.edges,
+                    'layout_settings': g.layout_settings,
+                }
+        except Exception:
+            pass
+        return (obj.workflow or {}).get('mindmap_graph', None)
 
     def get_repository(self, obj):
         try:
@@ -303,11 +343,12 @@ class ProjectDraftView(APIView):
 
 
 class ProjectDraftCollectionView(APIView):
-    """List only account-owned drafts; anonymous projects stay in browser storage and UUID access."""
+    """List account-owned drafts or unowned workspace drafts for local development."""
     def get(self, request):
-        if not request.user.is_authenticated:
-            return Response({'results': []})
-        drafts = authorized_project_drafts(request).select_related('repository')
+        if request.user.is_authenticated:
+            drafts = authorized_project_drafts(request).select_related('repository')
+        else:
+            drafts = ProjectDraft.objects.filter(owner__isnull=True).select_related('repository')[:30]
         return Response({'results': ProjectDraftSerializer(drafts, many=True).data})
 
 
@@ -941,3 +982,251 @@ class ProjectReplanView(APIView):
             'proposed_plan': proposed_plan,
             'comparison': comparison,
         }, status=status.HTTP_200_OK)
+
+
+class ProjectLaunchInputSerializer(serializers.Serializer):
+    idea = serializers.CharField(max_length=4000, allow_blank=False, trim_whitespace=True)
+    project_type = serializers.ChoiceField(choices=['Startup', 'Hackathon', 'College Project', 'Personal Project'])
+    attachment_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    attachment_text = serializers.CharField(max_length=20000, required=False, allow_blank=True)
+
+
+class ProjectLaunchView(APIView):
+    """
+    End-to-end launch pipeline:
+    Stage 1: Brave Search broad discovery
+    Stage 2: Tavily deep page extraction (competitors, pricing, complaints)
+    Stage 3: Gemini structured synthesis -> Flight Plan + Market Radar + Mind Map
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        serializer = ProjectLaunchInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({'error': 'Check the idea details and try again.', 'fields': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        data = serializer.validated_data
+        idea = data['idea']
+        project_type = data['project_type']
+        attachment_text = data.get('attachment_text', '')
+
+        try:
+            result = generate_market_radar_and_flight_plan(
+                idea=idea,
+                project_type=project_type,
+                attachment_text=attachment_text,
+            )
+        except Exception as error:
+            logger.error(f"Launch pipeline failed: {error}")
+            return Response({'error': f'Launch pipeline error: {str(error)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        understanding = {
+            'project_name': result['project_name'],
+            'problem_statement': result['problem_statement'],
+            'target_users': result['target_users'],
+            'expected_outcome': result['expected_outcome'],
+        }
+        workflow = {
+            'market_radar': result['market_radar'],
+            'flight_plan': result['flight_plan'],
+            'mindmap_graph': result['mindmap_graph'],
+            'web_research_sources': result['web_research_sources'],
+        }
+
+        milestones = result['flight_plan'].get('milestones', [])
+        deadline = None
+        if milestones and milestones[-1].get('target_date'):
+            try:
+                deadline = datetime.fromisoformat(milestones[-1]['target_date']).date()
+            except Exception:
+                deadline = (datetime.now(timezone.utc).date() + timedelta(days=80))
+
+        draft = ProjectDraft.objects.create(
+            owner=request.user if request.user.is_authenticated else None,
+            idea=idea,
+            project_type=project_type,
+            attachment={'name': data.get('attachment_name', ''), 'text': attachment_text[:20000]} if attachment_text else None,
+            understanding=understanding,
+            workflow=workflow,
+            current_stage='flight_plan',
+            start_date=datetime.now(timezone.utc).date(),
+            deadline=deadline,
+            team_size=1,
+            weekly_hours=20,
+            xp_points=0,
+            xp_level='Level 1: Idea Shaped',
+        )
+
+        MarketRadarReport.objects.create(
+            project=draft,
+            summary=result['market_radar'].get('summary', ''),
+            competitors=result['market_radar'].get('competitors', []),
+            customer_voice=result['market_radar'].get('customer_voice', []),
+            citations=result['market_radar'].get('citations', []),
+            validation_experiments=result['market_radar'].get('validation_experiments', []),
+            raw_snapshots={'sources': result['web_research_sources']},
+        )
+
+        MindMapGraph.objects.create(
+            project=draft,
+            nodes=result['mindmap_graph'].get('nodes', []),
+            edges=result['mindmap_graph'].get('edges', []),
+            layout_settings={'theme': 'coral', 'spacing': 260, 'opacity': 0.85},
+        )
+
+        return Response({
+            'project': ProjectDraftSerializer(draft).data,
+            'market_radar': result['market_radar'],
+            'flight_plan': result['flight_plan'],
+            'mindmap_graph': result['mindmap_graph'],
+        }, status=status.HTTP_201_CREATED)
+
+
+class ProjectMarketRadarView(APIView):
+    def get(self, request, draft_id):
+        draft = get_object_or_404(ProjectDraft, pk=draft_id)
+        radar = getattr(draft, 'market_radar', None)
+        if not radar:
+            radar_data = (draft.workflow or {}).get('market_radar', {})
+            return Response({'market_radar': radar_data})
+        return Response({
+            'market_radar': {
+                'summary': radar.summary,
+                'competitors': radar.competitors,
+                'customer_voice': radar.customer_voice,
+                'citations': radar.citations,
+                'validation_experiments': radar.validation_experiments,
+                'created_at': radar.created_at.isoformat(),
+            }
+        })
+
+
+class ProjectMindMapView(APIView):
+    def get(self, request, draft_id):
+        draft = get_object_or_404(ProjectDraft, pk=draft_id)
+        graph = getattr(draft, 'mindmap_graph', None)
+        if not graph:
+            graph_data = (draft.workflow or {}).get('mindmap_graph', {'nodes': [], 'edges': []})
+            return Response({'mindmap': graph_data})
+        return Response({
+            'mindmap': {
+                'nodes': graph.nodes,
+                'edges': graph.edges,
+                'layout_settings': graph.layout_settings,
+                'updated_at': graph.updated_at.isoformat(),
+            }
+        })
+
+    def put(self, request, draft_id):
+        draft = get_object_or_404(ProjectDraft, pk=draft_id)
+        nodes = request.data.get('nodes', [])
+        edges = request.data.get('edges', [])
+        layout_settings = request.data.get('layout_settings', {})
+
+        graph, _ = MindMapGraph.objects.get_or_create(project=draft)
+        graph.nodes = nodes
+        graph.edges = edges
+        if layout_settings:
+            graph.layout_settings = layout_settings
+        graph.save()
+
+        if draft.workflow is not None:
+            draft.workflow['mindmap_graph'] = {'nodes': nodes, 'edges': edges, 'layout_settings': graph.layout_settings}
+            draft.save(update_fields=['workflow', 'updated_at'])
+
+        return Response({'success': True, 'node_count': len(nodes)})
+
+
+class ProjectAddExperimentView(APIView):
+    def post(self, request, draft_id):
+        draft = get_object_or_404(ProjectDraft, pk=draft_id)
+        experiment = request.data.get('experiment', {})
+        if not experiment or not experiment.get('title'):
+            return Response({'error': 'Valid experiment details are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        workflow = draft.workflow or {}
+        flight_plan = workflow.get('flight_plan', {})
+        milestones = flight_plan.get('milestones', [])
+        if not milestones:
+            return Response({'error': 'No milestones found in flight plan.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        m1 = milestones[0]
+        exp_id = f"m1-exp-{len(m1.get('tasks', [])) + 1}"
+        new_task = {
+            'id': exp_id,
+            'title': f"Experiment: {experiment.get('title')}",
+            'why_matters': f"Market Radar Experiment: {experiment.get('hypothesis', '')}",
+            'radar_chip': f"Radar Validation ({experiment.get('estimated_cost', 'Low Cost')})",
+            'steps': [
+                {'text': f"Design experiment: {experiment.get('method', 'Setup smoke test')}", 'done': False},
+                {'text': f"Measure target metric: {experiment.get('pass_fail_metric', 'Pass threshold')}", 'done': False},
+                {'text': "Document pass/fail outcome in evidence log", 'done': False},
+            ],
+            'expected_evidence': ['docs/experiments/validation_report.md'],
+            'verification_criteria': f"Pass threshold achieved: {experiment.get('pass_fail_metric', 'Metric met')}",
+            'dependencies': [],
+            'xp_reward': 150,
+            'priority': 'high',
+            'effort_hours': experiment.get('effort_days', 2) * 4,
+            'suggested_role': 'Product Lead',
+            'start_date': m1.get('start_date', ''),
+            'target_date': m1.get('target_date', ''),
+        }
+
+        m1['tasks'] = [new_task] + m1.get('tasks', [])
+        workflow['flight_plan'] = flight_plan
+        draft.workflow = workflow
+        draft.save(update_fields=['workflow', 'updated_at'])
+
+        return Response({
+            'success': True,
+            'task': new_task,
+            'flight_plan': flight_plan,
+        }, status=status.HTTP_201_CREATED)
+
+
+class TaskVerificationView(APIView):
+    def post(self, request, draft_id):
+        draft = get_object_or_404(ProjectDraft, pk=draft_id)
+        task_key = request.data.get('task_key', '').strip()
+        task_title = request.data.get('task_title', '').strip()
+        proof_type = request.data.get('proof_type', 'manual_check')
+        proof_details = request.data.get('proof_details', {})
+        xp = int(request.data.get('xp_awarded', 150))
+
+        if not task_key:
+            return Response({'error': 'task_key is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        receipt, created = TaskVerificationReceipt.objects.get_or_create(
+            project=draft,
+            task_key=task_key,
+            defaults={
+                'task_title': task_title,
+                'proof_type': proof_type,
+                'proof_details': proof_details,
+                'xp_awarded': xp,
+            }
+        )
+
+        if created:
+            draft.xp_points = (draft.xp_points or 0) + xp
+            if draft.xp_points >= 1200:
+                draft.xp_level = 'Level 4: Launch Ready'
+            elif draft.xp_points >= 700:
+                draft.xp_level = 'Level 3: Core Verified'
+            elif draft.xp_points >= 300:
+                draft.xp_level = 'Level 2: Prototype Grounded'
+            else:
+                draft.xp_level = 'Level 1: Idea Shaped'
+            draft.save(update_fields=['xp_points', 'xp_level', 'updated_at'])
+
+        return Response({
+            'success': True,
+            'task_key': task_key,
+            'xp_awarded': xp if created else 0,
+            'total_xp': draft.xp_points,
+            'xp_level': draft.xp_level,
+            'receipt_id': str(receipt.id),
+        }, status=status.HTTP_200_OK)
+

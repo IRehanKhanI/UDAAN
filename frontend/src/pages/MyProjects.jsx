@@ -6,8 +6,10 @@ import {
 import { Link } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
-import { readSavedProjects, removeSavedProject } from '../services/projectStorage.js'
+import { readSavedProjects, removeSavedProject, syncBackendProjects } from '../services/projectStorage.js'
 import { deleteProject } from '../services/projectService.js'
+import { fetchWorkspaceProjects } from '../services/ideaWorkflowService.js'
+import { useEffect } from 'react'
 
 const tabs = [
   { id: 'all', label: 'All' },
@@ -158,6 +160,15 @@ export default function MyProjects() {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
+
+  useEffect(() => {
+    fetchWorkspaceProjects().then(data => {
+      if (data?.results?.length) {
+        const synced = syncBackendProjects(data.results)
+        setProjects(synced)
+      }
+    }).catch(() => {})
+  }, [])
 
   const counts = useMemo(() => ({
     all: projects.length,
