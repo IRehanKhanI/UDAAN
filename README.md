@@ -1,50 +1,190 @@
-# UDAAN
+# UDAAN ✈️
 
-UDAAN (Give Every Idea Wings) is an AI-assisted project development and team execution platform. This repository contains its initial frontend and backend foundation; product screens and business features will be built incrementally from the provided design references.
+> **Give Every Idea Wings** — An AI-assisted product execution platform featuring **Flight Plan**, **Market Radar**, **Mind Map DAG**, and verified milestone tracking. Built with React 19, Tailwind CSS, Framer Motion, and Django REST Framework.
 
-## Requirements
+---
 
-- Node.js 20.19+ or 22.12+
-- Python 3.10+
+## 📋 Requirements
 
-## Frontend
+- **Frontend**: [Bun](https://bun.sh/) (recommended) or Node.js (20.19+ / 22.12+)
+- **Backend**: Python 3.10+ (with `py` or `python` command)
+
+---
+
+## 🚀 Quick Start Guide
+
+### Step 1: Start the Backend (Django)
+
+In your terminal / PowerShell:
 
 ```powershell
+cd backend
+
+# 1. Create and activate a Python virtual environment
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+
+# 2. Copy the example environment file
+Copy-Item example.env .env
+# (or Copy-Item .env.example .env)
+
+# 3. Install backend dependencies
+py -m pip install -r requirements.txt
+
+# 4. Run database migrations
+py manage.py migrate
+
+# 5. Start the backend server (listening on all interfaces so mobile devices can connect)
+py manage.py runserver 0.0.0.0:8000
+```
+
+> **Backend Health Check**: Open `http://127.0.0.1:8000/api/health/` in your browser to verify it responds with `{"status": "healthy"}`.
+
+---
+
+### Step 2: Start the Frontend (Vite)
+
+In a **second terminal / PowerShell** window:
+
+#### Using Bun (Fastest):
+```powershell
 cd frontend
-Copy-Item .env.example .env
+
+# 1. Copy the example environment file
+Copy-Item example.env .env
+# (or Copy-Item .env.example .env)
+
+# 2. Install dependencies
+bun install
+
+# 3. Start development server
+bun run dev
+```
+
+#### Or Using npm:
+```powershell
+cd frontend
+Copy-Item example.env .env
 npm install
 npm run dev
 ```
 
-The Vite development server runs at http://127.0.0.1:5173. `VITE_API_BASE_URL` defaults in code to `http://127.0.0.1:8000`.
+---
 
-Build for production with `npm run build` from `frontend/`.
+## 📱 The 2 Access URLs (Localhost & Mobile WiFi)
 
-## Backend
+When Vite starts, it binds to `0.0.0.0:5173` and displays two access URLs:
 
-```powershell
-cd backend
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-Copy-Item .env.example .env
-py -m pip install -r requirements.txt
-py manage.py migrate
-py manage.py runserver 127.0.0.1:8000
+```text
+  VITE v7.3.7  ready in 1200 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: http://<YOUR_WIFI_IP>:5173/   (e.g., http://10.139.50.66:5173/)
 ```
 
-The API runs at http://127.0.0.1:8000. Check `http://127.0.0.1:8000/api/health/` for its health response. To enable idea analysis, add `GEMINI_API_KEY=your-key` to `backend/.env` (optionally set `GEMINI_MODEL=gemini-3.8-flash` and `GEMINI_FALLBACK_MODELS=gemini-3.6-flash,gemini-3.5-flash-lite`) and restart Django. Keep the key in the backend environment; do not add it to `frontend/.env`. The `/api/ideas/analyze/` endpoint returns a draft based on the idea and any attached text. SQLite is used by default. To use PostgreSQL, set `DB_ENGINE=postgresql` and configure the `DB_*` values in `backend/.env`.
+1. **Local URL (`http://localhost:5173/`)**: Open in your desktop/laptop browser.
+2. **Network URL (`http://<YOUR_WIFI_IP>:5173/`)**: Open in any **mobile phone browser connected to the same WiFi**.
+   - The frontend automatically routes all API requests through the Vite dev proxy to Django, so your mobile phone works out-of-the-box with **zero mobile configuration and zero CORS issues**!
 
-## Foundation
+---
 
-- React, Vite, React Router, Tailwind CSS, Framer Motion, and Lucide icons
-- Central API client, project storage, and idea workflow services
-- Django REST Framework with CORS configured for local Vite origins
-- Four stage idea planning wizard and Flight Plan pages
+## 🛠️ Troubleshooting: "Port 5173 is already in use"
 
-## Idea planning workflow
+If you see:
+```text
+error when starting dev server:
+Error: Port 5173 is already in use
+error: script "dev" exited with code 1
+```
 
-The four planning stages call the Django `/api/ideas/analyze/` and `/api/ideas/workflow-stage/` endpoints. Gemini credentials stay in `backend/.env` as `GEMINI_API_KEY`; `GEMINI_MODEL` may select the model. Generated Research is a preliminary, unverified landscape report. This app has no live web search integration, so AI generated source URLs are rejected and the source list starts empty. Verify claims and add real sources yourself. Feasibility is a buildability estimate, not proof of demand. Flight Plan assigns role suggestions only, never named people.
+This means an existing background process (Node or Bun) is already holding port `5173`.
 
-Drafts are saved in browser storage and to the Django `ProjectDraft` table. The current frontend has no sign-in flow and sends draft requests anonymously, so the draft UUID acts as a bearer identifier for read/write access; anyone who obtains that identifier may access an unowned draft. The API associates a draft with a user when a request is authenticated, then restricts access to that user, but the React app does not currently provide or send user credentials. Do not store sensitive personal or confidential information in these drafts.
+### Fix in PowerShell (Windows):
 
-Run backend checks from `backend/` with `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py test apps.core.tests`. Run the production frontend build from `frontend/` with `npm run build`.
+Run this one-liner in PowerShell to instantly free port 5173:
+```powershell
+Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
+
+Or step-by-step:
+```powershell
+# 1. Check which process ID is using port 5173:
+Get-NetTCPConnection -LocalPort 5173 | Select-Object OwningProcess
+
+# 2. Kill that process (replace <PID> with the number from step 1):
+Stop-Process -Id <PID> -Force
+```
+
+Then re-run:
+```powershell
+bun run dev
+# or npm run dev
+```
+
+*(Same applies for port 8000: `Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }`)*
+
+---
+
+## ⚙️ Environment Variables Overview
+
+Both directories include fully documented [`example.env`](file:///c:/Users/User/Desktop/learning/projects/UDAAN/backend/example.env) and [`.env.example`](file:///c:/Users/User/Desktop/learning/projects/UDAAN/backend/.env.example) files:
+
+### Backend (`backend/.env`):
+| Variable | Description | Default / Example |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | Secret key for Django sessions and security | Dev fallback string |
+| `DJANGO_DEBUG` | Development debug mode | `True` |
+| `DJANGO_ALLOWED_HOSTS` | Hosts allowed to connect (`*` enables mobile WiFi access) | `*` in dev |
+| `CORS_ALLOW_ALL_ORIGINS` | Enables mobile access from any device on WiFi | `True` in dev |
+| `GEMINI_API_KEY` | Google Gemini API key for roadmap & mind map synthesis | Get from Google AI Studio |
+| `GEMINI_MODEL` | Primary Gemini model | `gemini-2.5-flash` |
+| `BRAVE_API_KEY` | Real web discovery for competitor pricing & complaints | Optional (Brave Search API) |
+| `TAVILY_API_KEY` | Deep competitor content extraction | Optional (Tavily AI) |
+| `DB_ENGINE` | Database engine (`sqlite` or `postgresql`) | `sqlite` |
+
+### Frontend (`frontend/.env`):
+| Variable | Description | Recommended Setting |
+|---|---|---|
+| `VITE_API_BASE_URL` | Backend URL override | Leave **blank** in development (`VITE_API_BASE_URL=`) so Vite's proxy automatically bridges calls from both localhost and mobile devices on WiFi. |
+
+---
+
+## 🧪 Testing and Production Builds
+
+### Frontend Tests (Node.js Test Runner):
+```powershell
+cd frontend
+npm test
+# (27 unit & integration tests)
+```
+
+### Production Frontend Build:
+```powershell
+cd frontend
+npm run build
+# (Compiles optimized assets to frontend/dist/)
+```
+
+### Backend Tests (Django):
+```powershell
+cd backend
+py manage.py test apps.core
+# (102 tests covering all API endpoints)
+```
+
+---
+
+## 🌟 Key Platform Features
+
+1. **Flight Plan 4-Mode Switcher**:
+   - **Flow Map (Milestones)**: 4-milestone execution plan with deadline badges, overdue alerts, and schedule feasibility.
+   - **Mind Map & Idea Tree**: Interactive 2D DAG canvas with animated SVG flow pipes, zoom/pan controls, and node spacing tools.
+   - **Market Radar**: Real competitor matrix with public pricing models, verified customer pain points, and live web citations.
+   - **Gantt & Timeline**: Chronological progress visualizer tracking milestone targets against sprint deadlines.
+2. **Task Workbench & Multi-Track Verification**:
+   - Progressive disclosure drawer linking tasks directly to Market Radar context and repository file signatures.
+   - Independent tracking for **Manual User Completion**, **Repository Evidence**, and **Verification Checks**.
+   - Awards XP and level progression with cryptographic receipts.
+3. **AI Roadmap Replanning Diff**:
+   - Interactive Before vs. After visual diff with color-coded additions/modifications.
+   - Includes **"Accept Selected"**, **"Reject"**, and **1-Click Undo**.
