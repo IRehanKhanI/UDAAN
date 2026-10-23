@@ -343,12 +343,11 @@ class ProjectDraftView(APIView):
 
 
 class ProjectDraftCollectionView(APIView):
-    """List account-owned drafts or unowned workspace drafts for local development."""
+    """List only account-owned drafts; anonymous projects stay in browser storage and UUID access."""
     def get(self, request):
-        if request.user.is_authenticated:
-            drafts = authorized_project_drafts(request).select_related('repository')
-        else:
-            drafts = ProjectDraft.objects.filter(owner__isnull=True).select_related('repository')[:30]
+        if not request.user.is_authenticated:
+            return Response({'results': []})
+        drafts = authorized_project_drafts(request).select_related('repository')
         return Response({'results': ProjectDraftSerializer(drafts, many=True).data})
 
 
@@ -1040,7 +1039,7 @@ class ProjectLaunchView(APIView):
             try:
                 deadline = datetime.fromisoformat(milestones[-1]['target_date']).date()
             except Exception:
-                deadline = (datetime.now(timezone.utc).date() + timedelta(days=80))
+                deadline = (timezone.now().date() + timedelta(days=80))
 
         draft = ProjectDraft.objects.create(
             owner=request.user if request.user.is_authenticated else None,
@@ -1050,7 +1049,7 @@ class ProjectLaunchView(APIView):
             understanding=understanding,
             workflow=workflow,
             current_stage='flight_plan',
-            start_date=datetime.now(timezone.utc).date(),
+            start_date=timezone.now().date(),
             deadline=deadline,
             team_size=1,
             weekly_hours=20,
@@ -1142,7 +1141,13 @@ class ProjectAddExperimentView(APIView):
     def post(self, request, draft_id):
         draft = get_object_or_404(ProjectDraft, pk=draft_id)
         experiment = request.data.get('experiment', {})
-        if not experiment or not experiment.get('title'):
+        if isinstance(experiment, str):
+            try:
+                import json
+                experiment = json.loads(experiment)
+            except Exception:
+                experiment = {}
+        if not isinstance(experiment, dict) or not experiment.get('title'):
             return Response({'error': 'Valid experiment details are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         workflow = draft.workflow or {}

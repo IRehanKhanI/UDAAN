@@ -46,7 +46,7 @@ function ProjectCard({ project, menuOpen, deleting, onOptions, onDelete, onSelec
   }[project.tone] || 'bg-[#8E4B49]'
 
   return (
-    <article className="group bg-white rounded-3xl p-5 md:p-6 border border-[#EFEAE4] shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-4">
+    <article className="group bg-white rounded-3xl p-5 md:p-6 border border-[#EFEAE4] shadow-xs hover:shadow-xl hover:-translate-y-1 hover:-rotate-0.5 transition-all duration-300 flex flex-col justify-between gap-4">
       <div className="space-y-3">
         {/* Top Badges */}
         <div className="flex items-center justify-between">

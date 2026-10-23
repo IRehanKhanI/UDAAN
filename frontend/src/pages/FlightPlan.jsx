@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowRight,
+  Award,
   Bell,
   Calendar,
   CalendarClock,
@@ -35,6 +36,7 @@ import {
   ShieldAlert,
   Sparkles,
   Trash2,
+  Undo2,
   UsersRound,
   X,
 } from 'lucide-react'
@@ -44,13 +46,22 @@ import Header from '../layouts/Header.jsx'
 import AddTaskModal from '../components/modals/AddTaskModal.jsx'
 import PlainEnglishExplainerModal from '../components/modals/PlainEnglishExplainerModal.jsx'
 import CreativeBriefModal from '../components/modals/CreativeBriefModal.jsx'
-import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
+import MindMapCanvas from '../components/mindmap/MindMapCanvas.jsx'
+import MarketRadarView from '../components/radar/MarketRadarView.jsx'
+import ReplanDiffDrawer from '../components/diff/ReplanDiffDrawer.jsx'
+import TaskWorkbenchDrawer from '../components/workbench/TaskWorkbenchDrawer.jsx'
+import { readSavedProjects, updateSavedProject, syncBackendProjects } from '../services/projectStorage.js'
 import {
   generateIdeaStage,
   saveProjectDraft,
   getIdeaStageGeneration,
   queueIdeaStageGeneration,
   replanProjectRoadmap,
+  addExperimentToRoadmap,
+  verifyProjectTask,
+  getMarketRadar,
+  getMindMap,
+  saveMindMap,
 } from '../services/ideaWorkflowService.js'
 import { createStarterFlightPlan, hasActionableFlightPlan } from '../services/flightPlanUtils.js'
 import { getTeamWorkspace, updateTeamTask } from '../services/teamService.js'
@@ -106,6 +117,130 @@ function normalizeMilestones(plan = {}) {
   }))
 }
 
+export function buildClientMindMap(project, plan, radar = null) {
+  const rootId = 'node-root'
+  const nodes = [
+    {
+      id: rootId,
+      label: (project?.name || 'Project Anchor').slice(0, 32),
+      type: 'root',
+      group: 'core',
+      description: project?.idea || 'Core Idea & Vision Anchor',
+      x: 80,
+      y: 300,
+    },
+  ]
+  const edges = []
+
+  // Market Insights
+  const competitors = radar?.competitors || []
+  const voice = radar?.customer_voice || []
+  const insights = [
+    ...competitors.map(c => ({ title: `Comp: ${c.name}`, snippet: `${c.positioning} (${c.pricing})` })),
+    ...voice.map(v => ({ title: `Need: ${v.pain_point}`, snippet: v.user_complaint })),
+  ]
+  if (!insights.length) {
+    insights.push(
+      { title: 'Market Gap: High Cost', snippet: 'Existing market tools have expensive plans' },
+      { title: 'User Need: Simplicity', snippet: 'Creators demand an intuitive streamlined setup' }
+    )
+  }
+
+  insights.slice(0, 3).forEach((ins, idx) => {
+    const nId = `node-mkt-${idx + 1}`
+    nodes.push({
+      id: nId,
+      label: ins.title.slice(0, 26),
+      type: 'market',
+      group: 'market',
+      description: ins.snippet,
+      radar_chip: 'Market Grounding',
+      x: 360,
+      y: 120 + idx * 110,
+    })
+    edges.push({
+      id: `edge-root-${nId}`,
+      source: rootId,
+      target: nId,
+      label: 'grounded by',
+      animated: true,
+    })
+  })
+
+  // Milestones & Tasks
+  const milestonesList = normalizeMilestones(plan)
+  let prevMId = null
+
+  milestonesList.forEach((milestone, mIdx) => {
+    const mId = `node-m${mIdx + 1}`
+    const mY = 80 + mIdx * 160
+    nodes.push({
+      id: mId,
+      label: (milestone.title || `Milestone ${mIdx + 1}`).slice(0, 30),
+      type: 'milestone',
+      group: 'milestone',
+      description: milestone.purpose || '',
+      x: 680,
+      y: mY,
+    })
+
+    if (prevMId) {
+      edges.push({
+        id: `edge-${prevMId}-${mId}`,
+        source: prevMId,
+        target: mId,
+        label: 'advances to',
+        animated: true,
+      })
+    } else {
+      edges.push({
+        id: `edge-root-${mId}`,
+        source: rootId,
+        target: mId,
+        label: 'executes',
+        animated: true,
+      })
+    }
+    prevMId = mId
+
+    // 2-3 tasks per milestone
+    ;(milestone.tasks || []).slice(0, 3).forEach((task, tIdx) => {
+      const tId = task.id || `${mIdx}-${tIdx}`
+      const nodeTId = `node-task-${mIdx + 1}-${tIdx + 1}`
+      nodes.push({
+        id: nodeTId,
+        taskId: tId,
+        label: (task.title || `Task ${tIdx + 1}`).slice(0, 28),
+        type: 'task',
+        group: 'task',
+        description: task.why_matters || task.purpose || '',
+        xp_reward: task.xp_reward || 150,
+        radar_chip: task.radar_chip || '',
+        x: 1000,
+        y: mY - 35 + tIdx * 50,
+      })
+      edges.push({
+        id: `edge-${mId}-${nodeTId}`,
+        source: mId,
+        target: nodeTId,
+        label: `+${task.xp_reward || 150} XP`,
+        animated: false,
+      })
+    })
+  })
+
+  return {
+    nodes,
+    edges,
+    layout_settings: {
+      node_spacing: 1.0,
+      connection_opacity: 0.65,
+      theme: 'espresso',
+      show_labels: true,
+    },
+  }
+}
+
 function formatDate(value) {
   if (!value) return 'Not synced yet'
   const date = new Date(value)
@@ -123,13 +258,18 @@ export function formatDisplayDate(dateStr) {
 
 export function getDaysRemaining(deadlineStr) {
   if (!deadlineStr) return null
-  const d = new Date(deadlineStr)
-  if (Number.isNaN(d.valueOf())) return null
+  let target
+  if (typeof deadlineStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(deadlineStr.trim())) {
+    const parts = deadlineStr.trim().split('T')[0].split('-').map(Number)
+    target = new Date(parts[0], parts[1] - 1, parts[2])
+  } else {
+    const d = new Date(deadlineStr)
+    if (Number.isNaN(d.valueOf())) return null
+    target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  }
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const target = new Date(d)
-  target.setHours(0, 0, 0, 0)
-  const diffTime = target - today
+  const current = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const diffTime = target.getTime() - current.getTime()
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
   return {
     days: diffDays,
@@ -496,6 +636,10 @@ function RoadmapHeader({
   const startDateStr = project.startDate || project.start_date || project.workflow?.flight_plan?.start_date
   const daysInfo = useMemo(() => getDaysRemaining(deadlineStr), [deadlineStr])
   const timelineProgress = useMemo(() => getTimelineProgress(startDateStr, deadlineStr), [startDateStr, deadlineStr])
+  const [activeTrackInfo, setActiveTrackInfo] = useState(null)
+
+  const currentXp = project.xp_points || 0
+  const currentLvl = project.xp_level || (currentXp >= 1000 ? 4 : currentXp >= 600 ? 3 : currentXp >= 300 ? 2 : 1)
 
   return (
     <>
@@ -507,6 +651,11 @@ function RoadmapHeader({
         </div>
 
         <div className="fp-hero-actions">
+          <div className="fp-xp-badge" title="Project experience points earned through task verification">
+            <Award size={13} className="text-[#8E4B49]" />
+            <span>Level {currentLvl} · {currentXp} XP</span>
+          </div>
+
           <button
             className="fp-timing-badge-btn"
             type="button"
@@ -628,11 +777,26 @@ function RoadmapHeader({
           )}
         </div>
 
-        {/* Multi-track breakdown for repository verification */}
+        {/* Multi-track breakdown for repository verification with info popovers */}
         <div className="fp-progress-breakdown">
           <div className="fp-progress-stat">
             <div className="fp-stat-head">
-              <span className="fp-stat-label">Manual user completion</span>
+              <div className="fp-track-info-wrap">
+                <span className="fp-stat-label">Manual user completion</span>
+                <button
+                  type="button"
+                  className="fp-track-info-btn"
+                  onClick={() => setActiveTrackInfo(activeTrackInfo === 'manual' ? null : 'manual')}
+                  title="How is this track calculated?"
+                >
+                  <CircleHelp size={12} />
+                </button>
+                {activeTrackInfo === 'manual' && (
+                  <div className="fp-track-popover">
+                    <strong>Manual User Completion:</strong> Computed dynamically from task checkboxes marked as done by you.
+                  </div>
+                )}
+              </div>
               <span className="fp-stat-val">{doneCount} / {taskCount} ({percent}%)</span>
             </div>
             <div className="fp-stat-track user"><span style={{ width: `${percent}%` }} /></div>
@@ -641,7 +805,22 @@ function RoadmapHeader({
 
           <div className="fp-progress-stat">
             <div className="fp-stat-head">
-              <span className="fp-stat-label">Repository evidence found</span>
+              <div className="fp-track-info-wrap">
+                <span className="fp-stat-label">Repository evidence found</span>
+                <button
+                  type="button"
+                  className="fp-track-info-btn"
+                  onClick={() => setActiveTrackInfo(activeTrackInfo === 'evidence' ? null : 'evidence')}
+                  title="How is this track calculated?"
+                >
+                  <CircleHelp size={12} />
+                </button>
+                {activeTrackInfo === 'evidence' && (
+                  <div className="fp-track-popover">
+                    <strong>Repository Evidence Found:</strong> Deterministic file scan matching your connected GitHub repository's tree against expected milestone source code.
+                  </div>
+                )}
+              </div>
               <span className="fp-stat-val">{evidenceCount} / {taskCount} ({evidencePercent}%)</span>
             </div>
             <div className="fp-stat-track evidence"><span style={{ width: `${evidencePercent}%` }} /></div>
@@ -650,7 +829,22 @@ function RoadmapHeader({
 
           <div className="fp-progress-stat">
             <div className="fp-stat-head">
-              <span className="fp-stat-label">Verification passed</span>
+              <div className="fp-track-info-wrap">
+                <span className="fp-stat-label">Verification passed</span>
+                <button
+                  type="button"
+                  className="fp-track-info-btn"
+                  onClick={() => setActiveTrackInfo(activeTrackInfo === 'verified' ? null : 'verified')}
+                  title="How is this track calculated?"
+                >
+                  <CircleHelp size={12} />
+                </button>
+                {activeTrackInfo === 'verified' && (
+                  <div className="fp-track-popover">
+                    <strong>Verification Passed:</strong> Verifiable test receipts, PR reviews, and proofs verified in Task Workbench. Awards real XP toward project tier progression!
+                  </div>
+                )}
+              </div>
               <span className="fp-stat-val">{verifiedCount} / {taskCount} ({verifiedPercent}%)</span>
             </div>
             <div className="fp-stat-track verified"><span style={{ width: `${verifiedPercent}%` }} /></div>
@@ -680,6 +874,7 @@ function TaskRow({
   showMilestone = false,
   assessment,
   onInspect,
+  onOpenWorkbench,
 }) {
   const task = item.task
   const priority = (task.priority || 'medium').toLowerCase()
@@ -702,17 +897,33 @@ function TaskRow({
 
       <div className="fp-task-main">
         <div className="fp-task-title-line">
-          <h4>{task.title}</h4>
-          {showMilestone && <span className="fp-task-milestone-label">{item.milestone}</span>}
-          <button
-            type="button"
-            className={`fp-task-build-badge ${meta.className}`}
-            onClick={() => onInspect?.(item, assessment)}
-            title="Click to inspect repository evidence and checks"
+          <h4
+            className="cursor-pointer hover:text-[#8E4B49] transition-colors"
+            onClick={() => onOpenWorkbench?.(item)}
+            title="Click to open Task Workbench"
           >
-            <StatusIcon size={12} />
-            <span>{meta.label}</span>
-          </button>
+            {task.title}
+          </h4>
+          {showMilestone && <span className="fp-task-milestone-label">{item.milestone}</span>}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              className="fp-workbench-open-btn"
+              onClick={() => onOpenWorkbench?.(item)}
+              title="Open Task Workbench (Requirements, Evidence & Verification)"
+            >
+              <Sparkles size={11} /> Workbench
+            </button>
+            <button
+              type="button"
+              className={`fp-task-build-badge ${meta.className}`}
+              onClick={() => onInspect?.(item, assessment)}
+              title="Click to inspect repository evidence and checks"
+            >
+              <StatusIcon size={12} />
+              <span>{meta.label}</span>
+            </button>
+          </div>
         </div>
 
         <div className="fp-task-meta">
@@ -1453,7 +1664,7 @@ export default function FlightPlan() {
     if (project?.id) localStorage.setItem('udaan:selected-project', project.id)
   }, [project?.id])
 
-  const [view, setView] = useState('roadmap') // 'roadmap' | 'tasks'
+  const [view, setView] = useState('flowmap') // 'flowmap' | 'mindmap' | 'radar' | 'timeline'
   const [menuOpen, setMenuOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -1470,6 +1681,23 @@ export default function FlightPlan() {
   const [proposedPlan, setProposedPlan] = useState(null)
   const [generationStatus, setGenerationStatus] = useState('')
   const [generationError, setGenerationError] = useState('')
+
+  // Market Radar & Mind Map State
+  const [marketRadar, setMarketRadar] = useState(() => project?.market_radar || null)
+  const [mindMapGraph, setMindMapGraph] = useState(() => project?.mindmap_graph || null)
+  const [loadingRadar, setLoadingRadar] = useState(false)
+  const [loadingMindMap, setLoadingMindMap] = useState(false)
+  const [addingExpId, setAddingExpId] = useState(null)
+
+  // Task Workbench Drawer State
+  const [workbenchTask, setWorkbenchTask] = useState(null)
+  const [workbenchMilestoneTitle, setWorkbenchMilestoneTitle] = useState('')
+  const [isVerifying, setIsVerifying] = useState(false)
+
+  // Replan Diff Drawer & Undo History State
+  const [diffDrawerOpen, setDiffDrawerOpen] = useState(false)
+  const [replanComparison, setReplanComparison] = useState(null)
+  const [historyStack, setHistoryStack] = useState([])
 
   // Timing Modal
   const [timingModalOpen, setTimingModalOpen] = useState(false)
@@ -1583,6 +1811,210 @@ export default function FlightPlan() {
     void loadRepoAndAssessment()
     return () => { active = false }
   }, [project?.id])
+
+  // Load project's Market Radar & Mind Map Graph
+  useEffect(() => {
+    let active = true
+    if (!project?.id) return
+
+    if (project.market_radar && Object.keys(project.market_radar).length) {
+      setMarketRadar(project.market_radar)
+    } else {
+      setLoadingRadar(true)
+      getMarketRadar(project.id)
+        .then(res => {
+          if (active && res && Object.keys(res).length) {
+            setMarketRadar(res)
+            updateSavedProject(project.id, current => ({ ...current, market_radar: res }))
+          }
+        })
+        .catch(() => {})
+        .finally(() => { if (active) setLoadingRadar(false) })
+    }
+
+    if (project.mindmap_graph && project.mindmap_graph.nodes?.length) {
+      setMindMapGraph(project.mindmap_graph)
+    } else {
+      setLoadingMindMap(true)
+      getMindMap(project.id)
+        .then(res => {
+          if (active && res && res.nodes?.length) {
+            setMindMapGraph(res)
+            updateSavedProject(project.id, current => ({ ...current, mindmap_graph: res }))
+          } else if (active) {
+            const fallbackGraph = buildClientMindMap(project, flightPlan, project.market_radar)
+            setMindMapGraph(fallbackGraph)
+          }
+        })
+        .catch(() => {
+          if (active) {
+            const fallbackGraph = buildClientMindMap(project, flightPlan, project.market_radar)
+            setMindMapGraph(fallbackGraph)
+          }
+        })
+        .finally(() => { if (active) setLoadingMindMap(false) })
+    }
+
+    return () => { active = false }
+  }, [project?.id])
+
+  function handleOpenWorkbench(item) {
+    setWorkbenchTask(item.task)
+    setWorkbenchMilestoneTitle(item.milestone)
+  }
+
+  function handleMindMapNodeSelect(node) {
+    if (node.type === 'task' || node.taskId) {
+      const targetId = node.taskId || node.id.replace(/^node-task-\d+-/, '').replace(/^node-/, '')
+      const matched = allTasks.find(t => t.id === targetId || t.task?.id === targetId || t.task?.title === node.label)
+      if (matched) {
+        setWorkbenchTask(matched.task)
+        setWorkbenchMilestoneTitle(matched.milestone)
+      } else {
+        setWorkbenchTask({
+          title: node.label,
+          why_matters: node.description,
+          radar_chip: node.radar_chip,
+          xp_reward: node.xp_reward || 150,
+          steps: [{ text: 'Implement requirements', done: false }, { text: 'Run verification test', done: false }],
+          expected_evidence: ['src/main.js'],
+          verification_criteria: 'Deliverable complete and verified',
+        })
+        setWorkbenchMilestoneTitle('Mind Map Execution')
+      }
+    } else if (node.type === 'milestone') {
+      const mIdx = parseInt(node.id.replace(/\D/g, ''), 10) - 1
+      if (mIdx >= 0 && mIdx < milestones.length) {
+        setSelectedMilestone(mIdx)
+        setView('flowmap')
+      }
+    } else if (node.type === 'market') {
+      setView('radar')
+    }
+  }
+
+  async function handleSaveMindMap(graph) {
+    if (!project?.id) return
+    setMindMapGraph(graph)
+    updateSavedProject(project.id, current => ({ ...current, mindmap_graph: graph }))
+    try {
+      await saveMindMap(project.id, {
+        nodes: graph.nodes,
+        edges: graph.edges,
+        layoutSettings: graph.layout_settings,
+      })
+      setNotice('Mind Map layout saved.')
+      setTimeout(() => setNotice(''), 2500)
+    } catch {
+      // Saved in project storage
+    }
+  }
+
+  async function handleAddExperiment(exp) {
+    if (!project?.id) return
+    setAddingExpId(exp.id)
+    try {
+      const res = await addExperimentToRoadmap(project.id, exp)
+      if (res?.flight_plan) {
+        persistPlan(res.flight_plan, completed, ['flight_plan'])
+      } else {
+        const updatedMilestones = (flightPlan.milestones || []).map((m, idx) => {
+          if (idx !== 0) return m
+          const newTask = {
+            id: `m1-exp-${Date.now()}`,
+            title: `Validation: ${exp.title}`,
+            why_matters: exp.hypothesis,
+            radar_chip: exp.experiment_type || 'Experiment',
+            priority: 'high',
+            effort_estimate: `${exp.effort_days || 2} days`,
+            steps: [
+              { text: `Execute ${exp.method || 'smoke test'}`, done: false },
+              { text: `Verify threshold: ${exp.pass_fail_metric || 'Pass'}`, done: false },
+            ],
+            expected_evidence: ['docs/validation_report.md'],
+            verification_criteria: exp.pass_fail_metric,
+            dependencies: [],
+            xp_reward: 150,
+          }
+          return { ...m, tasks: [newTask, ...(m.tasks || [])] }
+        })
+        persistPlan({ ...flightPlan, milestones: updatedMilestones }, completed, ['flight_plan'])
+      }
+      setNotice(`Added validation experiment "${exp.title}" to Milestone 1!`)
+      setTimeout(() => setNotice(''), 3500)
+    } catch (err) {
+      setError(err.message || 'Could not add experiment to roadmap.')
+    } finally {
+      setAddingExpId(null)
+    }
+  }
+
+  async function handleVerifyTask(verificationPayload) {
+    if (!project?.id) return
+    setIsVerifying(true)
+    try {
+      const res = await verifyProjectTask(project.id, verificationPayload)
+      const earnedXp = res?.receipt?.xp_awarded || verificationPayload.xpAwarded || 150
+      const currentXp = Number(project.xp_points || 0)
+      const newXp = currentXp + earnedXp
+      const newLevel = res?.receipt?.xp_level || (newXp >= 1000 ? 4 : newXp >= 600 ? 3 : newXp >= 300 ? 2 : 1)
+
+      setAssessment(prev => {
+        const prevAssessments = prev?.task_assessments || {}
+        return {
+          ...prev,
+          task_assessments: {
+            ...prevAssessments,
+            [verificationPayload.taskKey]: {
+              status: 'verified',
+              notes: verificationPayload.proofDetails?.notes || 'Verification proof verified',
+              verified_at: new Date().toISOString(),
+            },
+          },
+        }
+      })
+
+      if (!completed.includes(verificationPayload.taskKey)) {
+        toggleTask(verificationPayload.taskKey)
+      }
+
+      const updated = updateSavedProject(project.id, current => ({
+        ...current,
+        xp_points: newXp,
+        xp_level: newLevel,
+      }))
+      if (updated) setProjects(current => current.map(item => item.id === updated.id ? updated : item))
+
+      setNotice(`🎉 Task Verified! Earned +${earnedXp} XP (Total: ${newXp} XP · Level ${newLevel})`)
+      setTimeout(() => setNotice(''), 4500)
+      setWorkbenchTask(null)
+    } catch (err) {
+      setError(err.message || 'Verification could not be recorded.')
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  function handleAcceptReplan(newPlan) {
+    setHistoryStack(prev => [...prev, structuredClone(flightPlan)])
+    const { _comparison, ...cleanPlan } = newPlan
+    persistPlan(cleanPlan, completed, ['flight_plan'])
+    setProposedPlan(null)
+    setDiffDrawerOpen(false)
+    setNotice('Revised deadline-aware roadmap applied. 1-click Undo available.')
+    setError('')
+    setSelectedMilestone(0)
+    setTimeout(() => setNotice(''), 4000)
+  }
+
+  function handleUndoReplan() {
+    if (!historyStack.length) return
+    const prevPlan = historyStack[historyStack.length - 1]
+    setHistoryStack(prev => prev.slice(0, -1))
+    persistPlan(prevPlan, completed, ['flight_plan'])
+    setNotice('Roadmap changes undone. Restored previous plan.')
+    setTimeout(() => setNotice(''), 3000)
+  }
 
   // Sync Repository
   async function handleSyncRepository() {
@@ -1926,6 +2358,8 @@ export default function FlightPlan() {
           ...replanResponse.proposed_plan,
           _comparison: replanResponse.comparison,
         })
+        setReplanComparison(replanResponse.comparison || null)
+        setDiffDrawerOpen(true)
       } else {
         const response = await generateIdeaStage({
           stage: 'flight_plan',
@@ -1948,6 +2382,7 @@ export default function FlightPlan() {
           throw new Error('The AI response did not include usable milestones and tasks. Your current plan is unchanged.')
         }
         setProposedPlan(response.result)
+        setDiffDrawerOpen(true)
       }
     } catch (requestError) {
       setError(requestError.message || 'Could not replan right now. Your current plan is unchanged.')
@@ -2190,23 +2625,50 @@ export default function FlightPlan() {
                     <div className="fp-view-toggle" role="tablist" aria-label="Roadmap view selection">
                       <button
                         role="tab"
-                        aria-selected={view === 'roadmap'}
-                        className={view === 'roadmap' ? 'active' : ''}
-                        onClick={() => setView('roadmap')}
+                        aria-selected={view === 'flowmap' || view === 'roadmap'}
+                        className={(view === 'flowmap' || view === 'roadmap') ? 'active' : ''}
+                        onClick={() => setView('flowmap')}
                       >
-                        <Route size={15} />Roadmap View
+                        <Route size={15} /> Flow Map (Milestones)
                       </button>
                       <button
                         role="tab"
-                        aria-selected={view === 'tasks'}
-                        className={view === 'tasks' ? 'active' : ''}
-                        onClick={() => setView('tasks')}
+                        aria-selected={view === 'mindmap'}
+                        className={view === 'mindmap' ? 'active' : ''}
+                        onClick={() => setView('mindmap')}
                       >
-                        <ListChecks size={15} />Timeline / Task List
+                        <Layers size={15} /> Mind Map & Idea Tree
+                      </button>
+                      <button
+                        role="tab"
+                        aria-selected={view === 'radar'}
+                        className={view === 'radar' ? 'active' : ''}
+                        onClick={() => setView('radar')}
+                      >
+                        <Compass size={15} /> Market Radar
+                      </button>
+                      <button
+                        role="tab"
+                        aria-selected={view === 'timeline' || view === 'tasks'}
+                        className={(view === 'timeline' || view === 'tasks') ? 'active' : ''}
+                        onClick={() => setView('timeline')}
+                      >
+                        <CalendarClock size={15} /> Gantt & Timeline
                       </button>
                     </div>
 
                     <div className="fp-controls-right-actions">
+                      {historyStack.length > 0 && (
+                        <button
+                          className="fp-undo-btn"
+                          type="button"
+                          onClick={handleUndoReplan}
+                          title="Undo last AI roadmap adjustment (Heuristic #3: User Control & Freedom)"
+                        >
+                          <Undo2 size={13} /> Undo Replan
+                        </button>
+                      )}
+
                       <button
                         className="fp-timing-quick-btn"
                         type="button"
@@ -2236,7 +2698,7 @@ export default function FlightPlan() {
                     error={editorError}
                     completedTasks={completed}
                   />
-                ) : view === 'roadmap' ? (
+                ) : (view === 'flowmap' || view === 'roadmap') ? (
                   <div className="fp-roadmap-layout">
                     <div className="fp-roadmap" aria-label="Project milestones">
                       {milestones.length ? (
@@ -2355,6 +2817,7 @@ export default function FlightPlan() {
                                 onToggle={() => toggleTask(item.id)}
                                 assessment={assessment?.task_assessments?.[item.id]}
                                 onInspect={handleInspectTask}
+                                onOpenWorkbench={handleOpenWorkbench}
                               />
                             ))}
                           {!activeMilestone.tasks.length && <p className="fp-no-tasks">No tasks have been added yet.</p>}
@@ -2375,6 +2838,35 @@ export default function FlightPlan() {
                       </aside>
                     )}
                   </div>
+                ) : view === 'mindmap' ? (
+                  <div className="bg-white rounded-3xl p-6 border border-[#EFEAE4] shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#EFEAE4]">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#7A3C3A] bg-[#FFAAA6]/30 px-2.5 py-0.5 rounded-full">
+                            2D Idea-to-Execution Mind Map
+                          </span>
+                          <span className="text-xs text-[#7C766F] font-mono">Curved SVG Animated Flow Pipes</span>
+                        </div>
+                        <h3 className="text-base font-bold text-[#1D1B18] mt-1">Idea DAG & Execution Pipeline</h3>
+                        <p className="text-xs text-[#534342]">
+                          Drag nodes or adjust spacing/opacity. Click any task node to open the Task Workbench with criteria and verification.
+                        </p>
+                      </div>
+                    </div>
+                    <MindMapCanvas
+                      graphData={mindMapGraph || buildClientMindMap(project, flightPlan, marketRadar)}
+                      onSaveGraph={handleSaveMindMap}
+                      onSelectNode={handleMindMapNodeSelect}
+                      completedTaskIds={completed}
+                    />
+                  </div>
+                ) : view === 'radar' ? (
+                  <MarketRadarView
+                    radarData={marketRadar}
+                    onAddExperiment={handleAddExperiment}
+                    addingExperimentId={addingExpId}
+                  />
                 ) : (
                   <section className="fp-task-list-view">
                     <header className="fp-task-list-heading">
@@ -2436,6 +2928,7 @@ export default function FlightPlan() {
                             showMilestone
                             assessment={assessment?.task_assessments?.[item.id]}
                             onInspect={handleInspectTask}
+                            onOpenWorkbench={handleOpenWorkbench}
                           />
                         ))
                       ) : (
@@ -2453,14 +2946,48 @@ export default function FlightPlan() {
           </div>
         </main>
 
-        {/* AI Replan Preview Modal */}
-        {proposedPlan && (
-          <ReplanPreview
-            plan={proposedPlan}
-            onCancel={() => setProposedPlan(null)}
-            onApprove={approveReplan}
-          />
-        )}
+        {/* Task Workbench Drawer */}
+        <TaskWorkbenchDrawer
+          isOpen={Boolean(workbenchTask)}
+          onClose={() => setWorkbenchTask(null)}
+          task={workbenchTask}
+          milestoneTitle={workbenchMilestoneTitle}
+          onToggleStep={(stepIdx) => {
+            if (!workbenchTask) return
+            const updatedSteps = (workbenchTask.steps || []).map((s, idx) =>
+              idx === stepIdx ? { ...s, done: !s.done } : s
+            )
+            const updatedTask = { ...workbenchTask, steps: updatedSteps }
+            setWorkbenchTask(updatedTask)
+            const updatedMilestones = (flightPlan.milestones || []).map(m => ({
+              ...m,
+              tasks: (m.tasks || []).map(t => (t.id === updatedTask.id || t.title === updatedTask.title) ? updatedTask : t)
+            }))
+            persistPlan({ ...flightPlan, milestones: updatedMilestones }, completed, ['flight_plan'])
+          }}
+          onVerifyTask={handleVerifyTask}
+          isVerifying={isVerifying}
+          allTasks={allTasks}
+          repoAnalysis={repoAnalysis}
+        />
+
+        {/* AI Replan Diff Drawer (Heuristic #3: User Control & Freedom) */}
+        <ReplanDiffDrawer
+          isOpen={diffDrawerOpen}
+          onClose={() => setDiffDrawerOpen(false)}
+          currentPlan={flightPlan}
+          proposedPlan={proposedPlan}
+          comparison={replanComparison}
+          onAccept={handleAcceptReplan}
+          onReject={() => {
+            setProposedPlan(null)
+            setDiffDrawerOpen(false)
+            setNotice('Proposed replan dismissed. Active roadmap unchanged.')
+            setTimeout(() => setNotice(''), 3000)
+          }}
+          onUndo={handleUndoReplan}
+          canUndo={historyStack.length > 0}
+        />
 
         {/* Schedule & Timing Edit Modal */}
         {timingModalOpen && project && (

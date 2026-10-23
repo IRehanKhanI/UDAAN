@@ -742,3 +742,117 @@ def _build_grounded_fallback(idea, project_type, sources, today):
             "milestones": milestones,
         },
     }
+
+
+def _build_default_mindmap_layout(idea_title, market_insights, milestones):
+    """
+    Builds a 2D directed graph layout with Idea -> Market Insights -> Milestones -> Tasks.
+    """
+    nodes = []
+    edges = []
+
+    # 1. Root Idea Node
+    root_id = "node-root"
+    nodes.append({
+        "id": root_id,
+        "label": (idea_title or "Idea Core")[:32],
+        "type": "root",
+        "group": "core",
+        "description": "Core Idea & Vision Anchor",
+        "x": 80,
+        "y": 320,
+    })
+
+    # 2. Market Insight Nodes
+    insight_y_start = 100
+    for idx, insight in enumerate(market_insights[:4]):
+        n_id = f"node-mkt-{idx+1}"
+        nodes.append({
+            "id": n_id,
+            "label": (insight.get("title") or f"Insight {idx+1}")[:28],
+            "type": "market",
+            "group": "market",
+            "description": insight.get("snippet", ""),
+            "radar_chip": "Market Grounding",
+            "x": 380,
+            "y": insight_y_start + idx * 110,
+        })
+        edges.append({
+            "id": f"edge-root-{n_id}",
+            "source": root_id,
+            "target": n_id,
+            "label": "grounded by",
+            "animated": True,
+        })
+
+    # 3. Milestone & Task Nodes
+    milestone_x = 700
+    task_x = 1040
+    prev_m_id = None
+
+    for m_idx, milestone in enumerate(milestones):
+        m_id = f"node-m{m_idx+1}"
+        m_y = 100 + m_idx * 180
+        nodes.append({
+            "id": m_id,
+            "label": (milestone.get("title") or f"Milestone {m_idx+1}")[:32],
+            "type": "milestone",
+            "group": "milestone",
+            "description": milestone.get("purpose", ""),
+            "x": milestone_x,
+            "y": m_y,
+        })
+
+        if prev_m_id:
+            edges.append({
+                "id": f"edge-{prev_m_id}-{m_id}",
+                "source": prev_m_id,
+                "target": m_id,
+                "label": "advances to",
+                "animated": True,
+            })
+        else:
+            edges.append({
+                "id": f"edge-root-{m_id}",
+                "source": root_id,
+                "target": m_id,
+                "label": "executes",
+                "animated": True,
+            })
+        prev_m_id = m_id
+
+        tasks = milestone.get("tasks", [])
+        for t_idx, task in enumerate(tasks[:3]):
+            t_id = task.get("id") or f"m{m_idx+1}-t{t_idx+1}"
+            node_t_id = f"node-{t_id}"
+            nodes.append({
+                "id": node_t_id,
+                "taskId": t_id,
+                "label": (task.get("title") or f"Task {t_idx+1}")[:30],
+                "type": "task",
+                "group": "task",
+                "description": task.get("why_matters", ""),
+                "xp_reward": int(task.get("xp_reward") or 150),
+                "radar_chip": task.get("radar_chip", ""),
+                "x": task_x,
+                "y": m_y - 40 + t_idx * 55,
+            })
+            edges.append({
+                "id": f"edge-{m_id}-{node_t_id}",
+                "source": m_id,
+                "target": node_t_id,
+                "label": f"+{int(task.get('xp_reward') or 150)} XP",
+                "animated": False,
+            })
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "layout_settings": {
+            "node_spacing": 1.0,
+            "connection_opacity": 0.65,
+            "theme": "espresso",
+            "show_labels": True,
+        },
+    }
+

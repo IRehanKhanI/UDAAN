@@ -1434,4 +1434,111 @@
   font-weight: 600;
 }
 
+/* Playful Utility UI & 4-View Switcher Enhancements */
+.fp-view-toggle button {
+  white-space: nowrap;
+}
+.fp-view-toggle button.active {
+  background: #1D1B18 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.14);
+}
+
+.fp-workbench-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: #FFF1ED;
+  border: 1px solid #FFAAA6;
+  color: #7A3C3A;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.fp-workbench-open-btn:hover {
+  background: #FFAAA6;
+  color: #1D1B18;
+  transform: translateY(-1px);
+}
+
+.fp-xp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: #FBE191;
+  border: 1px solid #E6CA65;
+  color: #635836;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.fp-undo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  background: #FFF1ED;
+  border: 1px solid #FFAAA6;
+  color: #7A3C3A;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.fp-undo-btn:hover {
+  background: #FFAAA6;
+  color: #1D1B18;
+}
+
+.fp-track-info-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.fp-track-info-btn {
+  background: none;
+  border: none;
+  color: #8E4B49;
+  cursor: pointer;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 50%;
+}
+.fp-track-info-btn:hover {
+  color: #1D1B18;
+}
+.fp-track-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1D1B18;
+  color: #FFFFFF;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  width: 240px;
+  z-index: 50;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  text-align: left;
+}
+.fp-track-popover::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1D1B18;
+}
+
+
 

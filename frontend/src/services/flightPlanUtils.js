@@ -41,13 +41,18 @@ export function formatDisplayDate(dateStr) {
 
 export function getDaysRemaining(deadlineStr) {
   if (!deadlineStr) return null
-  const d = new Date(deadlineStr)
-  if (Number.isNaN(d.valueOf())) return null
+  let target
+  if (typeof deadlineStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(deadlineStr.trim())) {
+    const parts = deadlineStr.trim().split('T')[0].split('-').map(Number)
+    target = new Date(parts[0], parts[1] - 1, parts[2])
+  } else {
+    const d = new Date(deadlineStr)
+    if (Number.isNaN(d.valueOf())) return null
+    target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  }
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const target = new Date(d)
-  target.setHours(0, 0, 0, 0)
-  const diffTime = target - today
+  const current = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const diffTime = target.getTime() - current.getTime()
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
   return {
     days: diffDays,

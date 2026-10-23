@@ -1901,3 +1901,150 @@ class MarketingGenerationServiceTests(SimpleTestCase):
         from apps.core.gemini_service import GeminiConfigurationError, generate_marketing_content
         with self.assertRaisesRegex(GeminiConfigurationError, 'GEMINI_API_KEY'):
             generate_marketing_content(mode='tool', inputs={'topic': 'An announcement'})
+
+
+class FlightPlanMarketRadarTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.draft = ProjectDraft.objects.create(
+            idea='A novel AI-powered robotics arm',
+            project_type='Startup',
+            understanding={'project_name': 'RoboArm', 'problem_statement': 'Automate delicate handling'},
+            workflow={
+                'flight_plan': {
+                    'summary': 'Roadmap',
+                    'milestones': [
+                        {
+                            'title': 'Milestone 1: Validation',
+                            'tasks': [
+                                {'id': 'm1-t1', 'title': 'Test kinematics', 'steps': [{'text': 'Check joints', 'done': False}], 'expected_evidence': ['src/kinematics.py'], 'xp_reward': 150}
+                            ]
+                        }
+                    ]
+                }
+            },
+            xp_points=0,
+            xp_level='Level 1: Idea Shaped',
+        )
+
+    @patch('apps.core.idea_views.generate_market_radar_and_flight_plan')
+    def test_launch_project_endpoint_creates_all_artifacts(self, mock_gen):
+        mock_gen.return_value = {
+            'project_name': 'RoboArm Launch',
+            'problem_statement': 'Automate delicate handling',
+            'target_users': 'Robotics engineers',
+            'expected_outcome': 'Working prototype',
+            'market_radar': {
+                'summary': 'Market landscape',
+                'competitors': [{'name': 'Cobot X', 'positioning': 'Industrial', 'pricing': '$5,000', 'core_features': [], 'market_presence': 'Global'}],
+                'customer_voice': [{'pain_point': 'High price', 'source_type': 'Review', 'user_complaint': 'Too costly', 'excerpt': 'expensive'}],
+                'citations': [],
+                'validation_experiments': [{'id': 'exp-1', 'title': 'Smoke test', 'hypothesis': 'Demand exists'}],
+            },
+            'flight_plan': {
+                'summary': 'Full plan',
+                'milestones': [
+                    {
+                        'title': 'Milestone 1: Validation',
+                        'target_date': '2026-11-01',
+                        'tasks': [{'id': 'm1-t1', 'title': 'Validate grip', 'xp_reward': 150, 'steps': [], 'expected_evidence': []}]
+                    }
+                ]
+            },
+            'mindmap_graph': {
+                'nodes': [{'id': 'node-root', 'label': 'RoboArm', 'type': 'root'}],
+                'edges': [],
+                'layout_settings': {'theme': 'coral'},
+            },
+            'web_research_sources': [{'title': 'Cobot article', 'url': 'https://example.com'}],
+        }
+
+        response = self.client.post('/api/projects/launch/', {
+            'idea': 'A novel AI-powered robotics arm',
+            'project_type': 'Startup',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        data = response.json()
+        self.assertIn('project', data)
+        self.assertIn('market_radar', data)
+        self.assertIn('mindmap_graph', data)
+        self.assertEqual(data['market_radar']['competitors'][0]['name'], 'Cobot X')
+
+    def test_market_radar_and_mindmap_endpoints(self):
+        from apps.projects.models import MarketRadarReport, MindMapGraph
+
+        MarketRadarReport.objects.create(
+            project=self.draft,
+            summary='Grounded report',
+            competitors=[{'name': 'Competitor A', 'pricing': '$99/mo'}],
+            customer_voice=[],
+            citations=[],
+            validation_experiments=[],
+        )
+
+        MindMapGraph.objects.create(
+            project=self.draft,
+            nodes=[{'id': 'root', 'label': 'Core'}],
+            edges=[],
+        )
+
+        r_res = self.client.get(f'/api/projects/drafts/{self.draft.id}/market-radar/')
+        self.assertEqual(r_res.status_code, 200)
+        self.assertEqual(r_res.json()['market_radar']['competitors'][0]['name'], 'Competitor A')
+
+        m_res = self.client.get(f'/api/projects/drafts/{self.draft.id}/mindmap/')
+        self.assertEqual(m_res.status_code, 200)
+        self.assertEqual(m_res.json()['mindmap']['nodes'][0]['id'], 'root')
+
+        # Test Mind Map Update
+        import json
+        update_res = self.client.put(
+            f'/api/projects/drafts/{self.draft.id}/mindmap/',
+            json.dumps({'nodes': [{'id': 'root', 'label': 'Updated Core', 'x': 50, 'y': 50}], 'edges': []}),
+            content_type='application/json'
+        )
+        self.assertEqual(update_res.status_code, 200)
+        self.assertEqual(update_res.json()['node_count'], 1)
+
+    def test_add_experiment_to_roadmap(self):
+        exp_payload = {
+            'experiment': {
+                'title': 'Landing Page Demand Test',
+                'hypothesis': '20% sign up rate',
+                'method': 'Deploy web page',
+                'pass_fail_metric': '>15%',
+                'estimated_cost': '$10',
+                'effort_days': 2,
+            }
+        }
+        res = self.client.post(f'/api/projects/drafts/{self.draft.id}/experiments/add/', exp_payload, format='json')
+        self.assertEqual(res.status_code, 201)
+        data = res.json()
+        self.assertTrue(data['success'])
+        self.assertIn('Experiment: Landing Page Demand Test', data['task']['title'])
+
+    def test_task_verification_awards_xp_and_level_progression(self):
+        res = self.client.post(f'/api/projects/drafts/{self.draft.id}/verify-task/', {
+            'task_key': 'm1-t1',
+            'task_title': 'Test kinematics',
+            'proof_type': 'test_suite',
+            'proof_details': {'tests_run': 12, 'passed': 12},
+            'xp_awarded': 350,
+        }, format='json')
+
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data['xp_awarded'], 350)
+        self.assertEqual(data['total_xp'], 350)
+        self.assertEqual(data['xp_level'], 'Level 2: Prototype Grounded')
+
+        # Verify idempotency: duplicate verification doesn't duplicate XP
+        res_dup = self.client.post(f'/api/projects/drafts/{self.draft.id}/verify-task/', {
+            'task_key': 'm1-t1',
+            'xp_awarded': 350,
+        }, format='json')
+        self.assertEqual(res_dup.status_code, 200)
+        self.assertEqual(res_dup.json()['xp_awarded'], 0)
+        self.assertEqual(res_dup.json()['total_xp'], 350)
+
