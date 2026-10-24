@@ -14,6 +14,16 @@ import { parseRepositoryUrl, syncAndAnalyzeRepository, associateProjectRepositor
 import { initializeTeamWorkspace } from '../services/teamService.js'
 import { createGitHubRepo, getTechHistory, saveTechHistory, getYouTubeVideos } from '../services/githubService.js'
 import { startGitHubLogin } from '../services/authService.js'
+import InteractiveMascot from '../components/mascot/InteractiveMascot.jsx'
+
+function getYouTubeThumb(url) {
+  if (!url) return null
+  const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+  const match = url.match(regExp)
+  return (match && match[2].length === 11)
+    ? `https://img.youtube.com/vi/${match[2]}/mqdefault.jpg`
+    : null
+}
 
 const draftKey = 'udaan:idea-draft'
 function newUuid() {
@@ -110,6 +120,49 @@ const TECH_STACKS = [
   },
 ]
 
+const ALL_POPULAR_TECH = [
+  'React', 'JavaScript', 'TypeScript', 'Next.js', 'Python', 'Django',
+  'Node.js', 'PostgreSQL', 'Supabase', 'Firebase', 'Tailwind CSS',
+  'Flutter', 'HTML/CSS', 'SQL', 'FastAPI', 'Docker', 'REST API'
+]
+
+function getBestTechStackRecommendation(idea = '', understanding = {}, knownSkills = []) {
+  const combined = `${idea} ${understanding.problem_statement || ''} ${understanding.expected_outcome || ''}`.toLowerCase()
+  if (knownSkills.includes('Python') && !knownSkills.includes('React') && !knownSkills.includes('Next.js')) {
+    return {
+      stackId: 'react-django',
+      badge: 'Matches your Python expertise',
+      reason: 'Since you already know Python, Django delivers high productivity with built-in admin, ORM, and enterprise-grade security.'
+    }
+  }
+  if (combined.includes('mobile app') || combined.includes('ios') || combined.includes('android')) {
+    return {
+      stackId: 'flutter-mobile',
+      badge: 'Best for Mobile Apps',
+      reason: 'Flutter allows you to deploy to both iOS & Android from one codebase with smooth native performance.'
+    }
+  }
+  if (combined.includes('static blog') || combined.includes('landing page only') || combined.includes('portfolio')) {
+    return {
+      stackId: 'static-site',
+      badge: 'Best for Static Publishing',
+      reason: 'Astro outputs zero JavaScript by default for maximum speed and instant search engine indexing.'
+    }
+  }
+  if (combined.includes('hackathon') || combined.includes('fast mvp')) {
+    return {
+      stackId: 'react-firebase',
+      badge: 'Fastest 0-to-1 Launch',
+      reason: 'React + Firebase gives you zero-backend serverless setup with real-time sync and built-in Google auth.'
+    }
+  }
+  return {
+    stackId: 'nextjs-fullstack',
+    badge: '★ Best Choice for Your Project',
+    reason: 'Next.js + Supabase is the top-tier stack for your app. It provides built-in user authentication for creators, instant PostgreSQL database to save stories and jokes, and 1-click deployment on Vercel.'
+  }
+}
+
 function readDraft() {
   try {
     const d = JSON.parse(sessionStorage.getItem(draftKey) || localStorage.getItem(draftKey) || 'null')
@@ -201,9 +254,16 @@ export default function IdeaAnalysis() {
   const [createRepoPrivate, setCreateRepoPrivate] = useState(false)
   const [createRepoLoading, setCreateRepoLoading] = useState(false)
   const [createRepoError, setCreateRepoError] = useState('')
+  const [createRepoToken, setCreateRepoToken] = useState('')
   // Tech stack selection
   const [selectedStack, setSelectedStack] = useState(draft?.selectedStack || null)
   const [techKnownInputs, setTechKnownInputs] = useState([]) // which stacks they know
+  // Custom tech stack
+  const [customStacks, setCustomStacks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('udaan:custom-stacks') || '[]') } catch { return [] }
+  })
+  const [showCustomModal, setShowCustomModal] = useState(false)
+  const [customForm, setCustomForm] = useState({ name: '', frontend: '', backend: '', database: '', cloud: '' })
   // YouTube videos
   const [ytVideos, setYtVideos] = useState({})
   const [ytLoading, setYtLoading] = useState(false)
@@ -229,7 +289,7 @@ export default function IdeaAnalysis() {
   function persist(updates = {}) {
     setDraft(cur => {
       const next = { ...cur, understanding, workflow, startDate, deadline, teamSize, weeklyHours, projectType, repoRequired, repository: connectedRepo, teamMembers, selectedStack, ...updates }
-      try { sessionStorage.setItem(draftKey, JSON.stringify(next)); localStorage.setItem(draftKey, JSON.stringify(next)) } catch {}
+      try { sessionStorage.setItem(draftKey, JSON.stringify(next)); localStorage.setItem(draftKey, JSON.stringify(next)) } catch { }
       return next
     })
   }
@@ -238,7 +298,7 @@ export default function IdeaAnalysis() {
   useEffect(() => {
     getTechHistory().then(data => {
       if (data?.known_stacks?.length) setTechKnownInputs(data.known_stacks.map(s => s.name || s))
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   // Auto-clarify Step 0
@@ -259,7 +319,7 @@ export default function IdeaAnalysis() {
     const stack = TECH_STACKS.find(s => s.id === selectedStack)
     if (!stack?.learn?.length) return
     setYtLoading(true)
-    getYouTubeVideos(stack.learn).then(data => setYtVideos(data?.videos || {})).catch(() => {}).finally(() => setYtLoading(false))
+    getYouTubeVideos(stack.learn).then(data => setYtVideos(data?.videos || {})).catch(() => { }).finally(() => setYtLoading(false))
   }, [selectedStack])
 
   async function analyzeUnderstanding() {
@@ -309,22 +369,29 @@ export default function IdeaAnalysis() {
     finally { setRepoChecking(false) }
   }
 
-  // GitHub OAuth repo creation
+  const allStacks = [...TECH_STACKS, ...customStacks]
+
+  // GitHub OAuth or Direct Token repo creation
   async function handleCreateGitHubRepo() {
     if (!createRepoName.trim()) { setCreateRepoError('Enter a repository name.'); return }
     setCreateRepoLoading(true); setCreateRepoError('')
     try {
-      const result = await createGitHubRepo({ name: createRepoName.trim(), description: understanding.project_name || draft.idea?.slice(0, 80), private: createRepoPrivate })
+      const result = await createGitHubRepo({
+        name: createRepoName.trim(),
+        description: understanding.project_name || draft.idea?.slice(0, 80),
+        private: createRepoPrivate,
+        token: createRepoToken.trim() || undefined,
+      })
       const repoData = { owner: result.full_name?.split('/')[0] || '', name: result.full_name?.split('/')[1] || createRepoName, fullName: result.full_name, url: result.repo_url, branch: result.default_branch || 'main', isEmpty: true, fileCount: 0 }
       setConnectedRepo(repoData); persist({ repository: repoData })
       setNotice(`Repository created: ${result.full_name} ✓`); setTimeout(() => setNotice(''), 5000)
     } catch (err) {
-      if (err?.status === 401 || err?.message?.includes('requires_auth') || err?.message?.includes('GitHub not connected')) {
+      if (!createRepoToken.trim() && (err?.status === 401 || err?.message?.includes('requires_auth') || err?.message?.includes('GitHub not connected'))) {
         // Redirect to GitHub OAuth with repo scope
         try {
           const url = await startGitHubLogin({ returnTo: '/projects/new/analysis' })
           window.location.href = url
-        } catch { setCreateRepoError('Connect GitHub first — click Connect GitHub above.') }
+        } catch { setCreateRepoError('Connect GitHub first or enter a Personal Access Token below.') }
       } else {
         setCreateRepoError(err.message || 'Failed to create repository.')
       }
@@ -332,13 +399,44 @@ export default function IdeaAnalysis() {
     finally { setCreateRepoLoading(false) }
   }
 
+  function handleSaveCustomStack(e) {
+    e?.preventDefault?.()
+    if (!customForm.name.trim()) return
+    const id = `custom-${Date.now()}`
+    const skills = [customForm.frontend, customForm.backend, customForm.database, customForm.cloud].filter(Boolean)
+    const newStack = {
+      id,
+      name: customForm.name.trim(),
+      tags: ['Custom', 'User-defined'],
+      color: '#1D1B18',
+      accent: '#F5F5F4',
+      icon: '⚙',
+      desc: `${customForm.frontend || 'Frontend'} + ${customForm.backend || 'Backend'} + ${customForm.database || 'DB'}`,
+      best_for: ['Custom project', 'Tailored solution'],
+      skills: skills.length ? skills : ['Full-Stack', 'APIs'],
+      learn: skills.length ? skills : ['Frontend', 'Backend'],
+    }
+    const updated = [...customStacks, newStack]
+    setCustomStacks(updated)
+    try { localStorage.setItem('udaan:custom-stacks', JSON.stringify(updated)) } catch {}
+    setSelectedStack(id)
+    persist({ selectedStack: id })
+    setShowCustomModal(false)
+    setCustomForm({ name: '', frontend: '', backend: '', database: '', cloud: '' })
+    if (skills.length) {
+      saveTechHistory({ learning_stacks: skills.map(n => ({ name: n, project_context: understanding.project_name || 'custom project' })) }).catch(() => {})
+    }
+    setNotice(`Custom stack "${newStack.name}" added & selected! ✓`)
+    setTimeout(() => setNotice(''), 4000)
+  }
+
   // Save chosen stack to tech history
   async function handleSelectStack(stackId) {
     setSelectedStack(stackId); persist({ selectedStack: stackId })
-    const stack = TECH_STACKS.find(s => s.id === stackId)
+    const stack = allStacks.find(s => s.id === stackId)
     if (stack?.learn) {
       const newLearning = stack.learn.map(name => ({ name, project_context: understanding.project_name || 'new project' }))
-      saveTechHistory({ learning_stacks: newLearning }).catch(() => {})
+      saveTechHistory({ learning_stacks: newLearning }).catch(() => { })
     }
   }
 
@@ -346,7 +444,7 @@ export default function IdeaAnalysis() {
   function toggleKnownTech(name) {
     setTechKnownInputs(prev => {
       const next = prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
-      saveTechHistory({ known_stacks: next.map(n => ({ name: n, confidence: 'comfortable', source: 'self' })) }).catch(() => {})
+      saveTechHistory({ known_stacks: next.map(n => ({ name: n, confidence: 'comfortable', source: 'self' })) }).catch(() => { })
       return next
     })
   }
@@ -358,11 +456,11 @@ export default function IdeaAnalysis() {
     setLoading(true); setError('')
     try {
       const project = saveIdeaProject({ draft: { ...draft, projectId: draft.projectId, idea: draft.idea, projectType, startDate, deadline, teamSize, weeklyHours, teamMembers, repository: connectedRepo, selectedStack }, understanding, workflow })
-      try { await saveProjectDraft(draft, understanding, workflow, 'flight_plan') } catch {}
+      try { await saveProjectDraft(draft, understanding, workflow, 'flight_plan') } catch { }
       if (connectedRepo) {
-        try { await associateProjectRepository(project.id, { repo_owner: connectedRepo.owner, repo_name: connectedRepo.name, repo_url: connectedRepo.url, selected_branch: connectedRepo.branch, connection_status: connectedRepo.isEmpty ? 'empty' : 'connected', is_empty: connectedRepo.isEmpty }) } catch {}
+        try { await associateProjectRepository(project.id, { repo_owner: connectedRepo.owner, repo_name: connectedRepo.name, repo_url: connectedRepo.url, selected_branch: connectedRepo.branch, connection_status: connectedRepo.isEmpty ? 'empty' : 'connected', is_empty: connectedRepo.isEmpty }) } catch { }
       }
-      try { await initializeTeamWorkspace(project.id) } catch {}
+      try { await initializeTeamWorkspace(project.id) } catch { }
       localStorage.setItem('udaan:selected-project', project.id)
       sessionStorage.removeItem(draftKey); localStorage.removeItem(draftKey)
       navigate(`/?project=${encodeURIComponent(project.id)}&launched=1`, { state: { createdProject: name, newlyLaunched: true } })
@@ -515,7 +613,7 @@ export default function IdeaAnalysis() {
                 <div className="bg-white rounded-2xl border border-[#EFEAE4] p-8 flex flex-col items-center">
                   <UdaanLoader character="researcher" size="md"
                     message={['Scanning the web…', 'Finding competitors…', 'Checking pricing models…', 'Mapping market gaps…']}
-                    sub="Tavily live web search + Gemini analysis" />
+                    sub="" />
                 </div>
               ) : !hasStageContent(research) ? (
                 <div className="bg-white rounded-2xl border border-[#EFEAE4] p-10 text-center space-y-3">
@@ -608,7 +706,7 @@ export default function IdeaAnalysis() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="text-sm font-bold text-[#1D1B18]">Pick your tech stack</h2>
-                    <p className="text-xs text-[#7C766F] mt-0.5">UDAAN picked the best options for your idea type. Choose one to get started.</p>
+                    <p className="text-xs text-[#7C766F] mt-0.5">UDAAN picked the best options for your idea type. Choose one or create your custom stack.</p>
                   </div>
                   {hasStageContent(feasibility) && (
                     <span className="text-[11px] px-2 py-1 rounded-xl bg-[#F0FAF8] border border-[#9FD8CB] text-[#2A5D54] font-bold shrink-0">
@@ -617,16 +715,25 @@ export default function IdeaAnalysis() {
                   )}
                 </div>
 
-                {/* AI-recommended message */}
-                {hasStageContent(feasibility) && feasibility.recommended_stack && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#FBE191]/30 border border-[#FBE191]">
-                    <Sparkles size={14} className="text-[#766320] shrink-0" />
-                    <span className="text-xs text-[#534342]">AI recommends: <strong className="text-[#1D1B18]">{feasibility.recommended_stack}</strong></span>
-                  </div>
-                )}
+                {/* Plain-English Recommendation Card */}
+                {(() => {
+                  const rec = getBestTechStackRecommendation(draft?.idea, understanding, techKnownInputs)
+                  if (!rec) return null
+                  return (
+                    <div className="rounded-2xl bg-gradient-to-r from-[#FFF8F3] to-[#FEF3C7]/40 border border-[#FFAAA6]/40 p-4 space-y-1.5 shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-[#8E4B49] text-white flex items-center justify-center text-xs font-bold">★</span>
+                        <span className="text-xs font-black text-[#8E4B49] uppercase tracking-wider">{rec.badge}</span>
+                      </div>
+                      <p className="text-xs text-[#534342] leading-relaxed">
+                        {rec.reason}
+                      </p>
+                    </div>
+                  )
+                })()}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {TECH_STACKS.map(stack => {
+                  {allStacks.map(stack => {
                     const isSelected = selectedStack === stack.id
                     return (
                       <button key={stack.id} type="button" onClick={() => handleSelectStack(stack.id)}
@@ -652,11 +759,29 @@ export default function IdeaAnalysis() {
                       </button>
                     )
                   })}
+
+                  {/* + Custom Tech Stack Button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomModal(true)}
+                    className="p-4 rounded-2xl border-2 border-dashed border-[#D5CFC7] bg-[#FAF8F5] hover:border-[#1D1B18] hover:bg-white text-left transition-all flex flex-col justify-between group min-h-[140px] cursor-pointer"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xl">⚙️</span>
+                        <span className="text-sm font-bold text-[#1D1B18] group-hover:text-[#8E4B49] transition-colors">+ Custom Stack</span>
+                      </div>
+                      <p className="text-xs text-[#7C766F] leading-relaxed">
+                        Configure your own frontend, backend, database and cloud provider.
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold text-[#8E4B49] underline pt-2">Build custom architecture →</span>
+                  </button>
                 </div>
 
                 {/* "What do you already know?" */}
                 {selectedStack && (() => {
-                  const stack = TECH_STACKS.find(s => s.id === selectedStack)
+                  const stack = allStacks.find(s => s.id === selectedStack)
                   if (!stack) return null
                   return (
                     <div className="pt-2 space-y-2 border-t border-[#EFEAE4]">
@@ -676,9 +801,102 @@ export default function IdeaAnalysis() {
                 })()}
               </div>
 
-              {/* 2b — YouTube learning videos */}
+              {/* Custom Tech Stack Modal */}
+              {showCustomModal && (
+                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+                  <div className="bg-white rounded-3xl border border-[#E8E2D9] p-6 max-w-md w-full shadow-xl space-y-4 font-['Plus_Jakarta_Sans']">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-lg bg-[#FFF1ED] text-[#8E4B49] flex items-center justify-center font-bold text-sm">⚡</span>
+                        <h3 className="text-sm font-black text-[#1D1B18]">Configure Custom Tech Stack</h3>
+                      </div>
+                      <button type="button" onClick={() => setShowCustomModal(false)} className="text-[#8C847E] hover:text-[#1D1B18] p-1">
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveCustomStack} className="space-y-3">
+                      <label className="block space-y-1">
+                        <span className="text-[11px] font-bold text-[#534342]">Stack Name *</span>
+                        <input
+                          type="text"
+                          required
+                          value={customForm.name}
+                          onChange={e => setCustomForm(f => ({ ...f, name: e.target.value }))}
+                          placeholder="e.g. SvelteKit + FastAPI + SQLite"
+                          className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                        />
+                      </label>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <label className="block space-y-1">
+                          <span className="text-[11px] font-bold text-[#534342]">Frontend</span>
+                          <input
+                            type="text"
+                            value={customForm.frontend}
+                            onChange={e => setCustomForm(f => ({ ...f, frontend: e.target.value }))}
+                            placeholder="e.g. SvelteKit, React, Vue"
+                            className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] font-bold text-[#534342]">Backend</span>
+                          <input
+                            type="text"
+                            value={customForm.backend}
+                            onChange={e => setCustomForm(f => ({ ...f, backend: e.target.value }))}
+                            placeholder="e.g. FastAPI, Go, Express"
+                            className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <label className="block space-y-1">
+                          <span className="text-[11px] font-bold text-[#534342]">Database</span>
+                          <input
+                            type="text"
+                            value={customForm.database}
+                            onChange={e => setCustomForm(f => ({ ...f, database: e.target.value }))}
+                            placeholder="e.g. PostgreSQL, Redis"
+                            className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                          />
+                        </label>
+                        <label className="block space-y-1">
+                          <span className="text-[11px] font-bold text-[#534342]">Cloud / Hosting</span>
+                          <input
+                            type="text"
+                            value={customForm.cloud}
+                            onChange={e => setCustomForm(f => ({ ...f, cloud: e.target.value }))}
+                            placeholder="e.g. Render, Fly.io, AWS"
+                            className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                          />
+                        </label>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomModal(false)}
+                          className="px-4 py-2 rounded-xl text-xs font-bold text-[#8C847E] hover:text-[#1D1B18]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-5 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black shadow-xs cursor-pointer"
+                        >
+                          Save & Select Stack
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              )}
+
+              {/* 2b — YouTube learning videos with REAL Thumbnails */}
               {selectedStack && (() => {
-                const stack = TECH_STACKS.find(s => s.id === selectedStack)
+                const stack = allStacks.find(s => s.id === selectedStack)
                 const unknownTech = stack?.learn?.filter(t => !techKnownInputs.includes(t)) || []
                 if (!unknownTech.length) return null
                 return (
@@ -686,11 +904,11 @@ export default function IdeaAnalysis() {
                     <div className="flex items-center gap-2">
                       <Play size={16} className="text-[#FF0000]" />
                       <h2 className="text-sm font-bold text-[#1D1B18]">Learn the stack</h2>
-                      <span className="text-xs text-[#7C766F]">Best videos to get started, curated for you</span>
+                      <span className="text-xs text-[#7C766F]">Best verified courses to get started, curated for you</span>
                     </div>
                     {ytLoading ? (
                       <div className="flex items-center gap-2 text-xs text-[#7C766F] py-2">
-                        <MiniLoader color="#7C766F" /> Loading videos…
+                        <MiniLoader color="#7C766F" /> Loading verified courses…
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -699,22 +917,43 @@ export default function IdeaAnalysis() {
                           return (
                             <div key={tech} className="space-y-2">
                               <span className="text-xs font-bold text-[#534342] uppercase tracking-wider">{tech}</span>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {vids.length ? vids.map((v, i) => (
-                                  <a key={i} href={v.url} target="_blank" rel="noreferrer"
-                                    className="flex items-start gap-3 p-3 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#FF6B6B] transition-colors no-underline group">
-                                    <div className="w-8 h-8 rounded-lg bg-[#FF0000]/10 flex items-center justify-center shrink-0">
-                                      <Play size={14} className="text-[#FF0000]" fill="currentColor" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="text-xs font-bold text-[#1D1B18] truncate group-hover:text-[#FF6B6B] transition-colors">{v.title}</div>
-                                      <div className="text-[11px] text-[#7C766F] flex items-center gap-1.5 mt-0.5">
-                                        <span>{v.channel}</span>
-                                        {v.duration && v.duration !== '—' && <><span>·</span><Clock size={9} /><span>{v.duration}</span></>}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {vids.length ? vids.map((v, i) => {
+                                  const thumb = getYouTubeThumb(v.url)
+                                  return (
+                                    <a key={i} href={v.url} target="_blank" rel="noreferrer"
+                                      className="flex flex-col sm:flex-row items-start gap-3 p-2.5 rounded-2xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#FF6B6B] hover:shadow-md transition-all no-underline group">
+                                      <div className="relative w-full sm:w-36 h-20 rounded-xl overflow-hidden bg-black shrink-0">
+                                        {thumb ? (
+                                          <img src={thumb} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                        ) : (
+                                          <div className="w-full h-full bg-[#1D1B18] flex items-center justify-center">
+                                            <Play size={20} className="text-white" />
+                                          </div>
+                                        )}
+                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/10 transition-colors">
+                                          <div className="w-7 h-7 rounded-full bg-[#FF0000] text-white flex items-center justify-center shadow-md">
+                                            <Play size={11} fill="white" className="ml-0.5" />
+                                          </div>
+                                        </div>
+                                        {v.duration && v.duration !== '—' && (
+                                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-bold text-white tracking-wide">
+                                            {v.duration}
+                                          </span>
+                                        )}
                                       </div>
-                                    </div>
-                                  </a>
-                                )) : (
+                                      <div className="min-w-0 flex-1 py-0.5">
+                                        <div className="text-xs font-bold text-[#1D1B18] line-clamp-2 group-hover:text-[#FF6B6B] transition-colors leading-snug">
+                                          {v.title}
+                                        </div>
+                                        <div className="text-[11px] text-[#7C766F] flex items-center gap-1.5 mt-1.5">
+                                          <span className="font-semibold">{v.channel}</span>
+                                          <span className="text-[10px] text-[#2A9D8F]">✓</span>
+                                        </div>
+                                      </div>
+                                    </a>
+                                  )
+                                }) : (
                                   <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(tech + ' tutorial for beginners')}`} target="_blank" rel="noreferrer"
                                     className="flex items-center gap-2 p-3 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#FF6B6B] transition-colors no-underline text-xs text-[#8E4B49] font-bold">
                                     <Play size={13} className="text-[#FF0000]" />
@@ -798,7 +1037,20 @@ export default function IdeaAnalysis() {
                         <div className="space-y-3">
                           <div className="p-3 rounded-xl bg-[#FFF8F3] border border-[#FFAAA6]/40 text-xs text-[#534342] flex items-start gap-2">
                             <Github size={14} className="text-[#1D1B18] shrink-0 mt-0.5" />
-                            <span>UDAAN will create a GitHub repository directly using your connected GitHub account. Make sure you've connected GitHub <strong className="text-[#1D1B18]">(via the profile page)</strong> to enable this.</span>
+                            <span>Create a GitHub repository directly using your connected account or enter a Personal Access Token below for instant creation.</span>
+                          </div>
+
+                          <div className="space-y-2">
+                            <input
+                              type="password"
+                              value={createRepoToken}
+                              onChange={e => setCreateRepoToken(e.target.value)}
+                              placeholder="GitHub Personal Access Token / Secret Key (Optional - skips OAuth)"
+                              className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-mono focus:border-[#8E4B49] focus:outline-none"
+                            />
+                            <span className="text-[10px] text-[#9B9590] block">
+                              Paste a classic token with <code>repo</code> scope to create directly, or leave blank to authenticate via OAuth.
+                            </span>
                           </div>
 
                           <div className="flex gap-2">
@@ -1029,6 +1281,11 @@ export default function IdeaAnalysis() {
 
         </main>
       )}
+
+      {/* Interactive Cursor Companion Mascot (Duolingo style) */}
+      <div className="hidden xl:block fixed right-8 bottom-8 z-30 pointer-events-auto">
+        <InteractiveMascot phase={step} />
+      </div>
     </div>
   )
 }

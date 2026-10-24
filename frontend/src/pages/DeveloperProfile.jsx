@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import UdaanLoader from '../components/UdaanLoader.jsx'
-import { AlertCircle, Check, ExternalLink, Github, LoaderCircle, LogOut, RefreshCw, Save, ShieldCheck, Sparkles, UserCheck, UserRound } from 'lucide-react'
+import { AlertCircle, BookOpen, Calendar, Check, ExternalLink, Github, Key, LoaderCircle, LogOut, RefreshCw, Save, ShieldCheck, Sparkles, UserCheck, UserRound } from 'lucide-react'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import { useAuth } from '../app/AuthContext.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { getDeveloperProfile, startGitHubLogin, updateDeveloperProfile, quickLogin, logoutAccount, connectGitHubUsername } from '../services/authService.js'
+import { getTechHistory, saveTechHistory } from '../services/githubService.js'
+import { createGoogleCalendarUrl, downloadIcsFile } from '../services/calendarService.js'
 import './DeveloperProfile.css'
 
 const AVATAR_PRESETS = [
@@ -16,6 +18,12 @@ const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
   'https://api.dicebear.com/7.x/bottts/svg?seed=udaan1',
   'https://api.dicebear.com/7.x/bottts/svg?seed=udaan2',
+]
+
+const POPULAR_SKILLS = [
+  'React', 'JavaScript', 'TypeScript', 'Next.js', 'Python', 'Django',
+  'Node.js', 'PostgreSQL', 'Supabase', 'Firebase', 'Tailwind CSS',
+  'Flutter', 'HTML/CSS', 'SQL', 'FastAPI', 'Docker', 'REST API'
 ]
 
 export default function DeveloperProfile() {
@@ -32,6 +40,17 @@ export default function DeveloperProfile() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState(query.get('github') === 'connected' ? 'GitHub is connected. Review your developer profile below.' : '')
+
+  // Google Calendar Integration State
+  const [googleConnected, setGoogleConnected] = useState(false)
+  const [googleEmail, setGoogleEmail] = useState('')
+
+  // GitHub Personal Access Token (Secret Key) State
+  const [githubPat, setGithubPat] = useState('')
+  const [hasSavedPat, setHasSavedPat] = useState(false)
+
+  // User Tech Knowledge History (DB Stored)
+  const [knownTech, setKnownTech] = useState([])
 
   useEffect(() => {
     const errors = {
@@ -50,6 +69,15 @@ export default function DeveloperProfile() {
     if (query.has('github')) { const next = new URLSearchParams(query); next.delete('github'); setQuery(next, { replace: true }); void refresh() }
   }, [])
 
+  // Load tech history from DB
+  useEffect(() => {
+    getTechHistory().then(th => {
+      if (th?.known_stacks?.length) {
+        setKnownTech(th.known_stacks.map(s => s.name || s))
+      }
+    }).catch(() => {})
+  }, [auth.authenticated])
+
   useEffect(() => {
     if (!auth.authenticated) {
       setProfile(null)
@@ -59,6 +87,9 @@ export default function DeveloperProfile() {
     void getDeveloperProfile().then(data => {
       if (!active) return
       setProfile(data)
+      setGoogleConnected(Boolean(data.google_calendar_connected))
+      setGoogleEmail(data.google_calendar_email || '')
+      setHasSavedPat(Boolean(data.github_access_token))
       setForm({ skills: (data.skills || []).join(', '), experience: data.experience || '', preferred_roles: (data.preferred_roles || []).join(', '), availability_hours: data.availability_hours ?? 10, learning_goals: data.learning_goals || '', avatar_url: data.avatar_url || '' })
     }).catch(err => {
       if (!active) return
@@ -154,6 +185,116 @@ export default function DeveloperProfile() {
       setNotice('Your developer profile and avatar were saved.')
     } catch (err) { setError(err.message || 'Could not save your profile.') }
     finally { setBusy(false) }
+  }
+
+  const toggleTechInHistory = async (techName) => {
+    const next = knownTech.includes(techName) ? knownTech.filter(t => t !== techName) : [...knownTech, techName]
+    setKnownTech(next)
+    try {
+      await saveTechHistory({ known_stacks: next.map(name => ({ name, confidence: 'comfortable', source: 'profile' })) })
+      setNotice(`Updated tech skills: ${next.length} technologies in your database profile.`)
+      setTimeout(() => setNotice(''), 3000)
+    } catch {
+      setError('Could not update tech history in database.')
+    }
+  }
+
+  const handleSaveGoogleCalendar = async (e) => {
+    if (e) e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const emailToUse = googleEmail.trim() || auth.user?.email || 'user@gmail.com'
+      const updated = await updateDeveloperProfile({
+        google_calendar_connected: true,
+        google_calendar_email: emailToUse,
+        google_calendar_synced_at: new Date().toISOString(),
+      })
+      setProfile(updated)
+      setGoogleConnected(true)
+      setGoogleEmail(emailToUse)
+      setNotice('Google Calendar connected! You can now sync project milestones and receive timeline alerts.')
+      setTimeout(() => setNotice(''), 4000)
+    } catch (err) {
+      setError(err.message || 'Failed to save Google Calendar settings.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleDisconnectGoogleCalendar = async () => {
+    setBusy(true)
+    try {
+      const updated = await updateDeveloperProfile({
+        google_calendar_connected: false,
+      })
+      setProfile(updated)
+      setGoogleConnected(false)
+      setNotice('Google Calendar disconnected.')
+      setTimeout(() => setNotice(''), 3000)
+    } catch (err) {
+      setError(err.message || 'Failed to disconnect Google Calendar.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleSyncAllMilestonesToCalendar = () => {
+    const projects = readSavedProjects()
+    const events = []
+    projects.forEach(p => {
+      const flightPlan = p.workflow?.flight_plan
+      if (flightPlan?.milestones) {
+        flightPlan.milestones.forEach((m, idx) => {
+          events.push({
+            title: `[${p.name || 'UDAAN'}] M${idx + 1}: ${m.title}`,
+            description: `${m.purpose || m.outcome || 'Milestone checkpoint'}\nProject: ${p.name}\nCategory: ${m.category || 'Milestone'}`,
+            startDate: m.start_date || p.startDate,
+            endDate: m.target_date || m.deadline || p.deadline,
+          })
+        })
+      }
+      if (p.deadline) {
+        events.push({
+          title: `🚀 TARGET LAUNCH: ${p.name || 'Project Launch'}`,
+          description: `Target launch deadline for ${p.name}!`,
+          startDate: p.deadline,
+          endDate: p.deadline,
+        })
+      }
+    })
+
+    if (!events.length) {
+      setError('No active project milestones found to sync. Create or open a project first!')
+      return
+    }
+
+    downloadIcsFile('udaan-project-milestones.ics', events)
+    setNotice(`Exported ${events.length} milestones & deadlines to Calendar (.ics)! Open it to sync directly to Google Calendar.`)
+    setTimeout(() => setNotice(''), 5000)
+  }
+
+  const handleSaveGitHubPat = async (e) => {
+    if (e) e.preventDefault()
+    if (!githubPat.trim()) {
+      setError('Please enter a valid GitHub token or Secret Key.')
+      return
+    }
+    setBusy(true)
+    try {
+      const updated = await updateDeveloperProfile({
+        github_access_token: githubPat.trim(),
+      })
+      setProfile(updated)
+      setHasSavedPat(true)
+      setNotice('GitHub Personal Access Token / Secret Key saved! UDAAN can now create repositories directly.')
+      setGithubPat('')
+      setTimeout(() => setNotice(''), 4000)
+    } catch (err) {
+      setError(err.message || 'Failed to save GitHub token.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const setField = (key, value) => setForm(current => ({ ...current, [key]: value }))
@@ -459,6 +600,163 @@ export default function DeveloperProfile() {
                     </button>
                   </div>
                 </form>
+
+                {/* Google Calendar Integration Card */}
+                <section className="bg-white rounded-3xl p-6 border border-[#EFEAE4] shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-9 h-9 rounded-2xl bg-[#E8F0FE] text-[#1A73E8] flex items-center justify-center font-bold">
+                        <Calendar size={18} />
+                      </span>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#1A73E8]">CALENDAR & TIMELINE SYNC</span>
+                        <h2 className="text-sm font-bold text-[#1D1B18]">Google Calendar Connection</h2>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${googleConnected ? 'bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6]' : 'bg-[#F1F3F4] text-[#5F6368]'}`}>
+                      <span className={`w-2 h-2 rounded-full ${googleConnected ? 'bg-[#137333]' : 'bg-[#70757A]'}`} />
+                      {googleConnected ? 'Connected & Synced' : 'Not Connected'}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-[#534342] leading-relaxed">
+                    Connect your Google Calendar to synchronize project milestones, track launch deadlines, and get timely reminders as dates approach.
+                  </p>
+
+                  <form onSubmit={handleSaveGoogleCalendar} className="space-y-3 pt-1">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="email"
+                          value={googleEmail}
+                          onChange={e => setGoogleEmail(e.target.value)}
+                          placeholder="your.email@gmail.com"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] text-xs font-bold text-[#1D1B18] focus:border-[#1A73E8] focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={busy}
+                        className="px-4 py-2.5 rounded-xl bg-[#1A73E8] text-white text-xs font-bold hover:bg-[#1557B0] transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                      >
+                        <Calendar size={13} />
+                        {googleConnected ? 'Update Calendar Email' : 'Connect Google Calendar'}
+                      </button>
+                      {googleConnected && (
+                        <button
+                          type="button"
+                          onClick={handleDisconnectGoogleCalendar}
+                          disabled={busy}
+                          className="px-3 py-2.5 rounded-xl border border-[#EFEAE4] text-xs font-bold text-[#8E4B49] hover:bg-[#FFF1ED] transition-colors"
+                        >
+                          Disconnect
+                        </button>
+                      )}
+                    </div>
+                  </form>
+
+                  <div className="pt-2 flex flex-wrap gap-2 items-center">
+                    <button
+                      type="button"
+                      onClick={handleSyncAllMilestonesToCalendar}
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors"
+                    >
+                      <Calendar size={13} />
+                      Sync & Download All Milestones (.ics)
+                    </button>
+                    <span className="text-[11px] text-[#7C766F]">
+                      Compatible with Google Calendar, Apple Calendar & Outlook
+                    </span>
+                  </div>
+                </section>
+
+                {/* GitHub Secret Key / PAT Direct Setup */}
+                <section className="bg-white rounded-3xl p-6 border border-[#EFEAE4] shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-9 h-9 rounded-2xl bg-[#FFF1ED] text-[#8E4B49] flex items-center justify-center font-bold">
+                        <Key size={18} />
+                      </span>
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#8E4B49]">DIRECT GITHUB ACCESS</span>
+                        <h2 className="text-sm font-bold text-[#1D1B18]">GitHub Secret Key & Personal Access Token</h2>
+                      </div>
+                    </div>
+                    {hasSavedPat && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6]">
+                        <Check size={12} />
+                        Token Saved in DB
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-[#534342] leading-relaxed">
+                    Provide a GitHub Personal Access Token (PAT / Secret Key) with <code className="px-1.5 py-0.5 rounded bg-[#FFF8F3] text-[#8E4B49] font-mono text-[11px]">repo</code> scope so UDAAN can create and configure repositories directly for you without OAuth redirects.
+                  </p>
+
+                  <form onSubmit={handleSaveGitHubPat} className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="password"
+                      value={githubPat}
+                      onChange={e => setGithubPat(e.target.value)}
+                      placeholder={hasSavedPat ? '•••••••••••••••••••••••• (Stored — enter new to replace)' : 'ghp_xxxxxxxxxxxxxxxxxxxx'}
+                      className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] text-xs font-mono text-[#1D1B18] focus:border-[#8E4B49] focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="px-4 py-2.5 rounded-xl bg-[#8E4B49] text-white text-xs font-bold hover:bg-[#7A3C3A] transition-colors flex items-center justify-center gap-1.5 shrink-0"
+                    >
+                      <Save size={13} />
+                      Save Secret Key
+                    </button>
+                  </form>
+                  <a
+                    href="https://github.com/settings/tokens/new?scopes=repo&description=UDAAN+Studio+Launchpad"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#8E4B49] hover:underline"
+                  >
+                    Generate a new Personal Access Token on GitHub <ExternalLink size={11} />
+                  </a>
+                </section>
+
+                {/* Known Technologies History (DB Tracked) */}
+                <section className="bg-white rounded-3xl p-6 border border-[#EFEAE4] shadow-xs space-y-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-9 h-9 rounded-2xl bg-[#FFFBEB] text-[#B45309] flex items-center justify-center font-bold">
+                      <BookOpen size={18} />
+                    </span>
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#B45309]">SKILLS HISTORY IN DATABASE</span>
+                      <h2 className="text-sm font-bold text-[#1D1B18]">Technologies You Know</h2>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-[#534342] leading-relaxed">
+                    Select the technologies you already know. UDAAN stores this in your database profile to recommend the best matching stacks and tailor video tutorials specifically for what you still need to learn.
+                  </p>
+
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {POPULAR_SKILLS.map(skill => {
+                      const isKnown = knownTech.includes(skill)
+                      return (
+                        <button
+                          key={skill}
+                          type="button"
+                          onClick={() => toggleTechInHistory(skill)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${isKnown ? 'bg-[#2A9D8F] border-[#2A9D8F] text-white shadow-xs' : 'bg-[#FAFAF9] border-[#EFEAE4] text-[#534342] hover:border-[#2A9D8F]'}`}
+                        >
+                          {isKnown && <Check size={11} />}
+                          <span>{skill}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <p className="text-[11px] text-[#7C766F]">
+                    {knownTech.length} technologies recorded in your permanent learning history.
+                  </p>
+                </section>
               </>
             ) : (
               <div className="bg-white rounded-3xl p-12 border border-[#EFEAE4] flex items-center justify-center">

@@ -894,8 +894,8 @@ function TaskRow({
         className="fp-task-check"
         title={locked ? 'Complete its dependencies first' : done ? 'Mark task incomplete' : 'Mark task complete'}
       >
-        <input type="checkbox" checked={done} disabled={locked} onChange={onToggle} />
-        <span>{done ? <Check size={12} /> : locked ? <ShieldAlert size={12} /> : null}</span>
+        <input type="checkbox" checked={done} onChange={onToggle} />
+        <span>{done ? <Check size={12} /> : null}</span>
       </label>
 
       <div className="fp-task-main">
@@ -1678,6 +1678,7 @@ export default function FlightPlan() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [milestoneFilter, setMilestoneFilter] = useState('all')
+  const [personFilter, setPersonFilter] = useState('all')
 
   const [editing, setEditing] = useState(false)
   const [editorPlan, setEditorPlan] = useState(null)
@@ -2203,6 +2204,14 @@ export default function FlightPlan() {
     return st === 'manual_review' || st === 'mismatch_detected'
   }).length
 
+  const availableRoles = useMemo(() => {
+    const roles = new Set()
+    allTasks.forEach(item => {
+      if (item.task?.suggested_role) roles.add(item.task.suggested_role)
+    })
+    return Array.from(roles)
+  }, [allTasks])
+
   const currentMilestoneIndex = milestones.findIndex((milestone, index) => {
     const tasks = allTasks.filter(task => task.milestoneIndex === index)
     return !tasks.length || !tasks.every(task => completed.includes(task.id))
@@ -2239,7 +2248,8 @@ export default function FlightPlan() {
   }
 
   function taskLocked(item) {
-    return milestoneStatus(item.milestoneIndex) === 'upcoming' || (!completed.includes(item.id) && dependencyBlocked(item))
+    // Only lock if an explicit dependency within the project is uncompleted, never lock simply because it's in an upcoming milestone
+    return !completed.includes(item.id) && dependencyBlocked(item)
   }
 
   function persistPlan(nextPlan, progress = completed, editedStages = []) {
@@ -2794,7 +2804,44 @@ export default function FlightPlan() {
                     completedTasks={completed}
                   />
                 ) : (view === 'flowmap' || view === 'roadmap') ? (
-                  <div className="fp-roadmap-layout">
+                  <div className="space-y-4">
+                    {/* Milestone Explainer Card */}
+                    <div className="rounded-2xl bg-gradient-to-r from-[#FFF8F3] to-[#FEF3C7]/40 border border-[#FFAAA6]/30 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+                      <div className="flex items-start gap-3.5">
+                        <span className="w-9 h-9 rounded-xl bg-[#8E4B49] text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
+                          💡
+                        </span>
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-black text-[#1D1B18] uppercase tracking-wider">
+                            What is a Milestone?
+                          </h4>
+                          <p className="text-xs text-[#534342] leading-relaxed max-w-2xl">
+                            Milestones are key flight checkpoints in your product journey. Each milestone groups critical deliverables (e.g., <strong>Foundation</strong>, <strong>Core MVP Build</strong>, <strong>Launch</strong>). Checking off tasks fills the milestone progress bar, unlocks subsequent phases, and earns Founder XP!
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={exportToGoogleCalendar}
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-[#FAF8F5] text-xs font-bold text-[#1D1B18] border border-[#E8E2D9] transition-all shadow-xs cursor-pointer"
+                        >
+                          <Calendar size={13} className="text-[#3B82F6]" />
+                          <span>Google Calendar .ics</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={openGoogleCalendar}
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1D1B18] hover:bg-black text-xs font-bold text-white transition-all shadow-xs cursor-pointer"
+                        >
+                          <ExternalLink size={12} />
+                          <span>Add to Cal</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="fp-roadmap-layout">
                     <div className="fp-roadmap" aria-label="Project milestones">
                       {milestones.length ? (
                         <>
@@ -2890,17 +2937,56 @@ export default function FlightPlan() {
                           </div>
                         )}
 
-                        <div className="fp-panel-task-heading">
-                          <h3>Tasks</h3>
-                          <span>
-                            {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && completed.includes(item.id)).length} /{' '}
-                            {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length} complete
-                          </span>
+                        {/* Person-by-Person Roadmap / Role Filter */}
+                        <div className="fp-panel-task-heading flex-col items-start gap-2 border-b border-[#ECE7E1] pb-3 mb-3">
+                          <div className="flex items-center justify-between w-full">
+                            <h3>Tasks</h3>
+                            <span>
+                              {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && completed.includes(item.id)).length} /{' '}
+                              {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length} complete
+                            </span>
+                          </div>
+
+                          {availableRoles.length > 0 && (
+                            <div className="flex items-center gap-1.5 overflow-x-auto w-full pt-1 pb-0.5">
+                              <span className="text-[10px] font-bold text-[#8C847E] shrink-0 uppercase tracking-wider mr-1">Role:</span>
+                              <button
+                                type="button"
+                                onClick={() => setPersonFilter('all')}
+                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
+                                  personFilter === 'all'
+                                    ? 'bg-[#1D1B18] text-white shadow-xs'
+                                    : 'bg-[#F4EFEA] text-[#534342] hover:bg-[#EAE4DC]'
+                                }`}
+                              >
+                                All Roles ({allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length})
+                              </button>
+                              {availableRoles.map(role => {
+                                const countForRole = allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && item.task?.suggested_role === role).length
+                                if (countForRole === 0) return null
+                                return (
+                                  <button
+                                    key={role}
+                                    type="button"
+                                    onClick={() => setPersonFilter(role)}
+                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
+                                      personFilter === role
+                                        ? 'bg-[#1D1B18] text-white shadow-xs'
+                                        : 'bg-[#F4EFEA] text-[#534342] hover:bg-[#EAE4DC]'
+                                    }`}
+                                  >
+                                    {role} ({countForRole})
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
 
                         <div className="fp-panel-tasks">
                           {allTasks
                             .filter(item => item.milestoneIndex === activeMilestoneIndex)
+                            .filter(item => personFilter === 'all' || item.task?.suggested_role === personFilter)
                             .map(item => (
                               <TaskRow
                                 key={item.id}
@@ -2933,6 +3019,7 @@ export default function FlightPlan() {
                       </aside>
                     )}
                   </div>
+                </div>
                 ) : view === 'radar' ? (
                   <MarketRadarView
                     radarData={marketRadar}

@@ -1,11 +1,11 @@
 import { apiRequest } from './apiClient.js'
 
 // ─── GitHub Repository Creation ───────────────────────────────────────────────
-export function createGitHubRepo({ name, description = '', private: isPrivate = false }) {
+export function createGitHubRepo({ name, description = '', private: isPrivate = false, token = '', secret_key = '' }) {
   return apiRequest('/api/auth/github/create-repo/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, description, private: isPrivate }),
+    body: JSON.stringify({ name, description, private: isPrivate, token: token || secret_key }),
   })
 }
 
@@ -27,9 +27,10 @@ export function saveTechHistory({ known_stacks, learning_stacks, recommendation_
 }
 
 // ─── YouTube Learning Videos ──────────────────────────────────────────────────
-export function getYouTubeVideos(stacks = []) {
+export function getYouTubeVideos(stacks = [], context = '') {
   if (!stacks.length) return Promise.resolve({ videos: {} })
   const params = new URLSearchParams()
   stacks.forEach(s => params.append('stack', s))
+  if (context) params.append('context', context)
   return apiRequest(`/api/learning/youtube/?${params}`)
 }

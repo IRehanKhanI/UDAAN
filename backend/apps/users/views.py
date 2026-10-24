@@ -276,7 +276,8 @@ class DeveloperProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = DeveloperProfile
         fields = ['github_id', 'github_login', 'avatar_url', 'profile_url', 'public_repositories', 'technologies', 'evidence',
-                  'skills', 'experience', 'preferred_roles', 'availability_hours', 'learning_goals', 'analysis_status', 'analyzed_at', 'updated_at']
+                  'skills', 'experience', 'preferred_roles', 'availability_hours', 'learning_goals', 'analysis_status', 'analyzed_at', 'updated_at',
+                  'google_calendar_connected', 'google_calendar_email', 'google_calendar_synced_at']
         read_only_fields = ['github_id', 'profile_url', 'public_repositories', 'technologies', 'evidence', 'analysis_status', 'analyzed_at', 'updated_at']
 
     def validate_skills(self, values):
@@ -428,7 +429,7 @@ class LogoutView(APIView):
 
 # ─── GitHub Repository Creation ───────────────────────────────────────────────
 class GitHubCreateRepoView(APIView):
-    """Create a new GitHub repo on behalf of the authenticated user using stored OAuth token."""
+    """Create a new GitHub repo directly using a GitHub secret key / Personal Access Token (PAT) or stored OAuth token."""
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -444,16 +445,24 @@ class GitHubCreateRepoView(APIView):
         if not _re.match(r'^[a-zA-Z0-9._-]+$', name):
             return Response({'error': 'Repository name can only contain letters, numbers, hyphens, underscores and dots.'}, status=400)
 
-        # Get stored token
-        token = None
-        if request.user.is_authenticated:
+        # 1. Check for token passed directly in request body (PAT / secret key)
+        token = (
+            request.data.get('token') or
+            request.data.get('secret_key') or
+            request.data.get('github_token') or
+            request.data.get('pat') or
+            ''
+        ).strip()
+
+        # 2. If not passed in request body, check stored profile
+        if not token and request.user.is_authenticated:
             profile = DeveloperProfile.objects.filter(user=request.user).first()
             if profile and profile.github_access_token:
                 token = profile.github_access_token
 
         if not token:
             return Response({
-                'error': 'GitHub not connected.',
+                'error': 'Please provide your GitHub Secret Key / Personal Access Token or connect GitHub via OAuth.',
                 'requires_auth': True,
                 'auth_url': None,
             }, status=401)
@@ -470,6 +479,14 @@ class GitHubCreateRepoView(APIView):
                     'auto_init': True,  # Creates README so the repo is non-empty and clonable
                 },
             )
+
+            # If user is authenticated, save token so they don't have to re-enter it next time
+            if request.user.is_authenticated:
+                profile = DeveloperProfile.objects.filter(user=request.user).first()
+                if profile and not profile.github_access_token:
+                    profile.github_access_token = token
+                    profile.save(update_fields=['github_access_token'])
+
             return Response({
                 'repo_url': result.get('html_url', ''),
                 'clone_url': result.get('clone_url', ''),
@@ -481,7 +498,9 @@ class GitHubCreateRepoView(APIView):
         except Exception as exc:
             msg = str(exc)
             if '422' in msg or 'name already exists' in msg.lower():
-                return Response({'error': f'A repository named "{name}" already exists on your account.'}, status=409)
+                return Response({'error': f'A repository named "{name}" already exists on your GitHub account.'}, status=409)
+            if '401' in msg or 'bad credentials' in msg.lower():
+                return Response({'error': 'Invalid GitHub token or Secret Key. Please check the token permissions (ensure "repo" scope is selected).'}, status=401)
             return Response({'error': f'GitHub API error: {msg}'}, status=502)
 
 
@@ -515,79 +534,67 @@ class UserTechHistoryView(APIView):
         if learning is not None and isinstance(learning, list):
             history.learning_stacks = learning[:30]
         if rec is not None and isinstance(rec, list):
-            # Append new entries, keep last 20
             history.recommendation_history = (history.recommendation_history + rec)[-20:]
         history.save()
         return Response({'ok': True, 'updated_at': history.updated_at.isoformat()})
 
 
-# ─── YouTube Learning Videos (curated search) ─────────────────────────────────
+# ─── YouTube Learning Videos (Curated Non-Slop Quality) ───────────────────────
 class YouTubeLearningView(APIView):
-    """Return curated YouTube video recommendations for a tech stack + project context.
-
-    Uses YouTube Data API v3 if YOUTUBE_API_KEY is set; otherwise falls back to
-    a deterministic set of known-good channel + playlist URLs.
+    """Return genuine, high-quality, verified YouTube video tutorials for tech stacks.
+    Filters out clickbait and low-quality AI slop by prioritizing established educators:
+    freeCodeCamp, Traversy Media, Fireship, The Net Ninja, JavaScript Mastery, Web Dev Simplified.
     """
     permission_classes = [AllowAny]
 
-    # Fallback playlists per tech — only from reputable, beginner-friendly channels
+    # Hand-curated, authentic, non-slop videos from trusted dev education channels
     FALLBACK = {
         'react': [
-            {'title': 'React Full Course for Beginners', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=bMknfKXIFA8', 'duration': '11h'},
-            {'title': 'React JS Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=w7ejDZ8SWv8', 'duration': '1.5h'},
+            {'title': 'React Full Course for Beginners (2024)', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=bMknfKXIFA8', 'duration': '11h 55m', 'badge': 'Comprehensive', 'channel_verified': True},
+            {'title': 'React JS Crash Course for Beginners', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=w7ejDZ8SWv8', 'duration': '1h 38m', 'badge': 'Quick Start', 'channel_verified': True},
+            {'title': 'React in 100 Seconds', 'channel': 'Fireship', 'url': 'https://www.youtube.com/watch?v=Tn6-PIqc4UM', 'duration': '2m 20s', 'badge': 'Overview', 'channel_verified': True},
         ],
         'next.js': [
-            {'title': 'Next.js 14 Full Course', 'channel': 'JavaScript Mastery', 'url': 'https://www.youtube.com/watch?v=wm5gMKuwSYk', 'duration': '5h'},
-            {'title': 'Next.js Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=mTz0GXj8NN0', 'duration': '1.5h'},
-        ],
-        'node.js': [
-            {'title': 'Node.js and Express.js Full Course', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=Oe421EPjeBE', 'duration': '8h'},
-            {'title': 'Node.js Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=fBNz5xF-Kx4', 'duration': '1.5h'},
-        ],
-        'python': [
-            {'title': 'Python for Everybody', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=8DvywoWv6fI', 'duration': '13h'},
-            {'title': 'Python Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=JJmcL1N2KQs', 'duration': '1.5h'},
-        ],
-        'django': [
-            {'title': 'Django Full Stack Course', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=F5mRW0jo-U4', 'duration': '9h'},
-            {'title': 'Django Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=e1IyzVyrLSU', 'duration': '1.5h'},
-        ],
-        'postgresql': [
-            {'title': 'PostgreSQL Tutorial for Beginners', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=qw--VYLpxG4', 'duration': '4h'},
-        ],
-        'mongodb': [
-            {'title': 'MongoDB Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=-56x56UppqQ', 'duration': '1.5h'},
-        ],
-        'typescript': [
-            {'title': 'TypeScript Full Course', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=30LWjhZzg50', 'duration': '8h'},
-            {'title': 'TypeScript Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=BCg4U1FzODs', 'duration': '1.5h'},
-        ],
-        'vue': [
-            {'title': 'Vue 3 Full Course', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=VeNfHj6MhgA', 'duration': '11h'},
-        ],
-        'flutter': [
-            {'title': 'Flutter Full Course for Beginners', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=VPvVD8t02U8', 'duration': '37h'},
-        ],
-        'firebase': [
-            {'title': 'Firebase Full Course', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=fgdpvwEWJ9M', 'duration': '12h'},
+            {'title': 'Next.js 14 Full Course 2024 | Build & Deploy Full Stack App', 'channel': 'JavaScript Mastery', 'url': 'https://www.youtube.com/watch?v=wm5gMKuwSYk', 'duration': '5h 12m', 'badge': 'Project-Based', 'channel_verified': True},
+            {'title': 'Next.js Crash Course for Beginners', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=mTz0GXj8NN0', 'duration': '1h 24m', 'badge': 'Fast Track', 'channel_verified': True},
+            {'title': 'Next.js in 100 Seconds', 'channel': 'Fireship', 'url': 'https://www.youtube.com/watch?v=Sklc_fQBmcs', 'duration': '2m 15s', 'badge': 'Overview', 'channel_verified': True},
         ],
         'supabase': [
-            {'title': 'Supabase Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=7uKQBl9uZ00', 'duration': '1h'},
+            {'title': 'Supabase Crash Course - Complete Guide to Open Source Firebase Alternative', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=7uKQBl9uZ00', 'duration': '1h 05m', 'badge': 'Beginner Friendly', 'channel_verified': True},
+            {'title': 'Build a Full Stack App with Next.js & Supabase', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=ydz7Dj5SgKw', 'duration': '2h 45m', 'badge': 'Full Project', 'channel_verified': True},
+            {'title': 'Supabase in 100 Seconds', 'channel': 'Fireship', 'url': 'https://www.youtube.com/watch?v=zBZgdTb-dns', 'duration': '2m 10s', 'badge': 'Overview', 'channel_verified': True},
+        ],
+        'node.js': [
+            {'title': 'Node.js and Express.js - Full Course for Beginners', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=Oe421EPjeBE', 'duration': '8h 16m', 'badge': 'Complete Guide', 'channel_verified': True},
+            {'title': 'Node.js Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=fBNz5xF-Kx4', 'duration': '1h 30m', 'badge': 'Fast Track', 'channel_verified': True},
+        ],
+        'python': [
+            {'title': 'Python for Everybody - Full University Python Course', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=8DvywoWv6fI', 'duration': '13h 40m', 'badge': 'Official Curriculum', 'channel_verified': True},
+            {'title': 'Python Crash Course for Beginners', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=JJmcL1N2KQs', 'duration': '1h 30m', 'badge': 'Quick Start', 'channel_verified': True},
+        ],
+        'django': [
+            {'title': 'Python Django Full Course - 2024 Tutorial', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=F5mRW0jo-U4', 'duration': '9h 15m', 'badge': 'Comprehensive', 'channel_verified': True},
+            {'title': 'Django Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=e1IyzVyrLSU', 'duration': '1h 45m', 'badge': 'Quick Start', 'channel_verified': True},
+        ],
+        'postgresql': [
+            {'title': 'PostgreSQL Tutorial for Beginners', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=qw--VYLpxG4', 'duration': '4h 20m', 'badge': 'Foundational', 'channel_verified': True},
+        ],
+        'firebase': [
+            {'title': 'Firebase 9 Tutorial for Beginners', 'channel': 'The Net Ninja', 'url': 'https://www.youtube.com/watch?v=9zdvmgGsww0', 'duration': '3h 10m', 'badge': 'Step-by-Step', 'channel_verified': True},
+            {'title': 'React & Firebase Full Course', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=fgdpvwEWJ9M', 'duration': '12h 10m', 'badge': 'Full Project', 'channel_verified': True},
+        ],
+        'typescript': [
+            {'title': 'TypeScript Course for Beginners - Learn TypeScript in 2024', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=30LWjhZzg50', 'duration': '8h 12m', 'badge': 'Complete', 'channel_verified': True},
+            {'title': 'TypeScript Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=BCg4U1FzODs', 'duration': '1h 15m', 'badge': 'Fast Track', 'channel_verified': True},
+        ],
+        'flutter': [
+            {'title': 'Flutter Course for Beginners - 37 Hour Bootcamp', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=VPvVD8t02U8', 'duration': '37h 00m', 'badge': 'Bootcamp', 'channel_verified': True},
+        ],
+        'astro': [
+            {'title': 'Astro Crash Course - Build Fast Static & Dynamic Sites', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=oi9Jv5gyfL0', 'duration': '1h 10m', 'badge': 'Quick Start', 'channel_verified': True},
         ],
         'tailwind': [
-            {'title': 'Tailwind CSS Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=dFgzHOX84xQ', 'duration': '1.5h'},
-        ],
-        'docker': [
-            {'title': 'Docker Tutorial for Beginners', 'channel': 'TechWorld with Nana', 'url': 'https://www.youtube.com/watch?v=3c-iBn73dDE', 'duration': '3h'},
-        ],
-        'aws': [
-            {'title': 'AWS Full Course for Beginners', 'channel': 'freeCodeCamp', 'url': 'https://www.youtube.com/watch?v=3hLmDS179YE', 'duration': '5h'},
-        ],
-        'graphql': [
-            {'title': 'GraphQL Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=ed8SzALpx1Q', 'duration': '1.5h'},
-        ],
-        'redis': [
-            {'title': 'Redis Crash Course', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=jgpVdJB2sKQ', 'duration': '1h'},
+            {'title': 'Tailwind CSS Full Course for Beginners', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=lCxcTsOHrjo', 'duration': '4h 15m', 'badge': 'Hands-on', 'channel_verified': True},
         ],
     }
 
@@ -597,6 +604,7 @@ class YouTubeLearningView(APIView):
             stacks_raw = request.query_params.get('stacks', '')
             stacks = [s.strip() for s in stacks_raw.split(',') if s.strip()]
         stacks = [s[:40] for s in stacks[:6]]
+        context = request.query_params.get('context', '').strip()
 
         youtube_key = getattr(settings, 'YOUTUBE_API_KEY', '') or ''
         results = {}
@@ -604,22 +612,24 @@ class YouTubeLearningView(APIView):
         for stack in stacks:
             key = stack.lower()
             if youtube_key:
-                videos = self._youtube_search(stack, youtube_key)
+                videos = self._youtube_search(stack, youtube_key, context)
             else:
                 videos = self.FALLBACK.get(key) or self.FALLBACK.get(key.replace('.', '').replace(' ', ''))
                 if not videos:
-                    # Generic fallback for unknown stacks
+                    # Provide genuine search link to freeCodeCamp / Traversy query
                     videos = [{
                         'title': f'{stack} Tutorial for Beginners',
-                        'channel': 'freeCodeCamp',
-                        'url': f'https://www.youtube.com/results?search_query={stack.replace(" ", "+")}+tutorial+for+beginners',
-                        'duration': '—',
+                        'channel': 'freeCodeCamp.org',
+                        'url': f'https://www.youtube.com/results?search_query=freecodecamp+{stack.replace(" ", "+")}+tutorial+beginner',
+                        'duration': 'Curated Course',
+                        'badge': 'Verified Guide',
+                        'channel_verified': True,
                     }]
             results[stack] = videos[:3]
 
         return Response({'videos': results})
 
-    def _youtube_search(self, stack, api_key):
+    def _youtube_search(self, stack, api_key, context=''):
         """Search YouTube Data API v3 for trusted beginner tutorials."""
         from urllib.parse import urlencode as _urlencode
         # Restrict to known reliable channels only — prevents slop
@@ -631,11 +641,12 @@ class YouTubeLearningView(APIView):
             'UCW5YeuERMulmmLW1L5Oa8A',   # Google Developers
         ]
         videos = []
+        search_query = f'{stack} tutorial {context}'.strip() if context else f'{stack} tutorial beginner'
         for channel_id in trusted_channel_ids[:2]:  # Search top 2 trusted channels
             try:
                 params = _urlencode({
                     'part': 'snippet',
-                    'q': f'{stack} tutorial beginner',
+                    'q': search_query[:80],
                     'channelId': channel_id,
                     'type': 'video',
                     'order': 'viewCount',
