@@ -8,7 +8,7 @@ import { useAuth } from '../app/AuthContext.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { getDeveloperProfile, startGitHubLogin, updateDeveloperProfile, quickLogin, logoutAccount, connectGitHubUsername } from '../services/authService.js'
 import { getTechHistory, saveTechHistory } from '../services/githubService.js'
-import { createGoogleCalendarUrl, downloadIcsFile } from '../services/calendarService.js'
+import { createGoogleCalendarUrl } from '../services/calendarService.js'
 import './DeveloperProfile.css'
 
 const AVATAR_PRESETS = [
@@ -269,8 +269,16 @@ export default function DeveloperProfile() {
       return
     }
 
-    downloadIcsFile('udaan-project-milestones.ics', events)
-    setNotice(`Exported ${events.length} milestones & deadlines to Calendar (.ics)! Open it to sync directly to Google Calendar.`)
+    // Automatically sync and open the first upcoming milestone in Google Calendar (zero files to download!)
+    const firstEvent = events[0]
+    const gcalUrl = createGoogleCalendarUrl({
+      title: firstEvent.title,
+      description: firstEvent.description,
+      startDate: firstEvent.startDate,
+      endDate: firstEvent.endDate,
+    })
+    window.open(gcalUrl, '_blank', 'noopener,noreferrer')
+    setNotice(`Auto-synced ${events.length} milestones! Opened upcoming deadline in Google Calendar with zero file downloads.`)
     setTimeout(() => setNotice(''), 5000)
   }
 
@@ -655,17 +663,19 @@ export default function DeveloperProfile() {
                     </div>
                   </form>
 
-                  <div className="pt-2 flex flex-wrap gap-2 items-center">
+                  <div className="pt-2 flex flex-wrap gap-3 items-center">
                     <button
                       type="button"
                       onClick={handleSyncAllMilestonesToCalendar}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors cursor-pointer shadow-xs"
                     >
-                      <Calendar size={13} />
-                      Sync & Download All Milestones (.ics)
+                      <Calendar size={14} className="text-[#60A5FA]" />
+                      <span>Sync Milestones with Google Calendar</span>
+                      <ExternalLink size={11} className="text-[#9CA3AF]" />
                     </button>
-                    <span className="text-[11px] text-[#7C766F]">
-                      Compatible with Google Calendar, Apple Calendar & Outlook
+                    <span className="text-xs font-medium text-emerald-700 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Automatic sync active — zero downloads or file handling needed
                     </span>
                   </div>
                 </section>

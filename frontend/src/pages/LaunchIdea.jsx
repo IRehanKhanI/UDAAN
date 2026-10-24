@@ -1,15 +1,16 @@
 import { useRef, useState } from 'react'
 import {
   ArrowLeft, BriefcaseBusiness, GraduationCap, Lightbulb,
-  Paperclip, Rocket, Sparkles, X
+  Paperclip, Rocket, Sparkles, X, Compass, ChevronRight, CheckCircle2
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import InteractiveMascot from '../components/mascot/InteractiveMascot.jsx'
 
 const QUICK_IDEAS = [
-  { label: '💼 Freelance Marketplace', text: 'WorkCraft: A peer-to-peer freelance and task marketplace platform with milestone escrow and verified portfolios.' },
-  { label: '🍞 Artisan Bakery', text: 'Crust & Crumb: A weekly micro-bakery drop where local food lovers reserve seasonal sourdough loaves & morning cardamom buns.' },
-  { label: '⚡ DevTools CLI', text: 'CodePilot CLI: An intelligent command-line tool that auto-detects flaky tests, suggests git diff fixes, and automates audits.' },
-  { label: '🤖 AI Sub-Agents', text: 'Nexus Studio: A multi-agent coordination platform orchestrating autonomous research, coding, and verification sub-agents.' },
+  { label: '💼 Freelance Escrow', text: 'WorkCraft: A peer-to-peer freelance and task marketplace platform with milestone escrow and verified portfolios.' },
+  { label: '🍞 Artisan Micro-Bakery', text: 'Crust & Crumb: A weekly micro-bakery drop where local food lovers reserve seasonal sourdough loaves & morning cardamom buns.' },
+  { label: '⚡ DevTools CLI & AI', text: 'CodePilot CLI: An intelligent command-line tool that auto-detects flaky tests, suggests git diff fixes, and automates audits.' },
+  { label: '🤖 Autonomous Sub-Agents', text: 'Nexus Studio: A multi-agent coordination platform orchestrating autonomous research, coding, and verification sub-agents.' },
 ]
 
 const CATEGORIES = [
@@ -20,17 +21,11 @@ const CATEGORIES = [
 ]
 
 const FLOW_STEPS = [
-  { emoji: '💡', title: 'Idea Input' },
-  { emoji: '🔍', title: 'Research' },
-  { emoji: '💰', title: 'Budget' },
-  { emoji: '🏗️', title: 'Architecture' },
-  { emoji: '🚀', title: 'Flight Plan' },
-]
-
-const WHAT_YOU_GET = [
-  { emoji: '🔍', title: 'Competitor Research', body: 'AI scans real websites to find who solves this today and where they fall short.' },
-  { emoji: '💰', title: 'Budget & Revenue', body: 'Real cost estimates, revenue model & break-even with live market data.' },
-  { emoji: '🗺️', title: 'Sprint Roadmap', body: '5-phase flight plan with milestones, task checklists & assignable roles.' },
+  { emoji: '💡', title: 'Idea & Purpose' },
+  { emoji: '🔍', title: 'Competitor Intelligence' },
+  { emoji: '💰', title: 'Budget & Pricing' },
+  { emoji: '🏗️', title: 'Architecture & Stacks' },
+  { emoji: '🚀', title: 'Flight Plan & Tasks' },
 ]
 
 export default function LaunchIdea() {
@@ -80,44 +75,91 @@ export default function LaunchIdea() {
   return (
     <div className="h-screen bg-[#FFF8F3] font-['Plus_Jakarta_Sans'] flex flex-col overflow-hidden">
 
-      {/* ── Top bar ──────────────────────────────────────────────── */}
-      <header className="shrink-0 flex items-center justify-between px-6 py-3 border-b border-[#EFEAE4] bg-white">
+      {/* ── Top Header ────────────────────────────────────────────── */}
+      <header className="shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-[#EFEAE4] bg-white z-10">
         <button
           type="button"
           onClick={() => navigate('/')}
           className="flex items-center gap-1.5 text-sm font-bold text-[#534342] hover:text-[#1D1B18] transition-colors cursor-pointer"
         >
           <ArrowLeft size={15} />
-          Back
+          Back to Dashboard
         </button>
         <span className="flex items-center gap-2 text-sm font-black text-[#1D1B18]">
-          <span className="w-6 h-6 rounded-lg bg-[#FFAAA6] flex items-center justify-center">
-            <Sparkles size={13} className="text-[#7A3C3A]" />
+          <span className="w-7 h-7 rounded-xl bg-[#FFAAA6] flex items-center justify-center shadow-xs">
+            <Sparkles size={14} className="text-[#7A3C3A]" />
           </span>
           Launch New Idea
         </span>
-        <div className="w-16" />
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-[#7C766F] bg-[#FAF8F5] px-2.5 py-1 rounded-full border border-[#EFEAE4] hidden sm:inline-block">
+            Phase 0: Vision
+          </span>
+        </div>
       </header>
 
-      {/* ── Body: left form + right panel ─────────────────────── */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* ── Main Body: Left Big Mascot + Right Shifted Studio Form ──── */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
 
-        {/* LEFT — form ──────────────────────────────────────────── */}
-        <div className="flex-1 flex flex-col justify-center px-8 lg:px-14 py-6 overflow-y-auto">
-          <div className="max-w-xl w-full mx-auto space-y-5">
+        {/* LEFT: Big Mascot Companion Stage ────────────────────────── */}
+        <div className="w-full lg:w-[44%] shrink-0 flex flex-col items-center justify-center p-6 lg:p-10 bg-gradient-to-br from-[#FFF8F3] via-[#FFF2EE]/70 to-[#FFE9E4]/40 border-b lg:border-b-0 lg:border-r border-[#EFEAE4] relative overflow-hidden select-none">
+          {/* Subtle Background Glows */}
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-[#FFAAA6]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-10 left-10 w-48 h-48 bg-[#FDE68A]/25 rounded-full blur-2xl pointer-events-none" />
 
-            {/* Heading */}
-            <div>
-              <h1 className="text-2xl font-black text-[#1D1B18] tracking-tight leading-tight">
+          {/* Big Interactive Mascot */}
+          <div className="relative z-10 flex flex-col items-center justify-center transform scale-110 sm:scale-125 lg:scale-135 py-4 transition-transform duration-300">
+            <InteractiveMascot phase={0} />
+          </div>
+
+          {/* Companion Info Strip */}
+          <div className="mt-8 relative z-10 text-center max-w-sm space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 border border-[#EFEAE4] shadow-xs text-xs font-bold text-[#1D1B18]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Pilot Companion Ready</span>
+            </div>
+            <p className="text-xs text-[#6D6560] leading-relaxed">
+              Move your mouse to look around, or click my head for friendly founder quotes! I'll guide you through your roadmap step by step.
+            </p>
+          </div>
+        </div>
+
+        {/* RIGHT: Shifted against right wall ───────────────────────── */}
+        <div className="flex-1 flex flex-col justify-center items-end px-5 sm:px-8 lg:px-12 py-6 overflow-y-auto">
+          <div className="w-full max-w-xl mr-0 space-y-4 bg-white rounded-3xl p-6 sm:p-8 border border-[#EFEAE4] shadow-sm">
+
+            {/* Heading & Subtitle */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#8E4B49]">STEP 1 OF 5 · LAUNCHPAD</span>
+              <h1 className="text-2xl sm:text-3xl font-black text-[#1D1B18] tracking-tight leading-tight">
                 What do you want to build?
               </h1>
-
+              <p className="text-xs text-[#534342]">
+                Describe your dream in plain words. UDAAN handles market research, tech stacks, and step-by-step milestones.
+              </p>
             </div>
 
-
+            {/* Quick Ideas Presets */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">
+                Quick Inspiration (Click to fill)
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {QUICK_IDEAS.map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => { setIdea(item.text); setError('') }}
+                    className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342] hover:border-[#1D1B18] hover:text-[#1D1B18] hover:bg-white transition-all cursor-pointer"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Form */}
-            <form onSubmit={launch} noValidate className="space-y-4">
+            <form onSubmit={launch} noValidate className="space-y-4 pt-1">
               <div className="space-y-1">
                 <label htmlFor="launch-idea-input" className="sr-only">Describe your idea</label>
                 <textarea
@@ -125,51 +167,58 @@ export default function LaunchIdea() {
                   rows={4}
                   value={idea}
                   onChange={e => { setIdea(e.target.value); setError('') }}
-                  placeholder="e.g. I want to build a platform where freelancers can post their work and get hired by clients directly..."
-                  className="w-full p-3.5 rounded-2xl bg-white border border-[#EFEAE4] focus:border-[#FFAAA6] focus:ring-2 focus:ring-[#FFAAA6]/30 text-sm text-[#1D1B18] placeholder-[#AAA29B] outline-none resize-none leading-relaxed transition-all"
+                  placeholder="e.g. I want to build a platform where freelancers can post their work and get hired by clients directly with milestone escrow..."
+                  className="w-full p-4 rounded-2xl bg-[#FFF8F3] border border-[#EFEAE4] focus:border-[#8E4B49] focus:bg-white focus:ring-3 focus:ring-[#FFAAA6]/30 text-sm text-[#1D1B18] placeholder-[#9C948D] outline-none resize-none leading-relaxed transition-all shadow-inner"
                 />
                 {error && <p className="text-xs font-semibold text-[#C0392B] pl-1">{error}</p>}
               </div>
 
-              {/* Category */}
+              {/* Category Pills */}
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider">Category</span>
-                <div className="flex flex-wrap gap-1.5">
+                <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">Project Type</span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {CATEGORIES.map(({ label, Icon }) => (
                     <button
                       key={label}
                       type="button"
                       onClick={() => setIntent(label)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${intent === label
-                        ? 'bg-[#FFAAA6]/30 border-[#FFAAA6] text-[#7A3C3A]'
-                        : 'bg-white border-[#EFEAE4] text-[#534342] hover:bg-[#F3EDE7]'
-                        }`}
+                      className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        intent === label
+                          ? 'bg-[#1D1B18] border-[#1D1B18] text-white shadow-xs'
+                          : 'bg-white border-[#EFEAE4] text-[#534342] hover:bg-[#FAF8F5]'
+                      }`}
                     >
-                      <Icon size={12} />
-                      {label}
+                      <Icon size={13} className={intent === label ? 'text-[#FFAAA6]' : 'text-[#7C766F]'} />
+                      <span>{label}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Attach + Submit */}
-              <div className="flex items-center justify-between gap-3 pt-1 border-t border-[#EFEAE4]">
+              {/* Attach File + Launch Button */}
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#EFEAE4]">
                 <div>
-                  <input ref={fileInput} type="file" accept=".txt,.md,text/plain,text/markdown" onChange={addAttachment} className="sr-only" />
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept=".txt,.md,text/plain,text/markdown"
+                    onChange={addAttachment}
+                    className="sr-only"
+                  />
                   {attachment ? (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF0EB] border border-[#FFCDB8] text-[#8E4B49] text-xs font-semibold">
                       <Paperclip size={12} />
-                      <span className="truncate max-w-[120px]">{attachment.name}</span>
+                      <span className="truncate max-w-[130px]">{attachment.name}</span>
                       <button type="button" onClick={() => setAttachment(null)} className="ml-1 cursor-pointer"><X size={12} /></button>
                     </span>
                   ) : (
                     <button
                       type="button"
                       onClick={() => fileInput.current?.click()}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#F3EDE7] border border-[#EFEAE4] text-xs text-[#534342] font-semibold transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FAF8F5] hover:bg-[#F3EDE7] border border-[#EFEAE4] text-xs text-[#534342] font-semibold transition-colors cursor-pointer"
                     >
-                      <Paperclip size={12} />
-                      Attach .txt or .md
+                      <Paperclip size={13} className="text-[#8E4B49]" />
+                      Attach Brief (.md / .txt)
                     </button>
                   )}
                   {attachmentNotice && <p className="text-[11px] text-[#C0392B] mt-1 pl-1">{attachmentNotice}</p>}
@@ -177,60 +226,30 @@ export default function LaunchIdea() {
 
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-[#1D1B18] hover:bg-black text-white text-sm font-black transition-all shadow hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shrink-0"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-[#8E4B49] hover:bg-[#723B39] text-white text-sm font-black transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shrink-0"
                 >
-                  Start Launch
+                  <span>Start Launch</span>
                   <Sparkles size={14} className="text-[#FBE191]" />
                 </button>
               </div>
             </form>
-          </div>
-        </div>
 
-        {/* RIGHT — info panel ────────────────────────────────────── */}
-        <div className="hidden lg:flex w-80 xl:w-96 shrink-0 bg-white border-l border-[#EFEAE4] flex-col justify-center px-8 py-8 gap-8">
-
-          {/* Flow steps */}
-          <div className="space-y-3">
-            <p className="text-[10px] font-bold text-[#7C766F] uppercase tracking-widest">What happens next</p>
-            <div className="space-y-1.5">
-              {FLOW_STEPS.map((step, i) => (
-                <div key={i} className={`flex items-center gap-3 p-2.5 rounded-xl transition-all ${i === 0 ? 'bg-[#FFF0EB] border border-[#FFCDB8]' : 'bg-[#F9F9F7]'
-                  }`}>
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-base shrink-0 ${i === 0 ? 'bg-white shadow-sm' : 'bg-white/60'
-                    }`}>{step.emoji}</span>
-                  <div>
-                    <span className={`text-xs font-bold ${i === 0 ? 'text-[#7A3C3A]' : 'text-[#534342]'}`}>
-                      {i === 0 && <span className="text-[#E76F51] mr-1">→</span>}
-                      {step.title}
-                    </span>
-                  </div>
-                  {i === 0 && <span className="ml-auto text-[10px] font-bold text-[#E76F51] shrink-0">Now</span>}
+            {/* Journey Roadmap Dots */}
+            <div className="pt-3 border-t border-[#EFEAE4] flex items-center justify-between gap-1 overflow-x-auto">
+              {FLOW_STEPS.map((step, idx) => (
+                <div key={idx} className="flex items-center gap-1 text-[11px] font-bold text-[#7C766F] shrink-0">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${idx === 0 ? 'bg-[#FFAAA6] text-[#7A3C3A] font-black' : 'bg-[#EFEAE4] text-[#7C766F]'}`}>
+                    {idx + 1}
+                  </span>
+                  <span className={idx === 0 ? 'text-[#1D1B18]' : ''}>{step.title}</span>
+                  {idx < FLOW_STEPS.length - 1 && <span className="text-[#D5CFC7] mx-0.5">›</span>}
                 </div>
               ))}
             </div>
+
           </div>
-
-          {/* Divider */}
-          <div className="border-t border-[#EFEAE4]" />
-
-          {/* What you'll get */}
-          <div className="space-y-3">
-            <p className="text-[10px] font-bold text-[#7C766F] uppercase tracking-widest">What you'll get</p>
-            <div className="space-y-2.5">
-              {WHAT_YOU_GET.map((card, i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <span className="text-xl shrink-0 mt-0.5">{card.emoji}</span>
-                  <div>
-                    <span className="text-xs font-bold text-[#1D1B18] block">{card.title}</span>
-                    <span className="text-[11px] text-[#7C766F] leading-snug">{card.body}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
         </div>
+
       </div>
     </div>
   )

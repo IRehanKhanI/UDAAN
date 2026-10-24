@@ -161,7 +161,7 @@ export default function MainDashboard() {
         const synced = syncBackendProjects(data.results)
         setProjects(synced)
       }
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   const currentProject = projects.find(p => String(p.id) === String(selectedProjectId)) || projects[0] || {
@@ -382,11 +382,10 @@ export default function MainDashboard() {
                 <button
                   type="button"
                   onClick={() => setIsTracking(!isTracking)}
-                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${
-                    isTracking
-                      ? 'bg-[#10B981] text-white hover:bg-[#059669]'
-                      : 'bg-[#1D1B18] text-white hover:bg-black'
-                  }`}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${isTracking
+                    ? 'bg-[#10B981] text-white hover:bg-[#059669]'
+                    : 'bg-[#1D1B18] text-white hover:bg-black'
+                    }`}
                 >
                   {isTracking ? <IconPause size={13} /> : <IconPlay size={13} />}
                   <span>{isTracking ? 'Pause tracking' : 'Start tracking'}</span>
@@ -409,58 +408,7 @@ export default function MainDashboard() {
           </div>
 
           {/* ── Metric Strip (Time tracker, Tasks in progress, Finished, Team) ── */}
-          <div className="flex flex-wrap items-center justify-between gap-4 py-2 border-b border-[#ECE7E1]">
-            <div className="flex flex-wrap items-center gap-6 sm:gap-10">
-              <div>
-                <span className="text-[11px] font-semibold text-[#8C847E] block">Project time tracker</span>
-                <span className="text-lg font-black text-[#1D1B18] tracking-tight flex items-center gap-1.5 mt-0.5">
-                  <span className={`w-2 h-2 rounded-full ${isTracking ? 'bg-[#10B981] animate-ping' : 'bg-[#F59E0B]'}`} />
-                  {isTracking ? formatTimer(trackedSeconds) : '16 hours'}
-                </span>
-              </div>
 
-              <div>
-                <span className="text-[11px] font-semibold text-[#8C847E] block">Tasks in progress</span>
-                <span className="text-lg font-black text-[#1D1B18] tracking-tight mt-0.5 block">
-                  {inProgressCount || 2}
-                </span>
-              </div>
-
-              <div>
-                <span className="text-[11px] font-semibold text-[#8C847E] block">Finished tasks</span>
-                <span className="text-lg font-black text-[#1D1B18] tracking-tight mt-0.5 block text-[#2A9D8F]">
-                  {doneCount}
-                </span>
-              </div>
-            </div>
-
-            {/* Team stack + Add team member */}
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-2 overflow-hidden">
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full ring-2 ring-white bg-[#FF6584] text-white text-[10px] font-bold">
-                  AK
-                </span>
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full ring-2 ring-white bg-[#3B82F6] text-white text-[10px] font-bold">
-                  DA
-                </span>
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full ring-2 ring-white bg-[#10B981] text-white text-[10px] font-bold">
-                  TS
-                </span>
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full ring-2 ring-white bg-[#1D1B18] text-white text-[10px] font-bold">
-                  +7
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setInviteModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-[#FAF7F4] text-[#1D1B18] text-xs font-bold border border-[#E5DFD7] transition-colors cursor-pointer shadow-xs"
-              >
-                <IconPlus size={13} />
-                <span>Add team member</span>
-              </button>
-            </div>
-          </div>
 
           {/* ── Main Two-Column Split (Recent Projects vs Daily Tasks) ── */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
@@ -650,18 +598,16 @@ export default function MainDashboard() {
                   return (
                     <div
                       key={task.id}
-                      className={`rounded-2xl bg-white border transition-all p-4.5 flex items-start justify-between gap-3 shadow-xs hover:border-[#D5CFC7] ${
-                        task.done ? 'bg-[#FAF8F5] border-[#EAE4DC] opacity-75' : 'border-[#E8E2D9]'
-                      }`}
+                      className={`rounded-2xl bg-white border transition-all p-4.5 flex items-start justify-between gap-3 shadow-xs hover:border-[#D5CFC7] ${task.done ? 'bg-[#FAF8F5] border-[#EAE4DC] opacity-75' : 'border-[#E8E2D9]'
+                        }`}
                     >
                       <div className="flex-1 min-w-0 space-y-1.5">
                         <span className="text-[11px] font-semibold text-[#8C847E] block">
                           Project: {task.projectName}
                         </span>
 
-                        <h4 className={`text-sm font-bold text-[#1D1B18] tracking-tight leading-snug ${
-                          task.done ? 'line-through text-[#8C847E]' : ''
-                        }`}>
+                        <h4 className={`text-sm font-bold text-[#1D1B18] tracking-tight leading-snug ${task.done ? 'line-through text-[#8C847E]' : ''
+                          }`}>
                           {task.title}
                         </h4>
 
@@ -679,20 +625,18 @@ export default function MainDashboard() {
 
                       {/* Right side: Status Tag + Checkbox */}
                       <div className="flex items-center gap-3 shrink-0 pt-0.5">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                          task.done
-                            ? 'bg-[#F0ECE6] text-[#6B7280]'
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${task.done
+                          ? 'bg-[#F0ECE6] text-[#6B7280]'
+                          : task.status === 'In progress'
+                            ? 'bg-[#ECFDF5] text-[#059669]'
+                            : 'bg-[#FFFBEB] text-[#D97706]'
+                          }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${task.done
+                            ? 'bg-[#9CA3AF]'
                             : task.status === 'In progress'
-                              ? 'bg-[#ECFDF5] text-[#059669]'
-                              : 'bg-[#FFFBEB] text-[#D97706]'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            task.done
-                              ? 'bg-[#9CA3AF]'
-                              : task.status === 'In progress'
-                                ? 'bg-[#10B981]'
-                                : 'bg-[#F59E0B]'
-                          }`} />
+                              ? 'bg-[#10B981]'
+                              : 'bg-[#F59E0B]'
+                            }`} />
                           {task.done ? 'Done' : task.status}
                         </span>
 
@@ -700,11 +644,10 @@ export default function MainDashboard() {
                         <button
                           type="button"
                           onClick={() => handleToggleTask(task.id)}
-                          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${
-                            task.done
-                              ? 'bg-[#1D1B18] border-[#1D1B18] text-white shadow-xs'
-                              : 'bg-white border-[#D1CAC0] hover:border-[#1D1B18]'
-                          }`}
+                          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${task.done
+                            ? 'bg-[#1D1B18] border-[#1D1B18] text-white shadow-xs'
+                            : 'bg-white border-[#D1CAC0] hover:border-[#1D1B18]'
+                            }`}
                           title={task.done ? 'Mark incomplete' : 'Mark complete'}
                         >
                           {task.done && <IconCheck size={12} />}
@@ -813,21 +756,19 @@ export default function MainDashboard() {
                       className="flex flex-col items-center gap-2 cursor-pointer group"
                       style={{ flex: '1 1 0' }}
                     >
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border-2 transition-all duration-200 group-hover:scale-105 ${
-                        done
-                          ? 'bg-[#10B981] border-[#10B981] shadow-xs text-white'
-                          : active
-                            ? 'bg-white border-[#FF6384] shadow-md ring-4 ring-[#FF6384]/15'
-                            : 'bg-white border-[#E8E2D9] text-[#9B9590]'
-                      }`}>
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border-2 transition-all duration-200 group-hover:scale-105 ${done
+                        ? 'bg-[#10B981] border-[#10B981] shadow-xs text-white'
+                        : active
+                          ? 'bg-white border-[#FF6384] shadow-md ring-4 ring-[#FF6384]/15'
+                          : 'bg-white border-[#E8E2D9] text-[#9B9590]'
+                        }`}>
                         {done
                           ? <IconCheck size={16} />
                           : <Icon size={16} className={active ? 'text-[#FF6384]' : 'text-[#9B9590]'} />
                         }
                       </div>
-                      <span className={`text-[11px] font-bold text-center leading-tight max-w-[70px] ${
-                        done ? 'text-[#10B981]' : active ? 'text-[#1D1B18]' : 'text-[#8C847E]'
-                      }`}>
+                      <span className={`text-[11px] font-bold text-center leading-tight max-w-[70px] ${done ? 'text-[#10B981]' : active ? 'text-[#1D1B18]' : 'text-[#8C847E]'
+                        }`}>
                         {step.label}
                       </span>
                     </div>

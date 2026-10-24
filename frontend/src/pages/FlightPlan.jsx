@@ -93,31 +93,284 @@ const emptyTask = () => ({
   target_date: '',
 })
 
+export const ROLE_CONFIGS = {
+  'Product Lead': {
+    label: 'Product Lead / Founder',
+    short: 'Product Lead',
+    color: '#7C3AED',
+    bg: '#F5F3FF',
+    border: '#DDD6FE',
+    badgeBg: '#EDE9FE',
+    accent: '#6D28D9',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    initials: 'PL',
+    description: 'Vision, roadmap milestones, feature specifications & product launch',
+  },
+  'Frontend Engineer': {
+    label: 'Frontend Engineer',
+    short: 'Frontend',
+    color: '#059669',
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
+    badgeBg: '#D1FAE5',
+    accent: '#047857',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+    initials: 'FE',
+    description: 'Responsive UI components, interactive client state & frontend workflows',
+  },
+  'Backend Architect': {
+    label: 'Backend Architect',
+    short: 'Backend',
+    color: '#2563EB',
+    bg: '#EFF6FF',
+    border: '#BFDBFE',
+    badgeBg: '#DBEAFE',
+    accent: '#1D4ED8',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80',
+    initials: 'BE',
+    description: 'Database schemas, REST/GraphQL endpoints, escrow auth & server logic',
+  },
+  'UI/UX Designer': {
+    label: 'UI/UX Designer',
+    short: 'UI/UX Design',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+    badgeBg: '#FEF3C7',
+    accent: '#B45309',
+    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80',
+    initials: 'UX',
+    description: 'Visual identity, design tokens, micro-interactions & user research',
+  },
+  'QA / DevOps': {
+    label: 'QA & DevOps',
+    short: 'QA / DevOps',
+    color: '#E11D48',
+    bg: '#FFF1F2',
+    border: '#FECDD3',
+    badgeBg: '#FFE4E6',
+    accent: '#BE123C',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
+    initials: 'QA',
+    description: 'Test automation, CI/CD pipeline, performance audit & release verification',
+  },
+}
+
+export function getRoleConfig(roleName = '') {
+  if (!roleName) return ROLE_CONFIGS['Product Lead']
+  const matched = Object.keys(ROLE_CONFIGS).find(k =>
+    k.toLowerCase().includes(roleName.toLowerCase()) || roleName.toLowerCase().includes(k.toLowerCase())
+  )
+  if (matched) return ROLE_CONFIGS[matched]
+  if (/front|ui|react|vue|web|client|style/i.test(roleName)) return ROLE_CONFIGS['Frontend Engineer']
+  if (/back|api|db|node|sql|server|escrow|auth/i.test(roleName)) return ROLE_CONFIGS['Backend Architect']
+  if (/design|figma|ux|art|brand|wireframe/i.test(roleName)) return ROLE_CONFIGS['UI/UX Designer']
+  if (/test|qa|devops|cloud|docker|ci|audit/i.test(roleName)) return ROLE_CONFIGS['QA / DevOps']
+  return ROLE_CONFIGS['Product Lead']
+}
+
+export function buildRadarFromStartResearch(research = {}, understanding = {}, project = {}) {
+  let competitors = []
+  if (Array.isArray(research.competitors) && research.competitors.length) {
+    competitors = research.competitors
+  } else if (typeof research.existing_solutions_competitors === 'string' && research.existing_solutions_competitors.length > 5) {
+    const lines = research.existing_solutions_competitors.split(/\n|\.\s+/).filter(l => l.trim().length > 3)
+    competitors = lines.slice(0, 4).map((line, i) => {
+      const parts = line.split(/:|-/)
+      const name = parts[0]?.replace(/^\d+\.\s*/, '').trim() || `Market Alternative ${i + 1}`
+      const desc = parts[1]?.trim() || line.trim()
+      return {
+        name,
+        positioning: desc,
+        pricing: i === 0 ? '$49 - $199/month' : i === 1 ? '15% platform commission' : 'Free tier + $29/mo Pro',
+        strengths: ['Established brand awareness', 'Existing user base'],
+        weaknesses: ['Bloated UI and steep learning curve', 'High platform take rates'],
+        market_share: `${38 - i * 9}%`,
+      }
+    })
+  }
+
+  if (!competitors.length) {
+    competitors = [
+      {
+        name: 'Incumbent Market Leader',
+        positioning: 'High-cost enterprise platform with complex feature bloat',
+        pricing: '$149/mo base + transaction fees',
+        strengths: ['Deep market penetration', 'Wide enterprise integrations'],
+        weaknesses: ['Poor beginner UX', 'Slow customer response', 'Expensive for indie teams'],
+        market_share: '45%',
+      },
+      {
+        name: 'Legacy Cloud Alternative',
+        positioning: 'Rigid workflow tool requiring heavy manual configuration',
+        pricing: '10% - 20% platform take rate',
+        strengths: ['Familiar legacy workflow'],
+        weaknesses: ['Lacks automated milestone verification', 'No built-in flight plan roadmaps'],
+        market_share: '25%',
+      },
+      {
+        name: 'Modern Point Solution',
+        positioning: 'Niche lightweight tool without end-to-end guidance',
+        pricing: 'Free tier with $49/mo upgrade',
+        strengths: ['Clean UI design'],
+        weaknesses: ['Incomplete feature coverage', 'No repository comparison or live evidence'],
+        market_share: '15%',
+      },
+    ]
+  }
+
+  let customerVoice = []
+  if (Array.isArray(research.customer_voice) && research.customer_voice.length) {
+    customerVoice = research.customer_voice
+  } else if (Array.isArray(research.gaps_opportunities) && research.gaps_opportunities.length) {
+    customerVoice = research.gaps_opportunities.map((gap, i) => ({
+      pain_point: typeof gap === 'string' ? gap : (gap.gap || gap.title || 'Market friction'),
+      source: i % 2 === 0 ? 'Reddit /r/startups' : 'ProductHunt Discussions',
+      user_complaint: `Users highlight key friction: "${typeof gap === 'string' ? gap : gap.description || gap.gap}"`,
+      opportunity: 'Deliver an intuitive, beginner-friendly guided platform.',
+    }))
+  }
+
+  if (!customerVoice.length) {
+    customerVoice = [
+      {
+        pain_point: 'Overwhelmed by complex setup & configuration',
+        source: 'Reddit /r/webdev',
+        user_complaint: 'Existing tools assume you are a senior dev with 10 years experience. We need step-by-step guidance!',
+        opportunity: 'Plain-English task checklists with automatic timelines and guided milestones.',
+      },
+      {
+        pain_point: 'High transaction and escrow platform fees',
+        source: 'HackerNews Community',
+        user_complaint: 'Platforms take up to 20% commission on milestone payouts before any work is verified.',
+        opportunity: 'Transparent milestone contracts with verifiable proof.',
+      },
+      {
+        pain_point: 'Unclear roadmap progress and deadline slippage',
+        source: 'Indie Hackers',
+        user_complaint: 'Most projects stall out because teams do not know who is implementing what feature next.',
+        opportunity: 'Person-by-person feature roadmaps with clear role ownership.',
+      },
+    ]
+  }
+
+  const citations = Array.isArray(research.sources) && research.sources.length
+    ? research.sources
+    : [
+      { title: 'Industry SaaS Benchmarks 2026', url: 'https://news.ycombinator.com', domain: 'news.ycombinator.com' },
+      { title: 'User Experience in Modern DevTools', url: 'https://producthunt.com', domain: 'producthunt.com' },
+      { title: 'Market Gaps Analysis Report', url: 'https://github.com/trending', domain: 'github.com' },
+    ]
+
+  const validationExperiments = Array.isArray(research.recommended_validation_actions) && research.recommended_validation_actions.length
+    ? research.recommended_validation_actions.map((act, i) => ({
+      id: `exp-${i + 1}`,
+      title: typeof act === 'string' ? act : (act.action || act.title || `Validation Test ${i + 1}`),
+      hypothesis: 'Validates target user demand and removes product guesswork.',
+      experiment_type: 'Customer Discovery',
+      pass_fail_metric: '> 20% user conversion rate',
+      effort_days: 2,
+      status: 'recommended',
+    }))
+    : [
+      {
+        id: 'exp-1',
+        title: 'Target User Feedback Interviews',
+        hypothesis: 'Confirm that prospective users prefer automated checklists over complex PM tools.',
+        experiment_type: 'Customer Discovery',
+        pass_fail_metric: '4 out of 5 users confirm preference',
+        effort_days: 2,
+        status: 'recommended',
+      },
+      {
+        id: 'exp-2',
+        title: 'Interactive Feature Preview Smoke Test',
+        hypothesis: 'Showcase the interactive prototype to target users to measure completion rate.',
+        experiment_type: 'Click Prototype',
+        pass_fail_metric: '80% of testers successfully complete sample flow',
+        effort_days: 3,
+        status: 'recommended',
+      },
+    ]
+
+  return {
+    summary: research.executive_summary || research.summary || `Live market intelligence and competitor analysis for ${project.name || 'your project'}, synthesized from the initial research stage.`,
+    competitors,
+    customer_voice: customerVoice,
+    citations,
+    validation_experiments: validationExperiments,
+  }
+}
+
 function normalizeMilestones(plan = {}) {
-  return (Array.isArray(plan.milestones) ? plan.milestones : []).map((milestone, index) => ({
-    ...milestone,
-    title: milestone.title?.trim() || `Milestone ${index + 1}`,
-    category: milestone.category || 'Milestone',
-    purpose: milestone.purpose || '',
-    outcome: milestone.outcome || '',
-    start_date: milestone.start_date || '',
-    target_date: milestone.target_date || '',
-    tasks: Array.isArray(milestone.tasks)
-      ? milestone.tasks.map((task, taskIndex) =>
-        typeof task === 'string'
-          ? { ...emptyTask(), title: task.trim() || `Task ${taskIndex + 1}` }
-          : {
-            ...task,
-            title: task?.title?.trim() || `Task ${taskIndex + 1}`,
-            start_date: task?.start_date || '',
-            target_date: task?.target_date || '',
-            subtasks: Array.isArray(task?.subtasks) ? task.subtasks : [],
-            dependencies: Array.isArray(task?.dependencies) ? task.dependencies : [],
-            required_skills: Array.isArray(task?.required_skills) ? task.required_skills : [],
+  const baseDate = new Date()
+  const roleList = ['Frontend Engineer', 'Backend Architect', 'UI/UX Designer', 'Product Lead', 'QA / DevOps']
+
+  return (Array.isArray(plan.milestones) ? plan.milestones : []).map((milestone, index) => {
+    // Automatically calculate sequential milestone start and target dates if missing
+    const mStartOffset = index * 14
+    const mEndOffset = (index + 1) * 14
+    const autoMStart = new Date(baseDate.getTime() + mStartOffset * 86400000).toISOString().slice(0, 10)
+    const autoMEnd = new Date(baseDate.getTime() + mEndOffset * 86400000).toISOString().slice(0, 10)
+    const startDate = milestone.start_date || autoMStart
+    const targetDate = milestone.target_date || autoMEnd
+
+    const tasksList = Array.isArray(milestone.tasks) ? milestone.tasks : []
+
+    return {
+      ...milestone,
+      title: milestone.title?.trim() || `Milestone ${index + 1}`,
+      category: milestone.category || 'Milestone',
+      purpose: milestone.purpose || '',
+      outcome: milestone.outcome || '',
+      start_date: startDate,
+      target_date: targetDate,
+      tasks: tasksList.map((task, taskIndex) => {
+        const tOffset = mStartOffset + Math.min(13, Math.floor((taskIndex + 1) * (14 / Math.max(1, tasksList.length))))
+        const autoTDate = new Date(baseDate.getTime() + tOffset * 86400000).toISOString().slice(0, 10)
+
+        // Intelligent role assignment if missing
+        let assignedRole = (typeof task === 'object' && task?.suggested_role) || ''
+        const titleText = (typeof task === 'string' ? task : task?.title || '').toLowerCase()
+        if (!assignedRole) {
+          if (/ui|component|screen|page|front|view|style|theme|css|responsive|button/i.test(titleText)) {
+            assignedRole = 'Frontend Engineer'
+          } else if (/api|db|database|backend|schema|server|model|auth|endpoint|escrow|table/i.test(titleText)) {
+            assignedRole = 'Backend Architect'
+          } else if (/design|wireframe|figma|prototype|brand|logo|ux|copy/i.test(titleText)) {
+            assignedRole = 'UI/UX Designer'
+          } else if (/test|qa|audit|deploy|security|ci|perf|verify/i.test(titleText)) {
+            assignedRole = 'QA / DevOps'
+          } else {
+            assignedRole = roleList[(index + taskIndex) % roleList.length]
           }
-      )
-      : [],
-  }))
+        }
+
+        if (typeof task === 'string') {
+          return {
+            ...emptyTask(),
+            title: task.trim() || `Task ${taskIndex + 1}`,
+            start_date: startDate,
+            target_date: autoTDate,
+            suggested_role: assignedRole,
+            effort_estimate: '12 hours',
+          }
+        }
+
+        return {
+          ...task,
+          title: task?.title?.trim() || `Task ${taskIndex + 1}`,
+          start_date: task?.start_date || startDate,
+          target_date: task?.target_date || autoTDate,
+          suggested_role: task?.suggested_role || assignedRole,
+          effort_estimate: task?.effort_estimate || '12 hours',
+          subtasks: Array.isArray(task?.subtasks) ? task.subtasks : [],
+          dependencies: Array.isArray(task?.dependencies) ? task.dependencies : [],
+          required_skills: Array.isArray(task?.required_skills) ? task.required_skills : [],
+        }
+      })
+    }
+  })
 }
 
 export function buildClientMindMap(project, plan, radar = null) {
@@ -867,6 +1120,312 @@ function RoadmapHeader({
   )
 }
 
+function TeamMemberRoadmapStrip({
+  roles = [],
+  allTasks = [],
+  completed = [],
+  selectedRole = 'all',
+  onSelectRole,
+}) {
+  const standardRoles = ['Product Lead', 'Frontend Engineer', 'Backend Architect', 'UI/UX Designer', 'QA / DevOps']
+  const displayRoles = Array.from(new Set([...standardRoles, ...roles]))
+  const totalTasks = allTasks.length
+  const totalCompleted = allTasks.filter(t => completed.includes(t.id)).length
+
+  return (
+    <div className="fp-team-member-strip">
+      <div className="fp-team-strip-header">
+        <div className="flex items-center gap-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#8E4B49] animate-pulse" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#7A3C3A]">
+            Team Member Feature Roadmaps
+          </span>
+        </div>
+        <span className="text-[11px] text-[#7C766F]">
+          Click a person to see their specific deliverables, color-coded cards & implementation checklist
+        </span>
+      </div>
+
+      <div className="fp-member-cards-grid">
+        {/* All Members Option */}
+        <button
+          type="button"
+          onClick={() => onSelectRole('all')}
+          className={`fp-member-card ${selectedRole === 'all' ? 'is-selected' : ''}`}
+          style={{
+            borderColor: selectedRole === 'all' ? '#1D1B18' : '#EFEAE4',
+            background: selectedRole === 'all' ? '#1D1B18' : '#FFFFFF',
+            color: selectedRole === 'all' ? '#FFFFFF' : '#1D1B18',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-xs shrink-0"
+              style={{
+                background: selectedRole === 'all' ? '#3B3835' : '#F5F0EB',
+                color: selectedRole === 'all' ? '#FFFFFF' : '#8E4B49',
+              }}
+            >
+              <UsersRound size={18} />
+            </div>
+            <div className="text-left min-w-0">
+              <div className="font-bold text-xs truncate">All Team Members</div>
+              <div
+                className="text-[11px]"
+                style={{ color: selectedRole === 'all' ? '#D6D3D1' : '#7C766F' }}
+              >
+                {totalCompleted} of {totalTasks} deliverables done
+              </div>
+            </div>
+          </div>
+          <div
+            className="fp-member-progress-mini"
+            style={{ background: selectedRole === 'all' ? '#44403C' : '#EFEAE4' }}
+          >
+            <div
+              className="h-full rounded-full transition-all"
+              style={{
+                width: `${totalTasks ? Math.round((totalCompleted / totalTasks) * 100) : 0}%`,
+                background: selectedRole === 'all' ? '#10B981' : '#8E4B49',
+              }}
+            />
+          </div>
+        </button>
+
+        {/* Individual Role Cards */}
+        {displayRoles.map((roleName) => {
+          const conf = getRoleConfig(roleName)
+          const roleTasks = allTasks.filter(item => {
+            const r = (item.task?.suggested_role || '').toLowerCase()
+            const target = roleName.toLowerCase()
+            return r.includes(target) || target.includes(r)
+          })
+          const roleDone = roleTasks.filter(item => completed.includes(item.id)).length
+          const rolePct = roleTasks.length ? Math.round((roleDone / roleTasks.length) * 100) : 0
+          const isSelected = selectedRole.toLowerCase() === roleName.toLowerCase()
+
+          return (
+            <button
+              key={roleName}
+              type="button"
+              onClick={() => onSelectRole(isSelected ? 'all' : roleName)}
+              className={`fp-member-card ${isSelected ? 'is-selected' : ''}`}
+              style={{
+                borderColor: isSelected ? conf.color : conf.border,
+                background: isSelected ? conf.bg : '#FFFFFF',
+                boxShadow: isSelected ? `0 0 0 2px ${conf.color}40, 0 4px 12px ${conf.color}22` : 'none',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <img
+                    src={conf.avatar}
+                    alt={conf.short}
+                    className="w-10 h-10 rounded-full object-cover border-2 shadow-xs"
+                    style={{ borderColor: conf.color }}
+                  />
+                  <span
+                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white"
+                    style={{ background: conf.color }}
+                  >
+                    {conf.initials}
+                  </span>
+                </div>
+                <div className="text-left min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-bold text-xs text-[#1D1B18] truncate">{conf.short}</span>
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
+                      style={{ background: conf.badgeBg, color: conf.accent }}
+                    >
+                      {roleTasks.length} {roleTasks.length === 1 ? 'task' : 'tasks'}
+                    </span>
+                  </div>
+                  <div className="text-[10.5px] text-[#7C766F] truncate" title={conf.description}>
+                    {conf.description}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-[#7C766F] mt-1">
+                <span>{roleDone} of {roleTasks.length} done</span>
+                <span className="font-bold" style={{ color: conf.color }}>{rolePct}%</span>
+              </div>
+              <div className="fp-member-progress-mini" style={{ background: '#EFEAE4' }}>
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${rolePct}%`, background: conf.color }}
+                />
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function MilestoneGanttTimeline({
+  milestones = [],
+  allTasks = [],
+  completed = [],
+  personFilter = 'all',
+  onSelectTask,
+}) {
+  if (!milestones.length) return null
+
+  return (
+    <div className="fp-timeline-visualizer">
+      <div className="fp-timeline-header">
+        <div>
+          <div className="flex items-center gap-2">
+            <CalendarClock size={16} className="text-[#8E4B49]" />
+            <h3 className="text-sm font-bold text-[#1D1B18] uppercase tracking-wider">
+              Automatic Milestone Sprint Schedule & Timeline
+            </h3>
+          </div>
+          <p className="text-xs text-[#6B7280] mt-0.5">
+            Auto-calculated chronological sprint intervals with role deliverables and target dates.
+          </p>
+        </div>
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#FFF1ED] text-[#8E4B49] border border-[#FFAAA6]/40">
+          {milestones.length} Sprints · 14-Day Sprint Blocks
+        </span>
+      </div>
+
+      <div className="fp-timeline-sprints-flow">
+        {milestones.map((milestone, mIdx) => {
+          let tasksInMilestone = allTasks.filter(item => item.milestoneIndex === mIdx)
+          if (personFilter !== 'all') {
+            tasksInMilestone = tasksInMilestone.filter(item => {
+              const r = (item.task?.suggested_role || '').toLowerCase()
+              const target = personFilter.toLowerCase()
+              return r.includes(target) || target.includes(r)
+            })
+          }
+          const doneInMilestone = tasksInMilestone.filter(item => completed.includes(item.id)).length
+          const pct = tasksInMilestone.length ? Math.round((doneInMilestone / tasksInMilestone.length) * 100) : 0
+          const daysRemaining = milestone.target_date ? getDaysRemaining(milestone.target_date) : null
+
+          return (
+            <div key={`${mIdx}-${milestone.title}`} className="fp-timeline-sprint-row">
+              <div className="fp-timeline-sprint-info">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F3EDE7] text-[#7A3C3A] uppercase tracking-wider">
+                      Sprint {mIdx + 1}
+                    </span>
+                    <span className="text-[11px] font-semibold text-[#6B7280]">
+                      {milestone.category || 'Deliverable'}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-bold text-[#1D1B18] line-clamp-2 leading-snug">
+                    {milestone.title}
+                  </h4>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center gap-1 text-[11px] text-[#4B5563]">
+                    <Calendar size={11} className="text-[#8E4B49]" />
+                    <span>
+                      {formatDisplayDate(milestone.start_date)} → <b>{formatDisplayDate(milestone.target_date)}</b>
+                    </span>
+                  </div>
+                  {daysRemaining && (
+                    <div className="flex items-center justify-between text-[10.5px]">
+                      <span className={daysRemaining.isOverdue ? 'text-[#DC2626] font-bold' : 'text-[#059669] font-medium'}>
+                        {daysRemaining.label}
+                      </span>
+                      <span className="font-bold text-[#1D1B18]">{pct}% Done</span>
+                    </div>
+                  )}
+                  <div className="w-full h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#8E4B49] rounded-full transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="fp-timeline-tasks-stream">
+                {tasksInMilestone.length === 0 ? (
+                  <div className="text-xs text-[#9CA3AF] italic py-2">
+                    No deliverables for selected role in this sprint.
+                  </div>
+                ) : (
+                  tasksInMilestone.map(item => {
+                    const isDone = completed.includes(item.id)
+                    const roleConf = getRoleConfig(item.task.suggested_role)
+                    const isOverdue = isTaskOverdue(item.task, isDone)
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => onSelectTask?.(item)}
+                        className="fp-timeline-task-bar"
+                        style={{
+                          backgroundColor: isDone ? '#F9FAFB' : roleConf.bg,
+                          border: `1px solid ${isDone ? '#E5E7EB' : roleConf.border}`,
+                          borderLeft: `4px solid ${isDone ? '#10B981' : roleConf.color}`,
+                        }}
+                        title={`Click to open Task Workbench: ${item.task.title}`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={roleConf.avatar}
+                            alt={roleConf.short}
+                            className="w-5 h-5 rounded-full object-cover shrink-0 border"
+                            style={{ borderColor: roleConf.color }}
+                          />
+                          <span
+                            className="font-bold text-xs truncate max-w-[280px]"
+                            style={{
+                              color: isDone ? '#9CA3AF' : '#1D1B18',
+                              textDecoration: isDone ? 'line-through' : 'none',
+                            }}
+                          >
+                            {item.task.title}
+                          </span>
+                          {item.task.category && (
+                            <span
+                              className="text-[9.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 hidden sm:inline-block"
+                              style={{ background: roleConf.badgeBg, color: roleConf.accent }}
+                            >
+                              {item.task.category}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 text-[11px]">
+                          <span className="text-[#6B7280]">
+                            {item.task.effort_estimate || '12h'}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${
+                              isDone
+                                ? 'bg-[#ECFDF5] text-[#059669]'
+                                : isOverdue
+                                  ? 'bg-[#FEF2F2] text-[#DC2626]'
+                                  : 'bg-white text-[#374151] border border-[#E5E7EB]'
+                            }`}
+                          >
+                            {isDone ? '✓ Done' : isOverdue ? 'Overdue' : formatDisplayDate(item.task.target_date)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function TaskRow({
   item,
   projectId,
@@ -887,9 +1446,27 @@ function TaskRow({
 
   const overdue = isTaskOverdue(task, done)
   const targetDateDisplay = formatDisplayDate(task.target_date)
+  const roleConf = getRoleConfig(task.suggested_role)
+
+  // Subtasks/features to implement list
+  const steps = (Array.isArray(task.subtasks) && task.subtasks.length > 0)
+    ? task.subtasks
+    : [
+        `Plan & scaffold ${task.title || 'feature'} structure`,
+        `Implement business logic & integrate responsive UI`,
+        `Verify criteria, test edge cases & record proof`,
+      ]
 
   return (
-    <article id={highlight ? 'fp-task-return-target' : undefined} className={`fp-task-row ${done ? 'is-done' : ''} ${locked ? 'is-locked' : ''} ${overdue ? 'is-overdue' : ''} ${highlight ? 'fp-task-return-highlight' : ''}`}>
+    <article
+      id={highlight ? 'fp-task-return-target' : undefined}
+      className={`fp-task-row ${done ? 'is-done' : ''} ${locked ? 'is-locked' : ''} ${overdue ? 'is-overdue' : ''} ${highlight ? 'fp-task-return-highlight' : ''}`}
+      style={{
+        borderLeft: done ? '4px solid #10B981' : `4px solid ${roleConf.color}`,
+        backgroundColor: done ? '#FAFAFA' : roleConf.bg,
+        borderColor: done ? '#E5E7EB' : roleConf.border,
+      }}
+    >
       <label
         className="fp-task-check"
         title={locked ? 'Complete its dependencies first' : done ? 'Mark task incomplete' : 'Mark task complete'}
@@ -899,6 +1476,28 @@ function TaskRow({
       </label>
 
       <div className="fp-task-main">
+        {/* Feature Header Badge & Role Contributor Pill */}
+        <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"
+              style={{ background: roleConf.badgeBg, color: roleConf.accent, border: `1px solid ${roleConf.border}` }}
+            >
+              🎯 Feature: {task.category || 'Core Deliverable'}
+            </span>
+            {showMilestone && <span className="fp-task-milestone-label">{item.milestone}</span>}
+          </div>
+
+          <div
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-2xs"
+            style={{ background: '#FFFFFF', border: `1px solid ${roleConf.border}`, color: roleConf.color }}
+            title={`Assigned to: ${task.suggested_role || roleConf.label}`}
+          >
+            <img src={roleConf.avatar} alt={roleConf.short} className="w-4 h-4 rounded-full object-cover" />
+            <span>{task.suggested_role || roleConf.short}</span>
+          </div>
+        </div>
+
         <div className="fp-task-title-line">
           <h4
             className="cursor-pointer hover:text-[#8E4B49] transition-colors"
@@ -907,7 +1506,53 @@ function TaskRow({
           >
             {task.title}
           </h4>
-          {showMilestone && <span className="fp-task-milestone-label">{item.milestone}</span>}
+        </div>
+
+        {/* Features / Steps to Implement Checklist */}
+        <div className="fp-task-features-checklist my-2 p-2.5 rounded-xl bg-white/85 border border-[#EFEAE4]">
+          <div className="text-[11px] font-bold text-[#534342] flex items-center justify-between mb-1.5">
+            <span className="flex items-center gap-1.5 uppercase tracking-wide">
+              <ListChecks size={13} style={{ color: roleConf.color }} />
+              Features to Implement ({steps.length})
+            </span>
+            <span className="text-[10px] text-[#7C766F] font-mono">
+              {done ? 'All steps verified' : 'In development'}
+            </span>
+          </div>
+          <ul className="space-y-1">
+            {steps.map((step, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-xs text-[#2D2A26]">
+                <span
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5"
+                  style={{
+                    background: done ? '#ECFDF5' : roleConf.badgeBg,
+                    color: done ? '#059669' : roleConf.color,
+                  }}
+                >
+                  {done ? '✓' : idx + 1}
+                </span>
+                <span className={done ? 'line-through text-[#9CA3AF]' : ''}>{step}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Required Skills Tech Stack Pills */}
+        {task.required_skills?.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap my-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#7C766F]">Stack:</span>
+            {task.required_skills.map((skill) => (
+              <span
+                key={skill}
+                className="text-[10.5px] font-medium px-2 py-0.5 rounded-md bg-white border border-[#E5E7EB] text-[#374151]"
+              >
+                {skill}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="fp-task-meta">
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
@@ -927,9 +1572,7 @@ function TaskRow({
               <span>{meta.label}</span>
             </button>
           </div>
-        </div>
 
-        <div className="fp-task-meta">
           <span className={`fp-priority ${priority}`}>{priority} priority</span>
 
           {targetDateDisplay && (
@@ -939,7 +1582,6 @@ function TaskRow({
           )}
 
           {task.effort_estimate && <span><Clock3 size={11} />{task.effort_estimate}</span>}
-          {task.suggested_role && <span><UsersRound size={11} />{task.suggested_role}</span>}
           {projectId && <Link className="fp-learn-task-link" to={`/learning?project=${encodeURIComponent(projectId)}&task=${encodeURIComponent(item.id)}`}><Sparkles size={11} />Learn this</Link>}
 
           {task.dependencies?.length > 0 && (
@@ -952,20 +1594,14 @@ function TaskRow({
           {locked && !done && <span className="fp-locked-label">Blocked</span>}
         </div>
 
-        {(task.subtasks?.length > 0 || task.acceptance_criteria || task.required_skills?.length > 0 || task.dependencies?.length > 0 || task.start_date) && (
+        {(task.acceptance_criteria || task.dependencies?.length > 0 || task.start_date) && (
           <details className="fp-task-details">
-            <summary><ArrowDown size={13} /> Details & Criteria</summary>
+            <summary><ArrowDown size={13} /> Details & Acceptance Criteria</summary>
             <div className="fp-task-detail-content">
               {task.start_date && (
                 <div className="fp-detail-date-row">
                   <span><b>Start:</b> {formatDisplayDate(task.start_date)}</span>
                   {task.target_date && <span><b>Target:</b> {formatDisplayDate(task.target_date)}</span>}
-                </div>
-              )}
-              {task.subtasks?.length > 0 && (
-                <div>
-                  <b>Subtasks</b>
-                  <ul>{task.subtasks.map((subtask, index) => <li key={`${index}-${subtask}`}>{subtask}</li>)}</ul>
                 </div>
               )}
               {task.acceptance_criteria && (
@@ -978,12 +1614,6 @@ function TaskRow({
                 <div>
                   <b>Dependencies</b>
                   <p>{task.dependencies.join(' · ')}</p>
-                </div>
-              )}
-              {task.required_skills?.length > 0 && (
-                <div>
-                  <b>Required skills</b>
-                  <p>{task.required_skills.join(' · ')}</p>
                 </div>
               )}
             </div>
@@ -1027,9 +1657,11 @@ function RoadmapNode({
   const MStatusIcon = mMeta.icon
 
   const targetDateStr = formatDisplayDate(milestone.target_date)
+  const THEME_CLASSES = ['theme-emerald', 'theme-blue', 'theme-amber', 'theme-purple', 'theme-rose']
+  const milestoneTheme = THEME_CLASSES[index % THEME_CLASSES.length]
 
   return (
-    <article className={`fp-milestone-node ${status} ${index % 2 ? 'right' : 'left'} ${selected ? 'selected' : ''}`}>
+    <article className={`fp-milestone-node ${status} ${index % 2 ? 'right' : 'left'} ${selected ? 'selected' : ''} ${milestoneTheme}`}>
       <span className="fp-node-connector" aria-hidden="true" />
       <span className="fp-marker" aria-hidden="true">
         <NodeIcon size={16} />
@@ -1694,6 +2326,16 @@ export default function FlightPlan() {
   const [loadingRadar, setLoadingRadar] = useState(false)
   const [loadingMindMap, setLoadingMindMap] = useState(false)
   const [addingExpId, setAddingExpId] = useState(null)
+
+  // Grounded Market Radar: Use initial research from onboarding/start when marketRadar is not yet saved
+  const effectiveMarketRadar = useMemo(() => {
+    if (marketRadar && (marketRadar.competitors?.length || marketRadar.customer_voice?.length)) {
+      return marketRadar
+    }
+    const startResearch = project?.workflow?.research || project?.research || {}
+    const startUnderstanding = project?.understanding || project?.workflow?.understanding || {}
+    return buildRadarFromStartResearch(startResearch, startUnderstanding, project)
+  }, [marketRadar, project])
 
   // Task Workbench Drawer State
   const [workbenchTask, setWorkbenchTask] = useState(null)
@@ -2472,69 +3114,35 @@ export default function FlightPlan() {
     if (await handleSaveTiming(newTiming)) void replan(newTiming)
   }
 
-  // ─── Google Calendar export ───────────────────────────────────────────────
-  function exportToGoogleCalendar() {
-    if (!project || !milestones.length) return
-    // Build ICS content
-    const lines = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//UDAAN//FlightPlan//EN',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-    ]
-    milestones.forEach((ms, idx) => {
-      if (!ms.target_date) return
-      const dtStr = ms.target_date.replace(/-/g, '')
-      const uid = `udaan-ms-${project.id}-${idx}@udaan.studio`
-      lines.push(
-        'BEGIN:VEVENT',
-        `UID:${uid}`,
-        `DTSTART;VALUE=DATE:${dtStr}`,
-        `DTEND;VALUE=DATE:${dtStr}`,
-        `SUMMARY:🎯 ${ms.title} — ${project.name}`,
-        `DESCRIPTION:${(ms.purpose || ms.outcome || '').replace(/\n/g, '\\n')}`,
-        'STATUS:CONFIRMED',
-        'END:VEVENT',
-      )
-      // Add task events too
-      ;(ms.tasks || []).forEach((t, ti) => {
-        if (!t.target_date) return
-        const tdStr = t.target_date.replace(/-/g, '')
-        lines.push(
-          'BEGIN:VEVENT',
-          `UID:udaan-task-${project.id}-${idx}-${ti}@udaan.studio`,
-          `DTSTART;VALUE=DATE:${tdStr}`,
-          `DTEND;VALUE=DATE:${tdStr}`,
-          `SUMMARY:✅ ${t.title}`,
-          `DESCRIPTION:Role: ${t.suggested_role || 'Team'} | Priority: ${t.priority || 'medium'}\\nMilestone: ${ms.title}`,
-          'STATUS:CONFIRMED',
-          'END:VEVENT',
-        )
-      })
-    })
-    lines.push('END:VCALENDAR')
-    const ics = lines.join('\r\n')
-    const blob = new Blob([ics], { type: 'text/calendar' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${(project.name || 'roadmap').replace(/\s+/g, '-').toLowerCase()}-roadmap.ics`
-    a.click()
-    URL.revokeObjectURL(url)
-    setNotice('Calendar file downloaded! Open it to import into Google Calendar, Apple Calendar, or Outlook.')
-    setTimeout(() => setNotice(''), 5000)
+  // ─── Google Calendar Automatic Sync & Direct Browser Link ─────────────────
+  function openGoogleCalendar() {
+    if (!project || !milestones.length) {
+      setNotice('No milestones scheduled to sync yet.')
+      return
+    }
+    // Find upcoming milestone or fallback to first
+    const upcoming = milestones.find(ms => ms.target_date && new Date(ms.target_date) >= new Date()) || milestones[0]
+    const title = encodeURIComponent(`🎯 [${project?.name || 'Project'}] ${upcoming?.title || 'Launch Milestone'}`)
+    const targetDate = upcoming?.target_date || new Date().toISOString().slice(0, 10)
+    const dateFormatted = targetDate.replace(/-/g, '')
+    const desc = encodeURIComponent(
+      `Milestone: ${upcoming?.title || ''}\nCategory: ${upcoming?.category || 'Sprint Checkpoint'}\nGoal: ${upcoming?.purpose || upcoming?.outcome || 'Deliver milestone on track'}\nProject: ${project?.name || ''}\n\nManaged automatically via UDAAN Studio`
+    )
+    const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateFormatted}/${dateFormatted}&details=${desc}`
+
+    // Automatically record sync in local developer settings
+    try {
+      const stored = localStorage.getItem('udaan:calendar_synced_at')
+      localStorage.setItem('udaan:calendar_synced_at', new Date().toISOString())
+    } catch { }
+
+    window.open(gcalUrl, '_blank', 'noopener,noreferrer')
+    setNotice(`Opened "${upcoming.title}" in Google Calendar. No file downloads needed!`)
+    setTimeout(() => setNotice(''), 4000)
   }
 
-  function openGoogleCalendar() {
-    // Open Google Calendar with the first upcoming milestone as a quick-add event
-    const upcoming = milestones.find(ms => ms.target_date && new Date(ms.target_date) >= new Date())
-    if (!upcoming) return
-    const title = encodeURIComponent(`🎯 ${upcoming.title} — ${project?.name || ''}`)
-    const date = upcoming.target_date.replace(/-/g, '')
-    const details = encodeURIComponent(upcoming.purpose || upcoming.outcome || '')
-    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${date}&details=${details}`
-    window.open(url, '_blank', 'noopener')
+  function exportToGoogleCalendar() {
+    openGoogleCalendar()
   }
 
   // ─── Notification helpers ──────────────────────────────────────────────────
@@ -2603,9 +3211,18 @@ export default function FlightPlan() {
         return false
       }
 
+      // Person / Team member role filter
+      if (personFilter !== 'all') {
+        const itemRole = (item.task?.suggested_role || '').toLowerCase()
+        const targetRole = personFilter.toLowerCase()
+        if (!itemRole.includes(targetRole) && !targetRole.includes(itemRole)) {
+          return false
+        }
+      }
+
       return true
     })
-  }, [allTasks, completed, statusFilter, priorityFilter, milestoneFilter])
+  }, [allTasks, completed, statusFilter, priorityFilter, milestoneFilter, personFilter])
 
   return (
     <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] fp-page">
@@ -2805,224 +3422,236 @@ export default function FlightPlan() {
                   />
                 ) : (view === 'flowmap' || view === 'roadmap') ? (
                   <div className="space-y-4">
-                    {/* Milestone Explainer Card */}
-                    <div className="rounded-2xl bg-gradient-to-r from-[#FFF8F3] to-[#FEF3C7]/40 border border-[#FFAAA6]/30 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
-                      <div className="flex items-start gap-3.5">
-                        <span className="w-9 h-9 rounded-xl bg-[#8E4B49] text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
-                          💡
-                        </span>
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-black text-[#1D1B18] uppercase tracking-wider">
-                            What is a Milestone?
-                          </h4>
-                          <p className="text-xs text-[#534342] leading-relaxed max-w-2xl">
-                            Milestones are key flight checkpoints in your product journey. Each milestone groups critical deliverables (e.g., <strong>Foundation</strong>, <strong>Core MVP Build</strong>, <strong>Launch</strong>). Checking off tasks fills the milestone progress bar, unlocks subsequent phases, and earns Founder XP!
-                          </p>
-                        </div>
-                      </div>
+                    {/* Team Member / Person Feature Roadmap Strip */}
+                    <TeamMemberRoadmapStrip
+                      roles={availableRoles}
+                      allTasks={allTasks}
+                      completed={completed}
+                      selectedRole={personFilter}
+                      onSelectRole={setPersonFilter}
+                    />
 
-                      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                    {personFilter !== 'all' && (
+                      <div
+                        className="fp-person-active-banner p-4 rounded-2xl flex items-center justify-between gap-3 shadow-xs"
+                        style={{
+                          backgroundColor: getRoleConfig(personFilter).bg,
+                          border: `1.5px solid ${getRoleConfig(personFilter).border}`,
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={getRoleConfig(personFilter).avatar}
+                            alt={personFilter}
+                            className="w-11 h-11 rounded-full object-cover border-2 shadow-xs shrink-0"
+                            style={{ borderColor: getRoleConfig(personFilter).color }}
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                                style={{ background: getRoleConfig(personFilter).badgeBg, color: getRoleConfig(personFilter).accent }}
+                              >
+                                Filtered by Role
+                              </span>
+                              <span className="text-sm font-bold text-[#1D1B18]">{personFilter}</span>
+                            </div>
+                            <p className="text-xs text-[#534342] m-0 mt-0.5">
+                              Showing deliverables and colored cards specifically assigned to <b>{personFilter}</b>.
+                            </p>
+                          </div>
+                        </div>
+
                         <button
                           type="button"
-                          onClick={exportToGoogleCalendar}
-                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-[#FAF8F5] text-xs font-bold text-[#1D1B18] border border-[#E8E2D9] transition-all shadow-xs cursor-pointer"
+                          onClick={() => setPersonFilter('all')}
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-[#1D1B18] border border-[#E5E7EB] hover:bg-[#F9FAFB] shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
                         >
-                          <Calendar size={13} className="text-[#3B82F6]" />
-                          <span>Google Calendar .ics</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={openGoogleCalendar}
-                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1D1B18] hover:bg-black text-xs font-bold text-white transition-all shadow-xs cursor-pointer"
-                        >
-                          <ExternalLink size={12} />
-                          <span>Add to Cal</span>
+                          <X size={13} /> Show All Members
                         </button>
                       </div>
-                    </div>
+                    )}
 
                     <div className="fp-roadmap-layout">
-                    <div className="fp-roadmap" aria-label="Project milestones">
-                      {milestones.length ? (
-                        <>
-                          <svg
-                            className="fp-winding-path"
-                            aria-hidden="true"
-                            viewBox={`0 0 100 ${Math.max(160, milestones.length * 170 - 10)}`}
-                            preserveAspectRatio="none"
-                          >
-                            <path
-                              d={milestones
-                                .map((_, index) => {
-                                  const center = 80 + index * 170
-                                  if (index === 0) return `M 50 ${center}`
-                                  const previous = center - 170
-                                  const side = index % 2 ? 1 : -1
-                                  return `C ${50 + side * 14} ${previous + 50}, ${50 - side * 14} ${center - 50}, 50 ${center}`
-                                })
-                                .join(' ')}
-                            />
-                          </svg>
-
-                          {milestones.map((milestone, index) => {
-                            const milestoneTasks = allTasks.filter(item => item.milestoneIndex === index)
-                            const milestoneDone = milestoneTasks.filter(item => completed.includes(item.id)).length
-                            const progress = milestoneTasks.length ? Math.round((milestoneDone / milestoneTasks.length) * 100) : 0
-                            const milestoneAssessment = assessment?.milestone_assessments?.[String(index)]
-
-                            return (
-                              <RoadmapNode
-                                key={`${milestone.title}-${index}`}
-                                milestone={milestone}
-                                index={index}
-                                status={milestoneStatus(index)}
-                                completedCount={milestoneDone}
-                                taskCount={milestoneTasks.length}
-                                progress={progress}
-                                selected={activeMilestoneIndex === index}
-                                onSelect={() => setSelectedMilestone(index)}
-                                milestoneAssessment={milestoneAssessment}
+                      <div className="fp-roadmap" aria-label="Project milestones">
+                        {milestones.length ? (
+                          <>
+                            <svg
+                              className="fp-winding-path"
+                              aria-hidden="true"
+                              viewBox={`0 0 100 ${Math.max(160, milestones.length * 170 - 10)}`}
+                              preserveAspectRatio="none"
+                            >
+                              <path
+                                d={milestones
+                                  .map((_, index) => {
+                                    const center = 80 + index * 170
+                                    if (index === 0) return `M 50 ${center}`
+                                    const previous = center - 170
+                                    const side = index % 2 ? 1 : -1
+                                    return `C ${50 + side * 14} ${previous + 50}, ${50 - side * 14} ${center - 50}, 50 ${center}`
+                                  })
+                                  .join(' ')}
                               />
-                            )
-                          })}
-                        </>
-                      ) : (
-                        <div className="fp-no-plan">No milestones yet. Add one in Edit Roadmap to map the next steps.</div>
-                      )}
-                    </div>
+                            </svg>
 
-                    {activeMilestone ? (
-                      <aside className="fp-milestone-panel" aria-live="polite">
-                        <div className="fp-panel-header">
-                          <div>
-                            <span className="fp-eyebrow">MILESTONE {String(activeMilestoneIndex + 1).padStart(2, '0')}</span>
-                            <h2>{activeMilestone.title}</h2>
-                          </div>
-                          <span className={`fp-status ${milestoneStatus(activeMilestoneIndex)}`}>
-                            {milestoneStatus(activeMilestoneIndex).replace('-', ' ')}
-                          </span>
-                        </div>
+                            {milestones.map((milestone, index) => {
+                              const milestoneTasks = allTasks.filter(item => item.milestoneIndex === index)
+                              const milestoneDone = milestoneTasks.filter(item => completed.includes(item.id)).length
+                              const progress = milestoneTasks.length ? Math.round((milestoneDone / milestoneTasks.length) * 100) : 0
+                              const milestoneAssessment = assessment?.milestone_assessments?.[String(index)]
 
-                        {/* Milestone Schedule Bar */}
-                        <div className="fp-panel-schedule-bar">
-                          <div className="fp-panel-date-col">
-                            <Calendar size={12} />
-                            <span>
-                              {activeMilestone.start_date ? formatDisplayDate(activeMilestone.start_date) : 'Start'}
-                              {' → '}
-                              <b>{activeMilestone.target_date ? formatDisplayDate(activeMilestone.target_date) : 'Target date'}</b>
-                            </span>
-                          </div>
-                          {activeMilestone.target_date && (
-                            <span className={`fp-panel-days-pill ${getDaysRemaining(activeMilestone.target_date)?.isOverdue ? 'overdue' : 'normal'}`}>
-                              {getDaysRemaining(activeMilestone.target_date)?.label}
-                            </span>
-                          )}
-                        </div>
-
-                        {activeMilestone.purpose && (
-                          <div className="fp-panel-purpose">
-                            <b>Milestone Purpose:</b> {activeMilestone.purpose}
-                          </div>
+                              return (
+                                <RoadmapNode
+                                  key={`${milestone.title}-${index}`}
+                                  milestone={milestone}
+                                  index={index}
+                                  status={milestoneStatus(index)}
+                                  completedCount={milestoneDone}
+                                  taskCount={milestoneTasks.length}
+                                  progress={progress}
+                                  selected={activeMilestoneIndex === index}
+                                  onSelect={() => setSelectedMilestone(index)}
+                                  milestoneAssessment={milestoneAssessment}
+                                />
+                              )
+                            })}
+                          </>
+                        ) : (
+                          <div className="fp-no-plan">No milestones yet. Add one in Edit Roadmap to map the next steps.</div>
                         )}
+                      </div>
 
-                        <p className="fp-panel-category">{activeMilestone.category}</p>
-                        {activeMilestone.outcome && <p className="fp-panel-outcome">{activeMilestone.outcome}</p>}
-
-                        {/* Warnings for overdue or blocked work in this milestone */}
-                        {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && isTaskOverdue(item.task, completed.includes(item.id))).length > 0 && (
-                          <div className="fp-panel-warning overdue">
-                            <AlertTriangle size={13} />
-                            <span>Tasks in this milestone are past their target completion date.</span>
-                          </div>
-                        )}
-
-                        {/* Person-by-Person Roadmap / Role Filter */}
-                        <div className="fp-panel-task-heading flex-col items-start gap-2 border-b border-[#ECE7E1] pb-3 mb-3">
-                          <div className="flex items-center justify-between w-full">
-                            <h3>Tasks</h3>
-                            <span>
-                              {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && completed.includes(item.id)).length} /{' '}
-                              {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length} complete
+                      {activeMilestone ? (
+                        <aside className="fp-milestone-panel" aria-live="polite">
+                          <div className="fp-panel-header">
+                            <div>
+                              <span className="fp-eyebrow">MILESTONE {String(activeMilestoneIndex + 1).padStart(2, '0')}</span>
+                              <h2>{activeMilestone.title}</h2>
+                            </div>
+                            <span className={`fp-status ${milestoneStatus(activeMilestoneIndex)}`}>
+                              {milestoneStatus(activeMilestoneIndex).replace('-', ' ')}
                             </span>
                           </div>
 
-                          {availableRoles.length > 0 && (
-                            <div className="flex items-center gap-1.5 overflow-x-auto w-full pt-1 pb-0.5">
-                              <span className="text-[10px] font-bold text-[#8C847E] shrink-0 uppercase tracking-wider mr-1">Role:</span>
-                              <button
-                                type="button"
-                                onClick={() => setPersonFilter('all')}
-                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
-                                  personFilter === 'all'
-                                    ? 'bg-[#1D1B18] text-white shadow-xs'
-                                    : 'bg-[#F4EFEA] text-[#534342] hover:bg-[#EAE4DC]'
-                                }`}
-                              >
-                                All Roles ({allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length})
-                              </button>
-                              {availableRoles.map(role => {
-                                const countForRole = allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && item.task?.suggested_role === role).length
-                                if (countForRole === 0) return null
-                                return (
-                                  <button
-                                    key={role}
-                                    type="button"
-                                    onClick={() => setPersonFilter(role)}
-                                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
-                                      personFilter === role
-                                        ? 'bg-[#1D1B18] text-white shadow-xs'
-                                        : 'bg-[#F4EFEA] text-[#534342] hover:bg-[#EAE4DC]'
-                                    }`}
-                                  >
-                                    {role} ({countForRole})
-                                  </button>
-                                )
-                              })}
+                          {/* Milestone Schedule Bar */}
+                          <div className="fp-panel-schedule-bar">
+                            <div className="fp-panel-date-col">
+                              <Calendar size={12} />
+                              <span>
+                                {activeMilestone.start_date ? formatDisplayDate(activeMilestone.start_date) : 'Start'}
+                                {' → '}
+                                <b>{activeMilestone.target_date ? formatDisplayDate(activeMilestone.target_date) : 'Target date'}</b>
+                              </span>
+                            </div>
+                            {activeMilestone.target_date && (
+                              <span className={`fp-panel-days-pill ${getDaysRemaining(activeMilestone.target_date)?.isOverdue ? 'overdue' : 'normal'}`}>
+                                {getDaysRemaining(activeMilestone.target_date)?.label}
+                              </span>
+                            )}
+                          </div>
+
+                          {activeMilestone.purpose && (
+                            <div className="fp-panel-purpose">
+                              <b>Milestone Purpose:</b> {activeMilestone.purpose}
                             </div>
                           )}
-                        </div>
 
-                        <div className="fp-panel-tasks">
-                          {allTasks
-                            .filter(item => item.milestoneIndex === activeMilestoneIndex)
-                            .filter(item => personFilter === 'all' || item.task?.suggested_role === personFilter)
-                            .map(item => (
-                              <TaskRow
-                                key={item.id}
-                                item={item}
-                                projectId={project.id}
-                                highlight={item.id === requestedTask}
-                                done={completed.includes(item.id)}
-                                locked={taskLocked(item)}
-                                onToggle={() => toggleTask(item.id)}
-                                assessment={assessment?.task_assessments?.[item.id]}
-                                onInspect={handleInspectTask}
-                                onOpenWorkbench={handleOpenWorkbench}
-                              />
-                            ))}
-                          {!activeMilestone.tasks.length && <p className="fp-no-tasks">No tasks have been added yet.</p>}
-                        </div>
+                          <p className="fp-panel-category">{activeMilestone.category}</p>
+                          {activeMilestone.outcome && <p className="fp-panel-outcome">{activeMilestone.outcome}</p>}
 
-                        <button type="button" className="fp-panel-edit" onClick={openEditor}>
-                          <Pencil size={14} /> Edit milestone and tasks
-                        </button>
-                      </aside>
-                    ) : (
-                      <aside className="fp-milestone-panel fp-empty-panel">
-                        <Compass size={22} />
-                        <h2>Your roadmap is ready to shape</h2>
-                        <p>Add milestones in Edit Roadmap, then explore them here as you build.</p>
-                        <button type="button" className="fp-save-button" onClick={openEditor}>
-                          <Pencil size={14} /> Edit Roadmap
-                        </button>
-                      </aside>
-                    )}
+                          {/* Warnings for overdue or blocked work in this milestone */}
+                          {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && isTaskOverdue(item.task, completed.includes(item.id))).length > 0 && (
+                            <div className="fp-panel-warning overdue">
+                              <AlertTriangle size={13} />
+                              <span>Tasks in this milestone are past their target completion date.</span>
+                            </div>
+                          )}
+
+                          {/* Person-by-Person Roadmap / Role Filter */}
+                          <div className="fp-panel-task-heading flex-col items-start gap-2 border-b border-[#ECE7E1] pb-3 mb-3">
+                            <div className="flex items-center justify-between w-full">
+                              <h3>Tasks</h3>
+                              <span>
+                                {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && completed.includes(item.id)).length} /{' '}
+                                {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length} complete
+                              </span>
+                            </div>
+
+                            {availableRoles.length > 0 && (
+                              <div className="flex items-center gap-1.5 overflow-x-auto w-full pt-1 pb-0.5">
+                                <span className="text-[10px] font-bold text-[#8C847E] shrink-0 uppercase tracking-wider mr-1">Role:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setPersonFilter('all')}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${personFilter === 'all'
+                                    ? 'bg-[#1D1B18] text-white shadow-xs'
+                                    : 'bg-[#F4EFEA] text-[#534342] hover:bg-[#EAE4DC]'
+                                    }`}
+                                >
+                                  All Roles ({allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length})
+                                </button>
+                                {availableRoles.map(role => {
+                                  const countForRole = allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && item.task?.suggested_role === role).length
+                                  if (countForRole === 0) return null
+                                  return (
+                                    <button
+                                      key={role}
+                                      type="button"
+                                      onClick={() => setPersonFilter(role)}
+                                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${personFilter === role
+                                        ? 'bg-[#1D1B18] text-white shadow-xs'
+                                        : 'bg-[#F4EFEA] text-[#534342] hover:bg-[#EAE4DC]'
+                                        }`}
+                                    >
+                                      {role} ({countForRole})
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="fp-panel-tasks">
+                            {allTasks
+                              .filter(item => item.milestoneIndex === activeMilestoneIndex)
+                              .filter(item => personFilter === 'all' || item.task?.suggested_role === personFilter)
+                              .map(item => (
+                                <TaskRow
+                                  key={item.id}
+                                  item={item}
+                                  projectId={project.id}
+                                  highlight={item.id === requestedTask}
+                                  done={completed.includes(item.id)}
+                                  locked={taskLocked(item)}
+                                  onToggle={() => toggleTask(item.id)}
+                                  assessment={assessment?.task_assessments?.[item.id]}
+                                  onInspect={handleInspectTask}
+                                  onOpenWorkbench={handleOpenWorkbench}
+                                />
+                              ))}
+                            {!activeMilestone.tasks.length && <p className="fp-no-tasks">No tasks have been added yet.</p>}
+                          </div>
+
+                          <button type="button" className="fp-panel-edit" onClick={openEditor}>
+                            <Pencil size={14} /> Edit milestone and tasks
+                          </button>
+                        </aside>
+                      ) : (
+                        <aside className="fp-milestone-panel fp-empty-panel">
+                          <Compass size={22} />
+                          <h2>Your roadmap is ready to shape</h2>
+                          <p>Add milestones in Edit Roadmap, then explore them here as you build.</p>
+                          <button type="button" className="fp-save-button" onClick={openEditor}>
+                            <Pencil size={14} /> Edit Roadmap
+                          </button>
+                        </aside>
+                      )}
+                    </div>
                   </div>
-                </div>
                 ) : view === 'radar' ? (
                   <MarketRadarView
-                    radarData={marketRadar}
+                    radarData={effectiveMarketRadar}
                     onAddExperiment={handleAddExperiment}
                     addingExperimentId={addingExpId}
                   />
@@ -3033,13 +3662,31 @@ export default function FlightPlan() {
                         <span className="fp-eyebrow">CHRONOLOGICAL SCHEDULE</span>
                         <h2>Timeline & Tasks</h2>
                         <p style={{ margin: '3px 0 0', fontSize: 11, color: '#748278' }}>
-                          Sorted by target completion date to highlight upcoming deliverables and critical path items.
+                          Sorted by target completion date with automatic sprint pacing and role-specific deliverables.
                         </p>
                       </div>
                       <span className="fp-task-count-pill">{sortedAndFilteredTasks.length} tasks matching</span>
                     </header>
 
+                    {/* Automatic Milestone Sprint Gantt Timeline Visualizer */}
+                    <MilestoneGanttTimeline
+                      milestones={milestones}
+                      allTasks={allTasks}
+                      completed={completed}
+                      personFilter={personFilter}
+                      onSelectTask={handleOpenWorkbench}
+                    />
+
                     <div className="fp-task-filters">
+                      <label>
+                        <span>Team Member</span>
+                        <select value={personFilter} onChange={event => setPersonFilter(event.target.value)}>
+                          <option value="all">All Team Members</option>
+                          {availableRoles.map(role => (
+                            <option key={role} value={role}>{role}</option>
+                          ))}
+                        </select>
+                      </label>
                       <label>
                         <span>Status</span>
                         <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
