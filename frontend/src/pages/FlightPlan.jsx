@@ -11,6 +11,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Circle,
   CircleHelp,
   Clock,
@@ -22,10 +23,10 @@ import {
   FileCode2,
   GitBranch,
   Github,
+  Info,
   Layers,
   Link2,
   ListChecks,
-  LoaderCircle,
   Menu,
   Pencil,
   Plus,
@@ -37,10 +38,12 @@ import {
   Sparkles,
   Trash2,
   Undo2,
+  UserCheck,
   UsersRound,
   X,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { MiniLoader } from '../components/UdaanLoader.jsx'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import AddTaskModal from '../components/modals/AddTaskModal.jsx'
@@ -101,18 +104,18 @@ function normalizeMilestones(plan = {}) {
     target_date: milestone.target_date || '',
     tasks: Array.isArray(milestone.tasks)
       ? milestone.tasks.map((task, taskIndex) =>
-          typeof task === 'string'
-            ? { ...emptyTask(), title: task.trim() || `Task ${taskIndex + 1}` }
-            : {
-                ...task,
-                title: task?.title?.trim() || `Task ${taskIndex + 1}`,
-                start_date: task?.start_date || '',
-                target_date: task?.target_date || '',
-                subtasks: Array.isArray(task?.subtasks) ? task.subtasks : [],
-                dependencies: Array.isArray(task?.dependencies) ? task.dependencies : [],
-                required_skills: Array.isArray(task?.required_skills) ? task.required_skills : [],
-              }
-        )
+        typeof task === 'string'
+          ? { ...emptyTask(), title: task.trim() || `Task ${taskIndex + 1}` }
+          : {
+            ...task,
+            title: task?.title?.trim() || `Task ${taskIndex + 1}`,
+            start_date: task?.start_date || '',
+            target_date: task?.target_date || '',
+            subtasks: Array.isArray(task?.subtasks) ? task.subtasks : [],
+            dependencies: Array.isArray(task?.dependencies) ? task.dependencies : [],
+            required_skills: Array.isArray(task?.required_skills) ? task.required_skills : [],
+          }
+      )
       : [],
   }))
 }
@@ -203,30 +206,30 @@ export function buildClientMindMap(project, plan, radar = null) {
     }
     prevMId = mId
 
-    // 2-3 tasks per milestone
-    ;(milestone.tasks || []).slice(0, 3).forEach((task, tIdx) => {
-      const tId = task.id || `${mIdx}-${tIdx}`
-      const nodeTId = `node-task-${mIdx + 1}-${tIdx + 1}`
-      nodes.push({
-        id: nodeTId,
-        taskId: tId,
-        label: (task.title || `Task ${tIdx + 1}`).slice(0, 28),
-        type: 'task',
-        group: 'task',
-        description: task.why_matters || task.purpose || '',
-        xp_reward: task.xp_reward || 150,
-        radar_chip: task.radar_chip || '',
-        x: 1000,
-        y: mY - 35 + tIdx * 50,
+      // 2-3 tasks per milestone
+      ; (milestone.tasks || []).slice(0, 3).forEach((task, tIdx) => {
+        const tId = task.id || `${mIdx}-${tIdx}`
+        const nodeTId = `node-task-${mIdx + 1}-${tIdx + 1}`
+        nodes.push({
+          id: nodeTId,
+          taskId: tId,
+          label: (task.title || `Task ${tIdx + 1}`).slice(0, 28),
+          type: 'task',
+          group: 'task',
+          description: task.why_matters || task.purpose || '',
+          xp_reward: task.xp_reward || 150,
+          radar_chip: task.radar_chip || '',
+          x: 1000,
+          y: mY - 35 + tIdx * 50,
+        })
+        edges.push({
+          id: `edge-${mId}-${nodeTId}`,
+          source: mId,
+          target: nodeTId,
+          label: `+${task.xp_reward || 150} XP`,
+          animated: false,
+        })
       })
-      edges.push({
-        id: `edge-${mId}-${nodeTId}`,
-        source: mId,
-        target: nodeTId,
-        label: `+${task.xp_reward || 150} XP`,
-        animated: false,
-      })
-    })
   })
 
   return {
@@ -279,8 +282,8 @@ export function getDaysRemaining(deadlineStr) {
       diffDays < 0
         ? `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'} overdue`
         : diffDays === 0
-        ? 'Due today'
-        : `${diffDays} day${diffDays === 1 ? '' : 's'} remaining`,
+          ? 'Due today'
+          : `${diffDays} day${diffDays === 1 ? '' : 's'} remaining`,
   }
 }
 
@@ -399,7 +402,7 @@ function ConnectedRepositoryPanel({
             disabled={syncing || comparing}
             title="Refresh repository files and analysis"
           >
-            {syncing ? <LoaderCircle size={14} className="fp-spinning" /> : <RefreshCw size={14} />}
+            {syncing ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <RefreshCw size={14} />}
             {syncing ? 'Syncing…' : 'Sync repository'}
           </button>
           <button
@@ -409,7 +412,7 @@ function ConnectedRepositoryPanel({
             disabled={comparing || syncing || isEmpty}
             title={isEmpty ? 'Cannot compare an empty repository' : 'Compare roadmap milestones with repository evidence'}
           >
-            {comparing ? <LoaderCircle size={14} className="fp-spinning" /> : <Sparkles size={14} />}
+            {comparing ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Sparkles size={14} />}
             {comparing ? 'Comparing…' : 'Compare with Repository'}
           </button>
         </div>
@@ -580,10 +583,10 @@ function TimingEditModal({ project, onClose, onSave, onSaveAndReplan, busy = fal
                   {deadlineMetrics?.isOverdue
                     ? 'Target launch date has passed. Replan to establish a realistic schedule.'
                     : totalDays <= 7
-                    ? 'High-intensity timeline (hackathon mode). Focus on core MVP tasks.'
-                    : totalDays <= 30
-                    ? 'Balanced sprint timeline. Sufficient time for development, testing, and polish.'
-                    : 'Comprehensive project timeline. Milestones can accommodate extensive verification.'}
+                      ? 'High-intensity timeline (hackathon mode). Focus on core MVP tasks.'
+                      : totalDays <= 30
+                        ? 'Balanced sprint timeline. Sufficient time for development, testing, and polish.'
+                        : 'Comprehensive project timeline. Milestones can accommodate extensive verification.'}
                 </span>
               </div>
             </div>
@@ -599,7 +602,7 @@ function TimingEditModal({ project, onClose, onSave, onSaveAndReplan, busy = fal
               <Save size={13} /> Save Timing
             </button>
             <button type="button" className="fp-btn-replan-accent" onClick={handleReplanWithNewTiming} disabled={busy}>
-              {busy ? <LoaderCircle size={13} className="fp-spinning" /> : <Sparkles size={13} />}
+              {busy ? <MiniLoader color="#fff" className="mr-0.5" /> : <Sparkles size={13} />}
               Save & Replan with AI
             </button>
           </div>
@@ -645,7 +648,7 @@ function RoadmapHeader({
     <>
       <section className="fp-hero">
         <div className="fp-hero-copy">
-          <div className="fp-eyebrow"><Compass size={13} /> PROJECT ROADMAP · FLIGHT PLAN</div>
+          <div className="fp-eyebrow"><Compass size={13} /> PROJECT ROADMAP</div>
           <h1>{project.name}</h1>
           <p>{description || 'A clear sequence of milestones to move this project forward.'}</p>
         </div>
@@ -681,7 +684,7 @@ function RoadmapHeader({
             onClick={onReplan}
             disabled={replanBusy || !project.idea}
           >
-            {replanBusy ? <LoaderCircle className="fp-spinning" size={14} /> : <Sparkles size={14} />}
+            {replanBusy ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Sparkles size={14} />}
             {replanBusy ? 'Replanning…' : 'Replan with AI'}
           </button>
 
@@ -1010,14 +1013,14 @@ function RoadmapNode({
     status === 'completed'
       ? Check
       : status === 'overdue'
-      ? AlertTriangle
-      : status === 'blocked'
-      ? ShieldAlert
-      : status === 'at-risk'
-      ? AlertCircle
-      : status === 'active'
-      ? Compass
-      : Circle
+        ? AlertTriangle
+        : status === 'blocked'
+          ? ShieldAlert
+          : status === 'at-risk'
+            ? AlertCircle
+            : status === 'active'
+              ? Compass
+              : Circle
 
   const mStatusKey = milestoneAssessment?.status || 'not_assessed'
   const mMeta = buildStatusMeta(mStatusKey)
@@ -1234,7 +1237,7 @@ function TaskAssessmentModal({
                 onClick={() => onExplainAI?.(item, assessment)}
                 disabled={explainingAI}
               >
-                {explainingAI ? <LoaderCircle size={13} className="fp-spinning" /> : <Sparkles size={13} />}
+                {explainingAI ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Sparkles size={13} />}
                 {explainingAI ? 'Analyzing with Gemini…' : 'Explain finding with AI'}
               </button>
             )}
@@ -1283,7 +1286,7 @@ function TaskAssessmentModal({
                 onClick={() => handleConfirmOverride()}
                 disabled={confirming}
               >
-                {confirming ? <LoaderCircle size={13} className="fp-spinning" /> : <Save size={13} />}
+                {confirming ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Save size={13} />}
                 Save Correction
               </button>
             </div>
@@ -1314,11 +1317,11 @@ function RoadmapEditor({ plan, onChange, onCancel, onSave, error, completedTasks
         index !== milestoneIndex
           ? milestone
           : {
-              ...milestone,
-              tasks: milestone.tasks.map((task, taskIndexInMilestone) =>
-                taskIndexInMilestone === taskIndex ? { ...task, [key]: value } : task
-              ),
-            }
+            ...milestone,
+            tasks: milestone.tasks.map((task, taskIndexInMilestone) =>
+              taskIndexInMilestone === taskIndex ? { ...task, [key]: value } : task
+            ),
+          }
       ),
     }))
   }
@@ -1330,9 +1333,9 @@ function RoadmapEditor({ plan, onChange, onCancel, onSave, error, completedTasks
         index !== milestoneIndex
           ? milestone
           : {
-              ...milestone,
-              tasks: milestone.tasks.filter((_, taskIndexInMilestone) => taskIndexInMilestone !== taskIndex),
-            }
+            ...milestone,
+            tasks: milestone.tasks.filter((_, taskIndexInMilestone) => taskIndexInMilestone !== taskIndex),
+          }
       ),
     }))
   }
@@ -1664,8 +1667,10 @@ export default function FlightPlan() {
     if (project?.id) localStorage.setItem('udaan:selected-project', project.id)
   }, [project?.id])
 
-  const [view, setView] = useState('flowmap') // 'flowmap' | 'mindmap' | 'radar' | 'timeline'
+  const [view, setView] = useState('flowmap') // 'flowmap' | 'mindmap' | 'radar' | 'timeline' | 'team'
   const [menuOpen, setMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [milestoneTooltipOpen, setMilestoneTooltipOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -1762,7 +1767,7 @@ export default function FlightPlan() {
         updateSavedProject(item.id, updated)
         return updated
       }))
-    }).catch(() => {})
+    }).catch(() => { })
     return () => { active = false }
   }, [project?.id])
 
@@ -1828,7 +1833,7 @@ export default function FlightPlan() {
             updateSavedProject(project.id, current => ({ ...current, market_radar: res }))
           }
         })
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => { if (active) setLoadingRadar(false) })
     }
 
@@ -2042,7 +2047,7 @@ export default function FlightPlan() {
         await saveRepositoryAnalysis(project.id, {
           analysis: syncResult.analysis,
           commitSha: syncResult.repository.revision,
-        }).catch(() => {})
+        }).catch(() => { })
       }
 
       setNotice('Repository files and deterministic analysis refreshed.')
@@ -2262,7 +2267,7 @@ export default function FlightPlan() {
         updated.workflow || {},
         'flight_plan',
         editedStages
-      ).catch(() => {})
+      ).catch(() => { })
     }
   }
 
@@ -2275,7 +2280,7 @@ export default function FlightPlan() {
         const sharedTask = workspace.tasks.find(item => item.source_position === taskId)
         if (sharedTask) return updateTeamTask(project.id, sharedTask.id, { status: next.includes(taskId) ? 'completed' : 'not_started' })
         return null
-      }).catch(() => {})
+      }).catch(() => { })
     }
   }
 
@@ -2425,9 +2430,9 @@ export default function FlightPlan() {
       teamSize: newTiming.teamSize,
       weeklyHours: newTiming.weeklyHours,
       workflow: {
-        ...current.workflow,
+        ...project.workflow,
         flight_plan: {
-          ...current.workflow?.flight_plan,
+          ...project.workflow?.flight_plan,
           start_date: newTiming.startDate,
           deadline: newTiming.deadline,
         },
@@ -2457,7 +2462,105 @@ export default function FlightPlan() {
     if (await handleSaveTiming(newTiming)) void replan(newTiming)
   }
 
-  // Filtered and Sorted tasks for Timeline / Task List View
+  // ─── Google Calendar export ───────────────────────────────────────────────
+  function exportToGoogleCalendar() {
+    if (!project || !milestones.length) return
+    // Build ICS content
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//UDAAN//FlightPlan//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+    ]
+    milestones.forEach((ms, idx) => {
+      if (!ms.target_date) return
+      const dtStr = ms.target_date.replace(/-/g, '')
+      const uid = `udaan-ms-${project.id}-${idx}@udaan.studio`
+      lines.push(
+        'BEGIN:VEVENT',
+        `UID:${uid}`,
+        `DTSTART;VALUE=DATE:${dtStr}`,
+        `DTEND;VALUE=DATE:${dtStr}`,
+        `SUMMARY:🎯 ${ms.title} — ${project.name}`,
+        `DESCRIPTION:${(ms.purpose || ms.outcome || '').replace(/\n/g, '\\n')}`,
+        'STATUS:CONFIRMED',
+        'END:VEVENT',
+      )
+      // Add task events too
+      ;(ms.tasks || []).forEach((t, ti) => {
+        if (!t.target_date) return
+        const tdStr = t.target_date.replace(/-/g, '')
+        lines.push(
+          'BEGIN:VEVENT',
+          `UID:udaan-task-${project.id}-${idx}-${ti}@udaan.studio`,
+          `DTSTART;VALUE=DATE:${tdStr}`,
+          `DTEND;VALUE=DATE:${tdStr}`,
+          `SUMMARY:✅ ${t.title}`,
+          `DESCRIPTION:Role: ${t.suggested_role || 'Team'} | Priority: ${t.priority || 'medium'}\\nMilestone: ${ms.title}`,
+          'STATUS:CONFIRMED',
+          'END:VEVENT',
+        )
+      })
+    })
+    lines.push('END:VCALENDAR')
+    const ics = lines.join('\r\n')
+    const blob = new Blob([ics], { type: 'text/calendar' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${(project.name || 'roadmap').replace(/\s+/g, '-').toLowerCase()}-roadmap.ics`
+    a.click()
+    URL.revokeObjectURL(url)
+    setNotice('Calendar file downloaded! Open it to import into Google Calendar, Apple Calendar, or Outlook.')
+    setTimeout(() => setNotice(''), 5000)
+  }
+
+  function openGoogleCalendar() {
+    // Open Google Calendar with the first upcoming milestone as a quick-add event
+    const upcoming = milestones.find(ms => ms.target_date && new Date(ms.target_date) >= new Date())
+    if (!upcoming) return
+    const title = encodeURIComponent(`🎯 ${upcoming.title} — ${project?.name || ''}`)
+    const date = upcoming.target_date.replace(/-/g, '')
+    const details = encodeURIComponent(upcoming.purpose || upcoming.outcome || '')
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${date}/${date}&details=${details}`
+    window.open(url, '_blank', 'noopener')
+  }
+
+  // ─── Notification helpers ──────────────────────────────────────────────────
+  const notifications = useMemo(() => {
+    const notifs = []
+    allTasks.forEach(item => {
+      const isDone = completed.includes(item.id)
+      if (isDone) return
+      const overdue = isTaskOverdue(item.task, false)
+      if (overdue) {
+        notifs.push({ type: 'overdue', id: item.id, title: item.task.title, milestone: item.milestone, date: item.task.target_date })
+        return
+      }
+      // Due within 3 days
+      if (item.task.target_date) {
+        const daysInfo = getDaysRemaining(item.task.target_date)
+        if (daysInfo && !daysInfo.isOverdue && daysInfo.days <= 3) {
+          notifs.push({ type: 'due_soon', id: item.id, title: item.task.title, milestone: item.milestone, date: item.task.target_date, days: daysInfo.days })
+        }
+      }
+    })
+    // Milestone approaching
+    milestones.forEach((ms, idx) => {
+      if (!ms.target_date) return
+      const milestoneTasks = allTasks.filter(t => t.milestoneIndex === idx)
+      const allDone = milestoneTasks.length && milestoneTasks.every(t => completed.includes(t.id))
+      if (allDone) return
+      const daysInfo = getDaysRemaining(ms.target_date)
+      if (daysInfo && !daysInfo.isOverdue && daysInfo.days <= 7) {
+        notifs.push({ type: 'milestone_due', id: `ms-${idx}`, title: ms.title, date: ms.target_date, days: daysInfo.days })
+      }
+    })
+    return notifs
+  }, [allTasks, completed, milestones])
+
+  // ─── Filtered and Sorted tasks for Timeline / Task List View ──────────────
   const sortedAndFilteredTasks = useMemo(() => {
     let tasks = [...allTasks]
 
@@ -2604,7 +2707,7 @@ export default function FlightPlan() {
 
                 {['queued', 'generating'].includes(generationStatus) && (
                   <div className="fp-message" role="status">
-                    <LoaderCircle className="fp-spinning" size={15} />{' '}
+                    <MiniLoader color="#8E4B49" className="mr-1" />{' '}
                     {hasActionableFlightPlan(project.workflow?.flight_plan)
                       ? 'Your saved roadmap remains available while UDAAN prepares an updated flight plan.'
                       : 'UDAAN is preparing your roadmap in the background.'}
@@ -2630,14 +2733,6 @@ export default function FlightPlan() {
                         onClick={() => setView('flowmap')}
                       >
                         <Route size={15} /> Flow Map (Milestones)
-                      </button>
-                      <button
-                        role="tab"
-                        aria-selected={view === 'mindmap'}
-                        className={view === 'mindmap' ? 'active' : ''}
-                        onClick={() => setView('mindmap')}
-                      >
-                        <Layers size={15} /> Mind Map & Idea Tree
                       </button>
                       <button
                         role="tab"
@@ -2679,7 +2774,7 @@ export default function FlightPlan() {
                       </button>
 
                       <button className="fp-replan-button" type="button" onClick={() => replan()} disabled={busy || !project.idea}>
-                        {busy ? <LoaderCircle className="fp-spinning" size={15} /> : <Sparkles size={15} />}
+                        {busy ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Sparkles size={15} />}
                         {busy ? 'Replanning…' : 'Replan with AI'}
                       </button>
                     </div>
@@ -2837,29 +2932,6 @@ export default function FlightPlan() {
                         </button>
                       </aside>
                     )}
-                  </div>
-                ) : view === 'mindmap' ? (
-                  <div className="bg-white rounded-3xl p-6 border border-[#EFEAE4] shadow-xs space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#EFEAE4]">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#7A3C3A] bg-[#FFAAA6]/30 px-2.5 py-0.5 rounded-full">
-                            2D Idea-to-Execution Mind Map
-                          </span>
-                          <span className="text-xs text-[#7C766F] font-mono">Curved SVG Animated Flow Pipes</span>
-                        </div>
-                        <h3 className="text-base font-bold text-[#1D1B18] mt-1">Idea DAG & Execution Pipeline</h3>
-                        <p className="text-xs text-[#534342]">
-                          Drag nodes or adjust spacing/opacity. Click any task node to open the Task Workbench with criteria and verification.
-                        </p>
-                      </div>
-                    </div>
-                    <MindMapCanvas
-                      graphData={mindMapGraph || buildClientMindMap(project, flightPlan, marketRadar)}
-                      onSaveGraph={handleSaveMindMap}
-                      onSelectNode={handleMindMapNodeSelect}
-                      completedTaskIds={completed}
-                    />
                   </div>
                 ) : view === 'radar' ? (
                   <MarketRadarView

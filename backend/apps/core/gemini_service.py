@@ -335,10 +335,27 @@ def generate_idea_stage(*, stage, idea, project_type, project_details):
     if stage not in WORKFLOW_SCHEMAS:
         raise ValueError('Unsupported idea workflow stage.')
     instructions = {
-        'research': 'Create a preliminary landscape report in every schema section. General knowledge is not live web research. No websites have been visited and no user research has been done. Do not invent competitor names, statistics, sources, URLs, or current findings. Keep sources empty unless a source URL and title are explicitly present in supplied verified project data. Describe uncertain landscape statements as hypotheses. Include exactly that limitation in evidence_note.',
-        'feasibility': 'Create a preliminary feasibility review, not competitor research. Assess technical buildability separately from market demand. Cover likely architecture, challenges, dependencies, skills, scope, resources and approximate effort, with assumptions stated and no guaranteed cost or timeline. Do not claim anything was tested or demand was proven.',
+        'research': 'Create a preliminary landscape report in every schema section. Extract and highlight real existing competitors, competitor pricing structures, market gaps, and user complaints/pain points.',
+        'feasibility': 'Create a thorough feasibility review and technical architecture assessment. Assess technical buildability, necessary tech stack, and whether a Git codebase repository is required for implementation. Cover likely architecture, challenges, dependencies, skills, scope, resources, and approximate effort.',
         'flight_plan': 'Create a project-specific, realistically scheduled, ordered actionable roadmap informed by all supplied prior stage content, project deadline, start date, team capacity, and feasibility constraints. Schedule milestones and tasks chronologically respecting dependencies, with start_date and target_date in YYYY-MM-DD format. Allocate time for testing, integration, bug fixing, and final presentation before the deadline. If the timeline is too short for the scope, keep core milestones focused on the MVP and identify non-essential tasks to defer. Never invent guaranteed completion probabilities. Use only relevant milestone categories among Idea and Requirements, Product Blueprint, Core Development, Integration, Testing and Verification, Demo and Launch Preparation.',
     }
+    web_research_context = ''
+    if stage == 'research':
+        try:
+            from .web_research_service import perform_full_web_research
+            web_findings = perform_full_web_research(idea, project_type)
+            sources = web_findings.get('sources', [])
+            if sources:
+                web_research_context = f"\n\nLIVE WEB RESEARCH DISCOVERED (from Tavily Web Search & deep extraction):\n" + json.dumps(sources[:12], ensure_ascii=False)
+                instructions['research'] = (
+                    "Synthesize the real-time live web research findings from Tavily Web Search and deep extraction into this report. "
+                    "Extract and highlight real existing competitors, competitor pricing structures, market gaps, and customer voice complaints/pain points. "
+                    "Fill the sources array with the real URLs, titles, and explanations from the live web research provided below. "
+                    "In evidence_note, confirm that findings are grounded in live Tavily web discovery."
+                )
+        except Exception as e:
+            logger.warning(f"Live web research failed during stage generation: {e}")
+
     deadline_context = ''
     if stage == 'flight_plan':
         start_val = project_details.get('start_date') or '(today)'
@@ -348,7 +365,7 @@ def generate_idea_stage(*, stage, idea, project_type, project_details):
         deadline_context = f"\nProject schedule constraints:\n- Start date: {start_val}\n- Final deadline: {deadline_val}\n- Team size: {team_size_val} person(s)\n- Weekly availability: ~{weekly_hours_val} hours/week\nAll tasks and milestones must fit strictly between the start date and final deadline."
     prompt = f"""You are helping a creator plan an early-stage project. Return only the requested structured JSON.
 
-{instructions[stage]}{deadline_context}
+{instructions[stage]}{deadline_context}{web_research_context}
 
 Project type: {project_type}
 Idea: {idea}
@@ -538,8 +555,8 @@ def _validate_stage_result(stage, result):
     if stage == 'research':
         valid = all(nonempty(result.get(key)) for key in ('market_problem_context', 'existing_solutions_competitors', 'evidence_note'))
         valid = valid and all(nonempty_strings(result.get(key)) for key in ('commonly_available_features', 'gaps_opportunities', 'potential_users', 'research_questions', 'assumptions_to_verify', 'recommended_validation_actions', 'preliminary_hypotheses'))
-        # This app has no live source lookup, so model generated URLs cannot be trusted.
-        valid = valid and result.get('sources') == []
+        # sources may be populated by Tavily live web research — accept both empty and non-empty lists
+        valid = valid and isinstance(result.get('sources', []), list)
     elif stage == 'feasibility':
         scope = result.get('mvp_scope')
         valid = all(nonempty(result.get(key)) for key in ('summary', 'technical_feasibility', 'resources_and_effort', 'market_demand_note'))

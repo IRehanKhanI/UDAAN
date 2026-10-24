@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import UdaanLoader from '../components/UdaanLoader.jsx'
 import {
   AlertCircle,
   ArrowLeft,
@@ -302,9 +303,8 @@ export default function ProjectSetup() {
             {/* Main Repository Connection Card */}
             <div className="ps-card">
               {loadingInitial ? (
-                <div className="flex items-center gap-2 text-xs text-[#7C766F] py-4">
-                  <LoaderCircle size={18} className="animate-spin text-[#8E4B49]" />
-                  <span>Loading project and integration details…</span>
+                <div className="flex justify-center py-8">
+                  <UdaanLoader character="builder" size="sm" message="Loading project details…" sub="fetching integration settings" />
                 </div>
               ) : connectedRepo ? (
                 /* Already connected state */

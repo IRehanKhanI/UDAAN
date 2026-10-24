@@ -7,6 +7,7 @@ import {
   Square, Terminal, Wifi, WifiOff, X, Zap,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import UdaanLoader, { MiniLoader } from '../components/UdaanLoader.jsx'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
@@ -150,7 +151,7 @@ function BrowserPanel({ latestScreenshot, currentUrl, runStatus, lastEventMsg,
         ) : (
           <div className="tp-browser-empty">
             {isActive
-              ? <><LoaderCircle size={28} className="tp-spin tp-spin-lg" /><p>Waiting for first screenshot…</p><small>Browser is starting up</small></>
+              ? <UdaanLoader character="tester" size="sm" message="Browser is starting up…" sub="Waiting for first screenshot" />
               : <><Globe size={28} /><p>No browser session active.<br />Enter a URL below and click Run test.</p></>
             }
           </div>
@@ -531,7 +532,7 @@ export default function TestPilot() {
                 {!isActive ? (
                   <button className="tp-run-btn" onClick={startRun} disabled={launching || !targetUrl}>
                     {launching
-                      ? <><LoaderCircle size={14} className="tp-spin" /> Starting…</>
+                      ? <><MiniLoader color="#fff" className="mr-0.5" /> Starting…</>
                       : <><Play size={14} fill="currentColor" /> Run test</>
                     }
                   </button>

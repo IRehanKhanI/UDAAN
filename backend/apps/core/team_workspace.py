@@ -72,6 +72,7 @@ def member_payload(member):
     return {'id': member.pk, 'slot': member.slot, 'name': member.name, 'display_name': member.display_name,
         'email': member.email, 'role': member.role, 'skills': member.skills, 'is_creator': member.is_creator,
         'user_id': member.user_id, 'github_connected': bool(profile),
+        'avatar_url': profile.avatar_url if profile else '',
         'github_login': profile.github_login if profile else '',
         'profile_skills': profile.skills if profile else [],
         'preferred_roles': profile.preferred_roles if profile else [],
@@ -589,9 +590,9 @@ class TeamInvitationCollectionView(APIView):
             if len(set(requested)) != len(requested):
                 return Response({'error': 'Remove duplicate email addresses from this invitation list.'}, status=400)
             pending_count = sum(invitation.status == 'pending' for invitation in invitations)
-            remaining = max(0, (project.team_size or 1) - len(members) - pending_count)
             if len(invitees) > remaining:
-                return Response({'error': f'Only {remaining} invitation slot(s) remain in this project capacity.', 'code': 'capacity_exceeded', 'remaining_capacity': remaining}, status=409)
+                project.team_size = len(members) + pending_count + len(invitees)
+                project.save(update_fields=['team_size', 'updated_at'])
             created = [create_invitation(project, request, invitee) for invitee in invitees]
         return Response({'invitations': created, 'message': 'Invitation records created. Check delivery status for each address.'}, status=201)
 

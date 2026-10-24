@@ -167,7 +167,7 @@ export default function MyProjects() {
         const synced = syncBackendProjects(data.results)
         setProjects(synced)
       }
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   const counts = useMemo(() => ({
@@ -234,10 +234,7 @@ export default function MyProjects() {
           {/* Top Eyebrow & Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFFFFF] text-[#8E4B49] text-xs font-bold tracking-wide border border-[#EFEAE4] shadow-xs mb-2">
-                <span className="w-2 h-2 rounded-full bg-[#FFAAA6]"></span>
-                <span>STUDIO WORKSPACES</span>
-              </div>
+
               <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1D1B18] tracking-tight leading-tight font-['Plus_Jakarta_Sans']">
                 My Projects
               </h1>
@@ -257,18 +254,7 @@ export default function MyProjects() {
             </div>
           </div>
 
-          {/* Summary Badges Bar */}
-          <div className="flex items-center gap-4 text-xs font-semibold text-[#534342] bg-white p-3.5 rounded-2xl border border-[#EFEAE4] shadow-xs">
-            <span className="flex items-center gap-1.5">
-              <Rocket size={15} className="text-[#8E4B49]" />
-              <strong>{counts['in-progress'] + counts.planning}</strong> active projects
-            </span>
-            <span className="w-1 h-1 rounded-full bg-[#D8C1C0]" />
-            <span className="flex items-center gap-1.5">
-              <Check size={15} className="text-[#8e4b49]" />
-              <strong>{counts.completed + counts.archived}</strong> finished or live
-            </span>
-          </div>
+
 
           {/* Controls: Search, Filters, Sorters, Grid/List */}
           <div className="bg-white p-4 rounded-3xl border border-[#EFEAE4] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -318,9 +304,8 @@ export default function MyProjects() {
                 <button
                   type="button"
                   onClick={() => setView('grid')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    view === 'grid' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
-                  }`}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${view === 'grid' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
+                    }`}
                   aria-label="Grid view"
                 >
                   <Grid2X2 size={16} />
@@ -328,9 +313,8 @@ export default function MyProjects() {
                 <button
                   type="button"
                   onClick={() => setView('list')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    view === 'list' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
-                  }`}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${view === 'list' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
+                    }`}
                   aria-label="List view"
                 >
                   <List size={16} />
@@ -348,11 +332,10 @@ export default function MyProjects() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[#FFAAA6] text-[#7A3C3A] shadow-xs'
-                      : 'text-[#534342] hover:bg-[#F3EDE7]'
-                  }`}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${isActive
+                    ? 'bg-[#FFAAA6] text-[#7A3C3A] shadow-xs'
+                    : 'text-[#534342] hover:bg-[#F3EDE7]'
+                    }`}
                 >
                   <span>{tab.label}</span>
                   <span className={`px-2 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-white/70 text-[#7A3C3A]' : 'bg-[#E7E1DC] text-[#534342]'}`}>

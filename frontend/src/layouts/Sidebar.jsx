@@ -7,6 +7,7 @@ import { NavLink, Link } from 'react-router-dom'
 import './Sidebar.css'
 import { useAuth } from '../app/AuthContext.jsx'
 import { logoutAccount } from '../services/authService.js'
+import { readSavedProjects } from '../services/projectStorage.js'
 import CommandPalette from '../components/modals/CommandPalette.jsx'
 
 const navigation = [
@@ -24,13 +25,15 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
   const { auth, refresh } = useAuth()
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
 
-  const displayName = auth.user?.name || (auth.authenticated ? 'Developer' : 'Connect GitHub')
-  const initials = displayName
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  const savedProjects = readSavedProjects()
+  const selectedId = localStorage.getItem('udaan:selected-project')
+  const currentProject = savedProjects.find(p => p.id === selectedId) || savedProjects[0]
+  const isComplete = currentProject ? (currentProject.progress >= 100 || currentProject.status === 'completed') : false
+
+  const displayName = auth.user?.name || (auth.authenticated ? 'Developer' : 'Sign In')
+  const initials = auth.authenticated
+    ? displayName.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+    : ''
   const avatarUrl = auth.profile?.avatar_url || ''
 
   const logout = async () => {
@@ -125,16 +128,30 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
 
         {/* Footer info & Profile Card */}
         <div className="flex flex-col gap-2 pt-2 border-t border-[#EFEAE4]">
-          {/* Status pill */}
-          <div className="bg-[#FFFFFF] rounded-2xl p-2.5 flex items-center justify-between shadow-[0_1px_4px_rgba(31,29,26,0.03)] border border-[#EFEAE4]">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#8e4b49] animate-pulse"></span>
-              <span className="text-xs font-semibold text-[#534342]">Ready to launch</span>
+          {/* Status pill (Only show Ready to Launch if project is complete) */}
+          {isComplete ? (
+            <div className="bg-[#FFFFFF] rounded-2xl p-2.5 flex items-center justify-between shadow-[0_1px_4px_rgba(31,29,26,0.03)] border border-[#2A5D54]/40">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#2A5D54]"></span>
+                <span className="text-xs font-bold text-[#2A5D54]">Ready to launch</span>
+              </div>
+              <span className="text-[11px] bg-[#9FD8CB]/30 text-[#2A5D54] px-2 py-0.5 rounded-full font-bold">
+                100%
+              </span>
             </div>
-            <span className="text-[11px] bg-[#FBE191] text-[#766320] px-2 py-0.5 rounded-full font-bold">
-              Studio v1.2
-            </span>
-          </div>
+          ) : (
+            <div className="bg-[#FFFFFF] rounded-2xl p-2.5 flex items-center justify-between shadow-[0_1px_4px_rgba(31,29,26,0.03)] border border-[#EFEAE4]">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#8E4B49] animate-pulse"></span>
+                <span className="text-xs font-semibold text-[#534342]">
+                  {currentProject ? `In Flight · ${currentProject.progress || 0}%` : 'Studio Active'}
+                </span>
+              </div>
+              <span className="text-[11px] bg-[#FBE191] text-[#766320] px-2 py-0.5 rounded-full font-bold">
+                Sprint 1
+              </span>
+            </div>
+          )}
 
           {/* Profile Card */}
           <div className="bg-[#FFFFFF] rounded-2xl p-2 flex items-center justify-between shadow-[0_2px_8px_-2px_rgba(31,29,26,0.04)] border border-[#EFEAE4]">
@@ -147,8 +164,10 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
               <div className="w-8 h-8 rounded-full bg-[#F9F2ED] border border-[#D8C1C0] flex items-center justify-center text-[11px] font-bold text-[#7A3C3A] overflow-hidden shrink-0">
                 {avatarUrl ? (
                   <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+                ) : initials ? (
+                  initials
                 ) : (
-                  initials || 'U'
+                  <UserRound size={15} />
                 )}
               </div>
               <div className="flex flex-col min-w-0">
@@ -156,7 +175,7 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
                   {displayName}
                 </span>
                 <span className="text-[10px] text-[#534342] font-medium truncate">
-                  {auth.authenticated ? 'Developer Profile' : 'Sign in with GitHub'}
+                  {auth.authenticated ? 'Developer Profile' : 'Click to Sign In'}
                 </span>
               </div>
             </Link>

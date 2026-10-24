@@ -1,13 +1,38 @@
 import { apiRequest } from './apiClient.js'
 
-export function generateIdeaStage({ stage, draft, projectDetails }) {
+export function generateIdeaStage(arg1, arg2, arg3) {
+  let stage, draft, projectDetails
+  if (typeof arg1 === 'object' && arg1?.stage) {
+    stage = arg1.stage
+    draft = arg1.draft || {}
+    projectDetails = arg1.projectDetails || {}
+  } else if (typeof arg1 === 'string' && typeof arg2 === 'object') {
+    stage = arg1
+    draft = arg2
+    projectDetails = arg3 || {}
+  } else if (typeof arg2 === 'string') {
+    stage = arg2
+    draft = typeof arg1 === 'object' ? arg1 : { projectId: arg1 }
+    projectDetails = arg3 || {}
+  } else {
+    stage = arg1
+    draft = {}
+    projectDetails = {}
+  }
+
   const candidateId = draft.projectId || draft.id
   const projectId = typeof candidateId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidateId) ? candidateId : undefined
   return apiRequest('/api/ideas/workflow-stage/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ stage, idea: draft.idea, project_type: draft.projectType, project_id: projectId, project_details: projectDetails }),
-  })
+    body: JSON.stringify({
+      stage,
+      idea: draft.idea,
+      project_type: draft.projectType || 'Startup',
+      project_id: projectId,
+      project_details: projectDetails,
+    }),
+  }).then(res => res?.result || res)
 }
 
 export function queueIdeaStageGeneration({ projectId, stage, retry = false, replaceEdited = false }) {

@@ -156,7 +156,7 @@ def _build_default_mindmap_layout(idea_title, market_insights, milestones):
 def generate_market_radar_and_flight_plan(*, idea, project_type, attachment_text=""):
     """
     End-to-End Launch Pipeline:
-    Stage A: Web Research (Brave Search API + Tavily Extraction).
+    Stage A: Web Research (Tavily Search API & Deep Extraction).
     Stage B: Gemini Structured Synthesis (Market Radar Report + 4-Milestone Plan + Mind Map Graph).
     """
     logger.info(f"Starting Stage A web research for idea: '{idea[:60]}'")
@@ -310,7 +310,7 @@ def generate_market_radar_and_flight_plan(*, idea, project_type, attachment_text
     }
 
     prompt = f"""You are UDAAN's expert project architect and market intelligence engine.
-Analyze the user's project idea using the real web discovery findings retrieved from Brave Search and Tavily extraction.
+Analyze the user's project idea using the real web discovery findings retrieved from Tavily Web Search and deep extraction.
 
 PROJECT IDEA:
 {idea}
@@ -321,7 +321,7 @@ PROJECT TYPE:
 OPTIONAL ATTACHMENT MATERIAL:
 {attachment_text[:5000] if attachment_text else '(none)'}
 
-RETRIEVED WEB RESEARCH FINDINGS (from Brave Search & Tavily):
+RETRIEVED WEB RESEARCH FINDINGS (from Tavily Web Search & Extraction):
 {sources_summary}
 
 RULES FOR SYNTHESIS:
@@ -520,7 +520,7 @@ def _build_grounded_fallback(idea, project_type, sources, today):
         citations = [
             {
                 "title": f"{idea[:30]} Landscape Overview",
-                "url": "https://brave.com/search",
+                "url": "https://tavily.com",
                 "retrieval_date": "Today",
                 "excerpt": "Aggregated market evidence comparing high-tier offerings with budget alternatives.",
                 "badge": "AI Hypothesis",

@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import MainDashboard from '../pages/MainDashboard.jsx'
+import LaunchIdea from '../pages/LaunchIdea.jsx'
 import MyProjects from '../pages/MyProjects.jsx'
 import TeamWorkspace from '../pages/TeamWorkspace.jsx'
 import TeamInvitationAccept from '../pages/TeamInvitationAccept.jsx'
@@ -17,6 +18,7 @@ import Glimpse from '../pages/Glimpse.jsx'
 export default function App() {
   return <Routes>
     <Route path="/" element={<MainDashboard />} />
+    <Route path="/launch" element={<LaunchIdea />} />
     <Route path="/login" element={<DeveloperProfile />} />
     <Route path="/profile" element={<DeveloperProfile />} />
     <Route path="/projects" element={<MyProjects />} />

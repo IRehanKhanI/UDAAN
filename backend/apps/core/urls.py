@@ -29,13 +29,22 @@ from .team_workspace import (TeamWorkspaceView, TeamMemberView, TeamTaskView, Ro
     TeamInvitationCollectionView, TeamInvitationManageView, PublicTeamInvitationView,
     TeamAllocationProposalView, TeamAllocationApprovalView)
 from .marketing_views import MarketingGenerateView, MarketingContentCollectionView, MarketingContentDetailView
-from apps.users.views import GitHubLoginStartView, GitHubLoginCallbackView, AuthStatusView, DeveloperProfileView, LogoutView, CsrfTokenView
+from apps.users.views import (
+    GitHubLoginStartView, GitHubLoginCallbackView, AuthStatusView, DeveloperProfileView,
+    LogoutView, CsrfTokenView, QuickLoginView, GitHubUsernameConnectView,
+    GitHubCreateRepoView, UserTechHistoryView, YouTubeLearningView,
+)
 
 urlpatterns = [
     path('auth/csrf/', CsrfTokenView.as_view(), name='csrf-token'),
     path('auth/status/', AuthStatusView.as_view(), name='auth-status'),
+    path('auth/quick-login/', QuickLoginView.as_view(), name='quick-login'),
     path('auth/github/start/', GitHubLoginStartView.as_view(), name='github-login-start'),
     path('auth/github/callback/', GitHubLoginCallbackView.as_view(), name='github-login-callback'),
+    path('auth/github/connect-username/', GitHubUsernameConnectView.as_view(), name='github-username-connect'),
+    path('auth/github/create-repo/', GitHubCreateRepoView.as_view(), name='github-create-repo'),
+    path('profile/tech-history/', UserTechHistoryView.as_view(), name='user-tech-history'),
+    path('learning/youtube/', YouTubeLearningView.as_view(), name='youtube-learning'),
     path('auth/logout/', LogoutView.as_view(), name='auth-logout'),
     path('profile/developer/', DeveloperProfileView.as_view(), name='developer-profile'),
     path('health/', health, name='health'),

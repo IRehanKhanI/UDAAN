@@ -45,7 +45,7 @@ from .gemini_service import (
 
 class IdeaAnalysisInputSerializer(serializers.Serializer):
     idea = serializers.CharField(max_length=4000, allow_blank=False, trim_whitespace=True)
-    project_type = serializers.ChoiceField(choices=['Startup', 'Hackathon', 'College Project', 'Personal Project'])
+    project_type = serializers.ChoiceField(choices=['Startup', 'Hackathon', 'College Project', 'Personal Project'], required=False, default='Startup')
     attachment_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     attachment_text = serializers.CharField(max_length=20000, required=False, allow_blank=True)
     project_name = serializers.CharField(max_length=160, required=False, allow_blank=True)
@@ -146,24 +146,25 @@ class IdeaWorkflowStageView(APIView):
             project_id = values.pop('project_id', None)
             if project_id:
                 drafts = authorized_project_drafts(request)
-                saved_project = get_object_or_404(drafts, pk=project_id)
-                supplied_details = values.pop('project_details', {})
-                saved_details = {'understanding': saved_project.understanding, **saved_project.workflow}
-                # Attachments are transient input material; saved project fields remain authoritative.
-                if supplied_details.get('attachment'):
-                    saved_details['attachment'] = supplied_details['attachment']
-                if saved_project.start_date:
-                    saved_details['start_date'] = saved_project.start_date.isoformat()
-                if saved_project.deadline:
-                    saved_details['deadline'] = saved_project.deadline.isoformat()
-                saved_details['team_size'] = saved_project.team_size
-                saved_details['weekly_hours'] = saved_project.weekly_hours
-                for key in ('start_date', 'deadline', 'team_size', 'weekly_hours', 'completed_task_ids'):
-                    if supplied_details.get(key) is not None:
-                        saved_details[key] = supplied_details[key]
-                values['idea'] = saved_project.idea
-                values['project_type'] = saved_project.project_type
-                values['project_details'] = saved_details
+                saved_project = drafts.filter(pk=project_id).first()
+                if saved_project:
+                    supplied_details = values.pop('project_details', {})
+                    saved_details = {'understanding': saved_project.understanding, **saved_project.workflow}
+                    # Attachments are transient input material; saved project fields remain authoritative.
+                    if supplied_details.get('attachment'):
+                        saved_details['attachment'] = supplied_details['attachment']
+                    if saved_project.start_date:
+                        saved_details['start_date'] = saved_project.start_date.isoformat()
+                    if saved_project.deadline:
+                        saved_details['deadline'] = saved_project.deadline.isoformat()
+                    saved_details['team_size'] = saved_project.team_size
+                    saved_details['weekly_hours'] = saved_project.weekly_hours
+                    for key in ('start_date', 'deadline', 'team_size', 'weekly_hours', 'completed_task_ids'):
+                        if supplied_details.get(key) is not None:
+                            saved_details[key] = supplied_details[key]
+                    values['idea'] = saved_project.idea
+                    values['project_type'] = saved_project.project_type
+                    values['project_details'] = saved_details
             result = generate_idea_stage(**values)
         except GeminiConfigurationError as error:
             return Response({'error': str(error)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -985,7 +986,7 @@ class ProjectReplanView(APIView):
 
 class ProjectLaunchInputSerializer(serializers.Serializer):
     idea = serializers.CharField(max_length=4000, allow_blank=False, trim_whitespace=True)
-    project_type = serializers.ChoiceField(choices=['Startup', 'Hackathon', 'College Project', 'Personal Project'])
+    project_type = serializers.ChoiceField(choices=['Startup', 'Hackathon', 'College Project', 'Personal Project'], required=False, default='Startup')
     attachment_name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     attachment_text = serializers.CharField(max_length=20000, required=False, allow_blank=True)
 

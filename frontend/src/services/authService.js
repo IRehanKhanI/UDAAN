@@ -7,6 +7,16 @@ export const updateDeveloperProfile = profile => apiRequest('/api/profile/develo
   method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(profile),
 })
 export const logoutAccount = () => apiRequest('/api/auth/logout/', { method: 'POST' })
+export const quickLogin = credentials => apiRequest('/api/auth/quick-login/', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(credentials),
+})
+export const connectGitHubUsername = username => apiRequest('/api/auth/github/connect-username/', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ username }),
+})
 export async function startGitHubLogin({ refresh = false, returnTo = '/profile', projectIds = [] } = {}) {
   const query = new URLSearchParams()
   if (refresh) query.set('refresh', '1')

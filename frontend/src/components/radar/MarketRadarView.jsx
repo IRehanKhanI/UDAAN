@@ -17,7 +17,7 @@ export default function MarketRadarView({
         <Sparkles size={28} className="mx-auto text-[#FFAAA6]" />
         <h3 className="text-base font-bold text-[#1D1B18]">Market Radar Gathering Intelligence</h3>
         <p className="text-xs text-[#534342] max-w-md mx-auto">
-          Market research is currently scanning live web evidence from Brave Search and Tavily for competitor pricing and customer pain points.
+          Market research is currently scanning live web evidence from Tavily AI Search for competitor pricing and customer pain points.
         </p>
       </div>
     )
@@ -39,7 +39,7 @@ export default function MarketRadarView({
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#8E4B49] animate-pulse"></span>
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#7A3C3A]">
-              Live Market Radar · Brave & Tavily Web Grounding
+              Live Market Radar · Tavily AI Web Grounding
             </span>
           </div>
           <h2 className="text-xl font-bold text-[#1D1B18]">Competitor Matrix & Customer Voice</h2>
