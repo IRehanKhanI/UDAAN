@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import {
   ArrowRight, Bolt, Check, ChevronDown, CircleCheck, GraduationCap,
-  Grid2X2, List, MoreHorizontal, Plus, Rocket, Search, Sparkles, Trash2
+  Grid2X2, List, MoreHorizontal, Plus, Rocket, Search, Settings, Sparkles, Trash2, Users
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
@@ -72,6 +72,14 @@ function ProjectCard({ project, menuOpen, deleting, onOptions, onDelete, onSelec
             </button>
             {menuOpen && (
               <div className="mp-project-menu" role="menu" aria-label={`${project.name} options`}>
+                <Link to={`/projects/${encodeURIComponent(project.id)}/settings`} role="menuitem" onClick={() => onSelect(project)}>
+                  <Settings size={14} />
+                  <span>Edit project & team</span>
+                </Link>
+                <Link to={`/team?project=${encodeURIComponent(project.id)}`} role="menuitem" onClick={() => onSelect(project)}>
+                  <Users size={14} />
+                  <span>Open Team Workspace</span>
+                </Link>
                 <button type="button" role="menuitem" onClick={() => onDelete(project)} disabled={deleting}>
                   <Trash2 size={14} />
                   <span>{deleting ? 'Deleting…' : 'Delete project'}</span>

@@ -15,12 +15,14 @@ import TestPilot from '../pages/TestPilot.jsx'
 import Verification from '../pages/Verification.jsx'
 import Glimpse from '../pages/Glimpse.jsx'
 import BusinessModel from '../pages/BusinessModel.jsx'
+import ProjectSettings from '../pages/ProjectSettings.jsx'
 
 export default function App() {
   return <Routes>
     <Route path="/" element={<MainDashboard />} />
     <Route path="/launch" element={<LaunchIdea />} />
     <Route path="/business-model" element={<BusinessModel />} />
+    <Route path="/projects/:projectId/settings" element={<ProjectSettings />} />
     <Route path="/login" element={<DeveloperProfile />} />
     <Route path="/profile" element={<DeveloperProfile />} />
     <Route path="/projects" element={<MyProjects />} />
