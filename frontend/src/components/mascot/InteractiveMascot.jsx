@@ -12,7 +12,6 @@ import { Sparkles, Heart, Lightbulb, Compass, Hammer, Users, Rocket } from 'luci
 const PHASE_CONFIGS = [
   {
     phase: 0,
-    title: 'Visionary Phase',
     name: 'Pillars & Purpose',
     icon: Lightbulb,
     badgeColor: '#FF6B6B',
@@ -26,7 +25,6 @@ const PHASE_CONFIGS = [
   },
   {
     phase: 1,
-    title: 'Detective Phase',
     name: 'Market Discovery',
     icon: Compass,
     badgeColor: '#F59E0B',
@@ -40,7 +38,6 @@ const PHASE_CONFIGS = [
   },
   {
     phase: 2,
-    title: 'Builder Phase',
     name: 'Tech Architecture',
     icon: Hammer,
     badgeColor: '#10B981',
@@ -54,7 +51,6 @@ const PHASE_CONFIGS = [
   },
   {
     phase: 3,
-    title: 'Coach Phase',
     name: 'Team & Schedule',
     icon: Users,
     badgeColor: '#8B5CF6',
@@ -68,7 +64,6 @@ const PHASE_CONFIGS = [
   },
   {
     phase: 4,
-    title: 'Aviator Phase',
     name: 'Flight Plan & Roadmap',
     icon: Rocket,
     badgeColor: '#EC4899',
@@ -145,13 +140,8 @@ export default function InteractiveMascot({ phase = 0, className = '' }) {
         style={{ borderColor: config.badgeColor }}
       >
         <div className="flex items-center gap-1.5 mb-1">
-          <span
-            className="w-2 h-2 rounded-full animate-ping"
-            style={{ backgroundColor: config.badgeColor }}
-          />
-          <span className="text-[10px] font-black uppercase tracking-wider text-[#1D1B18]">
-            UDAAN PAL · {config.name}
-          </span>
+
+          {config.name}
         </div>
         <p className="text-[11px] font-semibold text-[#3D3A37] leading-snug">
           "{currentTip}"
@@ -168,12 +158,14 @@ export default function InteractiveMascot({ phase = 0, className = '' }) {
       </div>
 
       {/* Floating hearts on click */}
-      {showHearts && (
-        <div className="absolute -top-6 flex items-center gap-1 animate-bounce pointer-events-none">
-          <Heart size={16} fill="#FF6B6B" className="text-[#FF6B6B]" />
-          <Sparkles size={14} className="text-[#FFD93D]" />
-        </div>
-      )}
+      {
+        showHearts && (
+          <div className="absolute -top-6 flex items-center gap-1 animate-bounce pointer-events-none">
+            <Heart size={16} fill="#FF6B6B" className="text-[#FF6B6B]" />
+            <Sparkles size={14} className="text-[#FFD93D]" />
+          </div>
+        )
+      }
 
       {/* Interactive Mascot SVG Character */}
       <div
@@ -181,7 +173,7 @@ export default function InteractiveMascot({ phase = 0, className = '' }) {
         className={`cursor-pointer transition-transform duration-300 ${isWaving ? 'scale-110' : 'hover:scale-105'}`}
         title="I am your UDAAN launch companion! Click me!"
       >
-        <svg width="130" height="130" viewBox="0 0 140 140" fill="none">
+        <svg className="w-[170px] h-[170px] sm:w-[220px] sm:h-[220px] md:w-[230px] md:h-[230px] max-w-full select-none" viewBox="0 0 140 140" fill="none">
           {/* Shadow */}
           <ellipse cx="70" cy="128" rx="36" ry="7" fill="#1D1B18" opacity="0.12" />
 
@@ -192,9 +184,9 @@ export default function InteractiveMascot({ phase = 0, className = '' }) {
               d="M32 80 C32 40, 108 40, 108 80 C108 115, 32 115, 32 80 Z"
               fill={
                 phase === 0 ? '#FF6B6B' :
-                phase === 1 ? '#3B1F5E' :
-                phase === 2 ? '#10B981' :
-                phase === 3 ? '#6366F1' : '#EC4899'
+                  phase === 1 ? '#3B1F5E' :
+                    phase === 2 ? '#10B981' :
+                      phase === 3 ? '#6366F1' : '#EC4899'
               }
             />
 
@@ -206,9 +198,9 @@ export default function InteractiveMascot({ phase = 0, className = '' }) {
               ry="22"
               fill={
                 phase === 0 ? '#FFE0DB' :
-                phase === 1 ? '#E8B4D0' :
-                phase === 2 ? '#D1FAE5' :
-                phase === 3 ? '#E0E7FF' : '#FCE7F3'
+                  phase === 1 ? '#E8B4D0' :
+                    phase === 2 ? '#D1FAE5' :
+                      phase === 3 ? '#E0E7FF' : '#FCE7F3'
               }
             />
 
@@ -221,9 +213,9 @@ export default function InteractiveMascot({ phase = 0, className = '' }) {
                 ry="13"
                 fill={
                   phase === 0 ? '#E05353' :
-                  phase === 1 ? '#2E154A' :
-                  phase === 2 ? '#059669' :
-                  phase === 3 ? '#4F46E5' : '#DB2777'
+                    phase === 1 ? '#2E154A' :
+                      phase === 2 ? '#059669' :
+                        phase === 3 ? '#4F46E5' : '#DB2777'
                 }
                 transform="rotate(-15 26 78)"
               />
@@ -238,9 +230,9 @@ export default function InteractiveMascot({ phase = 0, className = '' }) {
                 ry="13"
                 fill={
                   phase === 0 ? '#E05353' :
-                  phase === 1 ? '#2E154A' :
-                  phase === 2 ? '#059669' :
-                  phase === 3 ? '#4F46E5' : '#DB2777'
+                    phase === 1 ? '#2E154A' :
+                      phase === 2 ? '#059669' :
+                        phase === 3 ? '#4F46E5' : '#DB2777'
                 }
                 transform="rotate(15 114 78)"
               />
@@ -357,16 +349,8 @@ export default function InteractiveMascot({ phase = 0, className = '' }) {
       </div>
 
       {/* Mood tag badge */}
-      <span
-        className="mt-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border shadow-xs"
-        style={{
-          color: config.badgeColor,
-          backgroundColor: config.bgColor,
-          borderColor: config.badgeColor,
-        }}
-      >
-        {config.title}
-      </span>
-    </div>
+
+
+    </div >
   )
 }

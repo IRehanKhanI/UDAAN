@@ -1737,3 +1737,78 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
+@media (max-width: 1024px) {
+  .fp-roadmap-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .fp-content {
+    width: calc(100% - 24px);
+    padding: 16px 0 48px;
+  }
+  .fp-heading,
+  .fp-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .fp-hero h1,
+  .fp-empty h1 {
+    font-size: 26px;
+  }
+  .fp-project-switch {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .fp-project-select {
+    width: 100%;
+  }
+  .fp-overview {
+    padding: 14px;
+    border-radius: 12px;
+  }
+  .fp-overview-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .fp-view-toggle {
+    width: 100%;
+    overflow-x: auto;
+  }
+  .fp-replan-button,
+  .fp-edit-roadmap {
+    width: 100%;
+    justify-content: center;
+  }
+  .fp-roadmap::before {
+    left: 20px;
+    transform: none;
+  }
+  .fp-milestone-node {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-left: 48px;
+    min-height: auto;
+    margin-bottom: 16px;
+  }
+  .fp-marker {
+    position: absolute;
+    left: 2px;
+    top: 14px;
+  }
+  .fp-milestone-node.left .fp-milestone-card,
+  .fp-milestone-node.right .fp-milestone-card {
+    grid-column: auto;
+    width: 100%;
+  }
+  .fp-node-connector {
+    display: none;
+  }
+}
+

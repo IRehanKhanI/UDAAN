@@ -73,60 +73,57 @@ export default function LaunchIdea() {
   }
 
   return (
-    <div className="h-screen bg-[#FFF8F3] font-['Plus_Jakarta_Sans'] flex flex-col overflow-hidden">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[#FFF8F3] font-['Plus_Jakarta_Sans'] flex flex-col">
 
       {/* ── Top Header ────────────────────────────────────────────── */}
-      <header className="shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-[#EFEAE4] bg-white z-10">
+      <header className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-[#EFEAE4] bg-white z-10">
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-sm font-bold text-[#534342] hover:text-[#1D1B18] transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#534342] hover:text-[#1D1B18] transition-colors cursor-pointer"
         >
           <ArrowLeft size={15} />
-          Back to Dashboard
+          <span>Dashboard</span>
         </button>
-        <span className="flex items-center gap-2 text-sm font-black text-[#1D1B18]">
+        <span className="flex items-center gap-2 text-xs sm:text-sm font-black text-[#1D1B18]">
           <span className="w-7 h-7 rounded-xl bg-[#FFAAA6] flex items-center justify-center shadow-xs">
             <Sparkles size={14} className="text-[#7A3C3A]" />
           </span>
           Launch New Idea
         </span>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-[#7C766F] bg-[#FAF8F5] px-2.5 py-1 rounded-full border border-[#EFEAE4] hidden sm:inline-block">
+          <span className="text-[11px] font-bold text-[#7C766F] bg-[#FAF8F5] px-2.5 py-1 rounded-full border border-[#EFEAE4]">
             Phase 0: Vision
           </span>
         </div>
       </header>
 
       {/* ── Main Body: Left Big Mascot + Right Shifted Studio Form ──── */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden relative">
 
         {/* LEFT: Big Mascot Companion Stage ────────────────────────── */}
-        <div className="w-full lg:w-[44%] shrink-0 flex flex-col items-center justify-center p-6 lg:p-10 bg-gradient-to-br from-[#FFF8F3] via-[#FFF2EE]/70 to-[#FFE9E4]/40 border-b lg:border-b-0 lg:border-r border-[#EFEAE4] relative overflow-hidden select-none">
+        <div className="w-full lg:w-[44%] shrink-0 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-10 bg-gradient-to-br from-[#FFF8F3] via-[#FFF2EE]/70 to-[#FFE9E4]/40 border-b lg:border-b-0 lg:border-r border-[#EFEAE4] relative overflow-hidden select-none">
           {/* Subtle Background Glows */}
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-[#FFAAA6]/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-10 left-10 w-48 h-48 bg-[#FDE68A]/25 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-80 h-72 sm:h-80 bg-[#FFAAA6]/20 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-10 left-10 w-44 sm:w-48 h-44 sm:h-48 bg-[#FDE68A]/25 rounded-full blur-2xl pointer-events-none" />
 
           {/* Big Interactive Mascot */}
-          <div className="relative z-10 flex flex-col items-center justify-center transform scale-110 sm:scale-125 lg:scale-135 py-4 transition-transform duration-300">
+          <div className="relative z-10 flex flex-col items-center justify-center transform scale-95 sm:scale-110 lg:scale-135 py-2 sm:py-4 transition-transform duration-300">
             <InteractiveMascot phase={0} />
           </div>
 
           {/* Companion Info Strip */}
-          <div className="mt-8 relative z-10 text-center max-w-sm space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 border border-[#EFEAE4] shadow-xs text-xs font-bold text-[#1D1B18]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Pilot Companion Ready</span>
-            </div>
-            <p className="text-xs text-[#6D6560] leading-relaxed">
-              Move your mouse to look around, or click my head for friendly founder quotes! I'll guide you through your roadmap step by step.
-            </p>
+          <div className="mt-4 sm:mt-6 relative z-10 text-center max-w-sm space-y-1">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/80 border border-[#EFEAE4] shadow-xs text-xs font-bold text-[#1D1B18]">
+              <span className="w-2 h-2 rounded-full bg-[#8E4B49]" />
+              Phase 0 · Dream & Vision
+            </span>
           </div>
         </div>
 
         {/* RIGHT: Shifted against right wall ───────────────────────── */}
-        <div className="flex-1 flex flex-col justify-center items-end px-5 sm:px-8 lg:px-12 py-6 overflow-y-auto">
-          <div className="w-full max-w-xl mr-0 space-y-4 bg-white rounded-3xl p-6 sm:p-8 border border-[#EFEAE4] shadow-sm">
+        <div className="flex-1 flex flex-col justify-start lg:justify-center items-center lg:items-end px-4 sm:px-8 lg:px-12 py-5 sm:py-6 overflow-y-auto">
+          <div className="w-full max-w-xl mr-0 space-y-4 bg-white rounded-3xl p-5 sm:p-8 border border-[#EFEAE4] shadow-sm">
 
             {/* Heading & Subtitle */}
             <div className="space-y-1">
@@ -140,23 +137,7 @@ export default function LaunchIdea() {
             </div>
 
             {/* Quick Ideas Presets */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">
-                Quick Inspiration (Click to fill)
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_IDEAS.map((item, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => { setIdea(item.text); setError('') }}
-                    className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342] hover:border-[#1D1B18] hover:text-[#1D1B18] hover:bg-white transition-all cursor-pointer"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+
 
             {/* Form */}
             <form onSubmit={launch} noValidate className="space-y-4 pt-1">
@@ -164,7 +145,7 @@ export default function LaunchIdea() {
                 <label htmlFor="launch-idea-input" className="sr-only">Describe your idea</label>
                 <textarea
                   id="launch-idea-input"
-                  rows={4}
+                  rows={7}
                   value={idea}
                   onChange={e => { setIdea(e.target.value); setError('') }}
                   placeholder="e.g. I want to build a platform where freelancers can post their work and get hired by clients directly with milestone escrow..."
@@ -182,11 +163,10 @@ export default function LaunchIdea() {
                       key={label}
                       type="button"
                       onClick={() => setIntent(label)}
-                      className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                        intent === label
-                          ? 'bg-[#1D1B18] border-[#1D1B18] text-white shadow-xs'
-                          : 'bg-white border-[#EFEAE4] text-[#534342] hover:bg-[#FAF8F5]'
-                      }`}
+                      className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${intent === label
+                        ? 'bg-[#1D1B18] border-[#1D1B18] text-white shadow-xs'
+                        : 'bg-white border-[#EFEAE4] text-[#534342] hover:bg-[#FAF8F5]'
+                        }`}
                     >
                       <Icon size={13} className={intent === label ? 'text-[#FFAAA6]' : 'text-[#7C766F]'} />
                       <span>{label}</span>
@@ -196,7 +176,7 @@ export default function LaunchIdea() {
               </div>
 
               {/* Attach File + Launch Button */}
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-[#EFEAE4]">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-[#EFEAE4]">
                 <div>
                   <input
                     ref={fileInput}
@@ -215,7 +195,7 @@ export default function LaunchIdea() {
                     <button
                       type="button"
                       onClick={() => fileInput.current?.click()}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#FAF8F5] hover:bg-[#F3EDE7] border border-[#EFEAE4] text-xs text-[#534342] font-semibold transition-colors cursor-pointer"
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#FAF8F5] hover:bg-[#F3EDE7] border border-[#EFEAE4] text-xs text-[#534342] font-semibold transition-colors cursor-pointer w-full sm:w-auto"
                     >
                       <Paperclip size={13} className="text-[#8E4B49]" />
                       Attach Brief (.md / .txt)
@@ -226,7 +206,7 @@ export default function LaunchIdea() {
 
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-[#8E4B49] hover:bg-[#723B39] text-white text-sm font-black transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shrink-0"
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl bg-[#8E4B49] hover:bg-[#723B39] text-white text-sm font-black transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shrink-0"
                 >
                   <span>Start Launch</span>
                   <Sparkles size={14} className="text-[#FBE191]" />

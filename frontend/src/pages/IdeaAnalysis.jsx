@@ -489,25 +489,31 @@ export default function IdeaAnalysis() {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans']">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans']">
 
       {/* Top bar */}
-      <header className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-[#EFEAE4] flex items-center justify-between px-5 py-3 shrink-0">
-        <Link to="/" className="flex items-center gap-1.5 text-sm font-bold text-[#534342] hover:text-[#1D1B18] transition-colors no-underline">
-          <ArrowLeft size={15} /> Back
+      <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-[#EFEAE4] flex items-center justify-between px-4 sm:px-6 py-3 shrink-0">
+        <Link to="/" className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#534342] hover:text-[#1D1B18] transition-colors no-underline">
+          <ArrowLeft size={15} /> <span>Back</span>
         </Link>
 
         {draft && (
-          <nav className="hidden sm:flex items-center gap-1">
+          <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 max-w-[65vw] sm:max-w-none">
             {stages.map((s, i) => {
               const Icon = s.icon
               const done = i < step; const active = i === step
               return (
                 <button key={s.key} type="button" onClick={() => goToStage(i)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${active ? 'bg-[#FFAAA6]/30 text-[#7A3C3A] border border-[#FFAAA6]' : done ? 'bg-[#F0FAF8] text-[#2A9D8F] border border-[#9FD8CB]' : 'text-[#7C766F] hover:text-[#1D1B18] border border-transparent'}`}
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    active
+                      ? 'bg-[#FFAAA6]/30 text-[#7A3C3A] border border-[#FFAAA6]'
+                      : done
+                      ? 'bg-[#F0FAF8] text-[#2A9D8F] border border-[#9FD8CB]'
+                      : 'text-[#7C766F] hover:text-[#1D1B18] border border-transparent'
+                  }`}
                 >
                   {done ? <CheckCircle2 size={13} className="text-[#2A9D8F]" /> : <Icon size={13} />}
-                  <span className="hidden md:inline">{s.title}</span>
+                  <span className="hidden sm:inline">{s.title}</span>
                   {active && <span className="w-1.5 h-1.5 rounded-full bg-[#E76F51] ml-0.5" />}
                 </button>
               )
@@ -515,10 +521,12 @@ export default function IdeaAnalysis() {
           </nav>
         )}
 
-        <div className="flex items-center gap-2">
-          {draft && <span className="text-xs font-bold text-[#9B9590] hidden sm:block">{step + 1} / {stages.length}</span>}
-          <span className="flex items-center gap-1.5 text-sm font-black text-[#1D1B18]">
-            <span className="w-6 h-6 rounded-lg bg-[#FFAAA6] flex items-center justify-center"><Sparkles size={13} className="text-[#7A3C3A]" /></span>
+        <div className="flex items-center gap-2 shrink-0">
+          {draft && <span className="text-[11px] sm:text-xs font-bold text-[#9B9590]">{step + 1} / {stages.length}</span>}
+          <span className="flex items-center gap-1.5 text-xs sm:text-sm font-black text-[#1D1B18]">
+            <span className="w-6 h-6 rounded-lg bg-[#FFAAA6] flex items-center justify-center shadow-xs">
+              <Sparkles size={13} className="text-[#7A3C3A]" />
+            </span>
             <span className="hidden sm:inline">Launchpad</span>
           </span>
         </div>
@@ -536,7 +544,32 @@ export default function IdeaAnalysis() {
           </div>
         </main>
       ) : (
-        <main className="flex-1 w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
+        /* ── Main Body: Left Big Mascot (Bird) + Right Stage Content (Rest things) ──── */
+        <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden relative">
+
+          {/* LEFT: Big Mascot Companion Stage ("Bird") */}
+          <div className="w-full lg:w-[40%] xl:w-[36%] shrink-0 flex flex-col items-center justify-center p-5 sm:p-7 lg:p-10 bg-gradient-to-br from-[#FFF8F3] via-[#FFF2EE]/70 to-[#FFE9E4]/40 border-b lg:border-b-0 lg:border-r border-[#EFEAE4] relative overflow-hidden select-none">
+            {/* Subtle Ambient Background Glows */}
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-80 h-72 sm:h-80 bg-[#FFAAA6]/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-10 left-10 w-44 sm:w-52 h-44 sm:h-52 bg-[#FDE68A]/25 rounded-full blur-2xl pointer-events-none" />
+
+            {/* Big Interactive Mascot */}
+            <div className="relative z-10 flex flex-col items-center justify-center transform scale-95 sm:scale-105 lg:scale-120 xl:scale-130 py-2 sm:py-4 transition-transform duration-300">
+              <InteractiveMascot phase={step} />
+            </div>
+
+            {/* Companion Stage Pill */}
+            <div className="mt-4 sm:mt-6 relative z-10 text-center max-w-xs space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 border border-[#EFEAE4] shadow-xs text-xs font-bold text-[#1D1B18]">
+                <span className="w-2 h-2 rounded-full bg-[#8E4B49]" />
+                <span>Step {step + 1} of {stages.length} · {stages[step]?.title}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: Active Stage Content & Actions ("Rest things") */}
+          <main className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-10 xl:px-12 py-6 space-y-6 flex flex-col justify-between">
+            <div className="space-y-6">
 
           {/* Progress bar */}
           <div className="h-1.5 bg-[#EFEAE4] rounded-full overflow-hidden">
@@ -1251,41 +1284,39 @@ export default function IdeaAnalysis() {
             </div>
           )}
 
-          {/* Navigation */}
-          <div className="flex items-center justify-between gap-3 pt-2 pb-6 border-t border-[#EFEAE4]">
-            <button type="button" onClick={() => { persist(); navigate('/') }}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-[#EFEAE4] text-xs font-bold text-[#534342] hover:bg-[#F7F4F0] transition-colors">
-              <Save size={13} /> Save & Exit
-            </button>
-            <div className="flex items-center gap-2">
-              {step > 0 && (
-                <button type="button" onClick={() => goToStage(step - 1)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-[#EFEAE4] text-xs font-bold hover:bg-[#F7F4F0] transition-colors">
-                  <ArrowLeft size={13} /> Back
-                </button>
-              )}
-              {step < 4 ? (
-                <button type="button" onClick={() => goToStage(step + 1)}
-                  className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-all shadow hover:shadow-md hover:-translate-y-0.5">
-                  Continue <ArrowRight size={13} />
-                </button>
-              ) : (
-                <button type="button" onClick={createProject} disabled={loading}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#8E4B49] text-white text-xs font-black hover:bg-[#7A3C3A] transition-all shadow-md disabled:opacity-60">
-                  {loading ? <MiniLoader color="#fff" /> : <Rocket size={14} />}
-                  Launch Project
-                </button>
-              )}
             </div>
-          </div>
 
-        </main>
+            {/* Navigation */}
+            <div className="flex items-center justify-between gap-3 pt-4 pb-3 border-t border-[#EFEAE4]">
+              <button type="button" onClick={() => { persist(); navigate('/') }}
+                className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl bg-white border border-[#EFEAE4] text-xs font-bold text-[#534342] hover:bg-[#F7F4F0] transition-colors cursor-pointer">
+                <Save size={13} /> <span className="hidden xs:inline">Save &</span> Exit
+              </button>
+              <div className="flex items-center gap-2">
+                {step > 0 && (
+                  <button type="button" onClick={() => goToStage(step - 1)}
+                    className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl bg-white border border-[#EFEAE4] text-xs font-bold hover:bg-[#F7F4F0] transition-colors cursor-pointer">
+                    <ArrowLeft size={13} /> Back
+                  </button>
+                )}
+                {step < 4 ? (
+                  <button type="button" onClick={() => goToStage(step + 1)}
+                    className="flex items-center gap-1.5 px-5 sm:px-6 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-all shadow hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
+                    Continue <ArrowRight size={13} />
+                  </button>
+                ) : (
+                  <button type="button" onClick={createProject} disabled={loading}
+                    className="flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-[#8E4B49] text-white text-xs font-black hover:bg-[#7A3C3A] transition-all shadow-md disabled:opacity-60 cursor-pointer">
+                    {loading ? <MiniLoader color="#fff" /> : <Rocket size={14} />}
+                    Launch Project
+                  </button>
+                )}
+              </div>
+            </div>
+
+          </main>
+        </div>
       )}
-
-      {/* Interactive Cursor Companion Mascot (Duolingo style) */}
-      <div className="hidden xl:block fixed right-8 bottom-8 z-30 pointer-events-auto">
-        <InteractiveMascot phase={step} />
-      </div>
     </div>
   )
 }
