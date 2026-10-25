@@ -834,10 +834,38 @@ export default function IdeaAnalysis() {
                 {['AI fills this in from your idea — just review & tweak.', 'Real competitor data from the live web.', 'Pick your tech stack and set up your repo.', 'Who builds it and when does it ship?', 'Your milestone roadmap, ready to execute.'][step]}
               </p>
             </div>
-            {/* Idea chip */}
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] max-w-[200px] shrink-0">
-              <Lightbulb size={13} className="text-[#8E4B49] shrink-0" />
-              <span className="text-[11px] font-semibold text-[#534342] truncate">{draft.idea?.slice(0, 50)}</span>
+            {/* Top Right: AI Domain Pick Dropdown & Idea chip */}
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="relative flex items-center">
+                <select
+                  value={domain}
+                  onChange={(e) => {
+                    const nextDomain = e.target.value
+                    setDomain(nextDomain)
+                    try {
+                      const updated = { ...(draft || {}), domain: nextDomain }
+                      setDraft(updated)
+                      localStorage.setItem('udaan:idea-draft', JSON.stringify(updated))
+                    } catch {}
+                  }}
+                  className="appearance-none cursor-pointer pl-3 pr-7 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] text-xs font-bold shadow-xs hover:border-[#D1D5DB] transition focus:outline-none"
+                  style={{
+                    color: domain === 'hardware' ? '#059669' : domain === 'hybrid' ? '#D97706' : '#2563EB',
+                  }}
+                  title="Project Type (AI Pick) · Click to change domain"
+                >
+                  <option value="software">💻 Software {domain === 'software' ? '· AI Pick' : ''}</option>
+                  <option value="hardware">📟 Hardware {domain === 'hardware' ? '· AI Pick' : ''}</option>
+                  <option value="hybrid">⚡ Software + Hardware {domain === 'hybrid' ? '· AI Pick' : ''}</option>
+                </select>
+                <ChevronDown size={13} className="absolute right-2.5 pointer-events-none text-[#7C766F]" />
+              </div>
+
+              {/* Idea chip */}
+              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] max-w-[200px] shrink-0">
+                <Lightbulb size={13} className="text-[#8E4B49] shrink-0" />
+                <span className="text-[11px] font-semibold text-[#534342] truncate">{draft.idea?.slice(0, 50)}</span>
+              </div>
             </div>
           </div>
 

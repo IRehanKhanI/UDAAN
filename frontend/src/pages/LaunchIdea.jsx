@@ -210,44 +210,6 @@ export default function LaunchIdea() {
                 </div>
               </div>
 
-              {/* AI Domain Detection */}
-              <div className="space-y-2 p-3 rounded-2xl border border-[#EFEAE4] bg-[#FAFAF9]">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-black text-[#7C766F] uppercase tracking-wider flex items-center gap-1.5">
-                    {domainClassifying
-                      ? <><Loader2 size={11} className="animate-spin" /> AI Detecting type…</>
-                      : <><Sparkles size={11} className="text-[#8E4B49]" /> AI Project Type</>
-                    }
-                  </span>
-                  {domainReasoning && (
-                    <span className="text-[10px] text-[#7C766F] italic truncate max-w-[180px]">{domainReasoning}</span>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {DOMAIN_OPTIONS.map(opt => (
-                    <button key={opt.key} type="button"
-                      onClick={() => { setDomain(opt.key); setUserOverrodeDomain(true) }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all cursor-pointer"
-                      style={domain === opt.key
-                        ? { background: opt.bg, borderColor: opt.color, color: opt.color }
-                        : { background: 'white', borderColor: '#EFEAE4', color: '#534342' }
-                      }
-                    >
-                      <span style={{ color: domain === opt.key ? opt.color : '#9CA3AF' }}>{opt.icon}</span>
-                      <span>{opt.label}</span>
-                      {domain === opt.key && !domainClassifying && (
-                        <span className="text-[9px] font-black uppercase ml-0.5 opacity-70">
-                          {userOverrodeDomain ? 'Manual' : 'AI Pick'}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[10px] text-[#9CA3AF]">
-                  {DOMAIN_OPTIONS.find(o => o.key === domain)?.desc} — AI detects automatically, you can override.
-                </p>
-              </div>
-
               {/* Attach File + Launch Button */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-[#EFEAE4]">
                 <div>

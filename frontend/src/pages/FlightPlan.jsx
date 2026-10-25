@@ -49,6 +49,9 @@ import {
   Package,
   Search,
   Target,
+  Bird,
+  Flame,
+  Rocket,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { MiniLoader } from '../components/UdaanLoader.jsx'
@@ -2814,51 +2817,43 @@ function formatIndianCurrencyText(text) {
 }
 
 function FlyingBirdMascot() {
+  const [mascotStyle, setMascotStyle] = useState('rocket') // 'rocket' | 'bird'
+
   return (
     <div className="fp-v2-hero-mascot select-none">
       <div className="fp-v2-speech-bubble">
         Turning ideas into real things!
       </div>
-      <svg width="140" height="140" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
-        {/* Jetpack Smoke Puffs */}
-        <circle cx="50" cy="130" r="14" fill="#E0E7FF" opacity="0.6" />
-        <circle cx="42" cy="142" r="10" fill="#DDD6FE" opacity="0.5" />
-        <circle cx="60" cy="140" r="8" fill="#FDE68A" opacity="0.7" />
-
-        {/* Rocket Flames */}
-        <path d="M58 116 L50 134 L66 128 Z" fill="#EF4444" />
-        <path d="M60 118 L55 130 L64 126 Z" fill="#F59E0B" />
-
-        {/* Jetpack Body */}
-        <rect x="52" y="80" width="18" height="34" rx="7" fill="#6B7280" stroke="#374151" strokeWidth="2" />
-        <rect x="56" y="84" width="10" height="8" rx="2" fill="#9CA3AF" />
-
-        {/* Bird Body (Round Warm Yellow) */}
-        <circle cx="95" cy="88" r="38" fill="#FBBF24" stroke="#D97706" strokeWidth="2.5" />
-        <ellipse cx="102" cy="98" rx="22" ry="20" fill="#FEF3C7" />
-
-        {/* Aviator Helmet */}
-        <path d="M63 80 C63 56 78 40 100 40 C122 40 135 56 135 80 C135 84 133 86 130 86 C124 74 116 70 98 70 C80 70 72 74 66 86 C64 86 63 84 63 80 Z" fill="#0D9488" stroke="#042F2E" strokeWidth="2" />
-        <path d="M63 76 L134 76" stroke="#475569" strokeWidth="4" strokeLinecap="round" />
-        <circle cx="86" cy="74" r="13" fill="#67E8F9" stroke="#0F172A" strokeWidth="3" />
-        <circle cx="112" cy="74" r="13" fill="#67E8F9" stroke="#0F172A" strokeWidth="3" />
-        <path d="M81 70 L91 78" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" />
-        <path d="M107 70 L117 78" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" />
-
-        {/* Beak */}
-        <path d="M124 88 L142 93 L124 99 Z" fill="#F97316" stroke="#C2410C" strokeWidth="1.5" />
-
-        {/* Cheeks */}
-        <circle cx="86" cy="98" r="6" fill="#F43F5E" opacity="0.35" />
-        <circle cx="114" cy="100" r="6" fill="#F43F5E" opacity="0.35" />
-
-        {/* Wing flapping */}
-        <path d="M72 88 C66 96 66 108 78 110 C86 112 92 104 90 94 Z" fill="#F59E0B" stroke="#D97706" strokeWidth="2" />
-
-        {/* Flying Stars */}
-        <path d="M136 48 L138 42 L140 48 L146 50 L140 52 L138 58 L136 52 L130 50 Z" fill="#F59E0B" />
-        <path d="M36 68 L37 64 L39 68 L43 69 L39 71 L37 75 L36 71 L32 69 Z" fill="#F59E0B" opacity="0.8" />
-      </svg>
+      <div
+        className="fp-v2-mascot-container cursor-pointer"
+        onClick={() => setMascotStyle((prev) => (prev === 'rocket' ? 'bird' : 'rocket'))}
+        title="UDAAN Mascot · Click to toggle Rocket/Bird"
+      >
+        <div className="fp-v2-mascot-glow" />
+        <div className="fp-v2-mascot-badge">
+          {mascotStyle === 'rocket' ? (
+            <div className="relative flex items-center justify-center">
+              <Rocket
+                size={48}
+                className="fp-v2-mascot-rocket-icon text-[#D97706] drop-shadow-md transform -rotate-12 hover:rotate-0 transition-transform duration-300"
+              />
+              <Flame
+                size={22}
+                className="fp-v2-mascot-flame-icon text-[#EF4444] absolute -bottom-2.5 -left-2 animate-pulse"
+              />
+            </div>
+          ) : (
+            <div className="relative flex items-center justify-center">
+              <Bird
+                size={48}
+                className="fp-v2-mascot-bird-icon text-[#0D9488] drop-shadow-md hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          )}
+        </div>
+        <Sparkles size={20} className="fp-v2-sparkle-1 text-[#F59E0B] absolute -top-1 -right-1" />
+        <Sparkles size={16} className="fp-v2-sparkle-2 text-[#8B5CF6] absolute bottom-1 -left-1" />
+      </div>
     </div>
   )
 }
@@ -3080,14 +3075,120 @@ function FlightPlanFlowMap({
   onSelectMilestone,
 }) {
   const [searchNodeQuery, setSearchNodeQuery] = useState('')
+  const [activeFilterColor, setActiveFilterColor] = useState(null)
+  const [zoomLevel, setZoomLevel] = useState(1)
+
+  const trackRef = useRef(null)
+  const startNodeRef = useRef(null)
+  const launchNodeRef = useRef(null)
+  const cardRefs = useRef({})
+  const [pathData, setPathData] = useState({ path: '', nodes: [] })
 
   const filteredMilestones = useMemo(() => {
-    return milestones.map((m, idx) => ({ ...m, originalIndex: idx })).filter(m => {
-      if (!searchNodeQuery.trim()) return true
-      const q = searchNodeQuery.toLowerCase()
-      return m.title.toLowerCase().includes(q) || (m.purpose && m.purpose.toLowerCase().includes(q))
-    })
-  }, [milestones, searchNodeQuery])
+    return milestones
+      .map((m, idx) => ({ ...m, originalIndex: idx }))
+      .filter((m) => {
+        const theme = MILESTONE_THEMES[m.originalIndex % MILESTONE_THEMES.length]
+        if (activeFilterColor && theme.numBg.toLowerCase() !== activeFilterColor.toLowerCase()) {
+          return false
+        }
+        if (!searchNodeQuery.trim()) return true
+        const q = searchNodeQuery.toLowerCase()
+        return (
+          m.title.toLowerCase().includes(q) ||
+          (m.purpose && m.purpose.toLowerCase().includes(q)) ||
+          (m.category && m.category.toLowerCase().includes(q))
+        )
+      })
+  }, [milestones, searchNodeQuery, activeFilterColor])
+
+  // Dynamically compute the serpentine S-curve path connecting Start -> alternating milestones -> Launch Ready
+  useEffect(() => {
+    const updatePath = () => {
+      if (!trackRef.current) return
+      const trackRect = trackRef.current.getBoundingClientRect()
+      if (trackRect.width === 0 || trackRect.height === 0) return
+
+      const points = []
+
+      // 1. Start Node Anchor
+      if (startNodeRef.current) {
+        const rect = startNodeRef.current.getBoundingClientRect()
+        points.push({
+          x: rect.left + rect.width / 2 - trackRect.left,
+          y: rect.bottom - trackRect.top,
+          type: 'start',
+        })
+      }
+
+      // 2. Alternating Milestones Anchors (Inner edges facing the center)
+      filteredMilestones.forEach((m, idx) => {
+        const cardEl = cardRefs.current[m.originalIndex]
+        if (!cardEl) return
+        const rect = cardEl.getBoundingClientRect()
+        const isLeft = idx % 2 === 0
+        const x = isLeft
+          ? rect.right - trackRect.left
+          : rect.left - trackRect.left
+        const y = rect.top + rect.height / 2 - trackRect.top
+
+        points.push({
+          x,
+          y,
+          isLeft,
+          index: m.originalIndex,
+          milestoneIndex: idx,
+          theme: MILESTONE_THEMES[m.originalIndex % MILESTONE_THEMES.length],
+          type: 'milestone',
+          isSelected: activeMilestoneIndex === m.originalIndex,
+        })
+      })
+
+      // 3. Launch Node Anchor
+      if (launchNodeRef.current) {
+        const rect = launchNodeRef.current.getBoundingClientRect()
+        points.push({
+          x: rect.left + rect.width / 2 - trackRect.left,
+          y: rect.top - trackRect.top,
+          type: 'launch',
+        })
+      }
+
+      if (points.length < 2) {
+        setPathData({ path: '', nodes: [] })
+        return
+      }
+
+      // Build smooth cubic bezier curve
+      let d = `M ${points[0].x} ${points[0].y}`
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i]
+        const p2 = points[i + 1]
+        const midX = (p1.x + p2.x) / 2
+        d += ` C ${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`
+      }
+
+      setPathData({
+        path: d,
+        nodes: points.filter((p) => p.type === 'milestone'),
+      })
+    }
+
+    updatePath()
+    const timer = setTimeout(updatePath, 50)
+    const timer2 = setTimeout(updatePath, 200)
+
+    const ro = new ResizeObserver(updatePath)
+    if (trackRef.current) ro.observe(trackRef.current)
+    window.addEventListener('resize', updatePath)
+
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(timer2)
+      ro.disconnect()
+      window.removeEventListener('resize', updatePath)
+    }
+  }, [filteredMilestones, zoomLevel, activeMilestoneIndex])
 
   return (
     <div className="fp-v2-flow-canvas">
@@ -3110,99 +3211,246 @@ function FlightPlanFlowMap({
           </div>
 
           <div className="fp-v2-filter-dots">
-            {['#EF4444', '#10B981', '#3B82F6', '#8B5CF6'].map((dotColor) => (
+            {['#F59E0B', '#8B5CF6', '#10B981', '#F87171', '#6366F1'].map((dotColor) => (
               <span
                 key={dotColor}
-                className="fp-v2-dot"
+                className={`fp-v2-dot ${activeFilterColor === dotColor ? 'active' : ''}`}
                 style={{ backgroundColor: dotColor }}
-                title="Filter color"
+                title="Filter by milestone color"
+                onClick={() => setActiveFilterColor((prev) => (prev === dotColor ? null : dotColor))}
               />
             ))}
             <span className="text-[10px] text-[#9CA3AF] ml-0.5">›</span>
           </div>
 
           <div className="fp-v2-zoom-btns">
-            <button type="button" className="fp-v2-zoom-btn" title="Zoom In">+</button>
-            <button type="button" className="fp-v2-zoom-btn" title="Zoom Out">−</button>
-            <button type="button" className="fp-v2-zoom-btn" title="Fit to Screen">⛶</button>
+            <button
+              type="button"
+              className="fp-v2-zoom-btn"
+              title="Zoom In"
+              onClick={() => setZoomLevel((z) => Math.min(1.25, +(z + 0.1).toFixed(2)))}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="fp-v2-zoom-btn"
+              title="Zoom Out"
+              onClick={() => setZoomLevel((z) => Math.max(0.85, +(z - 0.1).toFixed(2)))}
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className="fp-v2-zoom-btn"
+              title="Fit to Screen"
+              onClick={() => setZoomLevel(1)}
+            >
+              ⛶
+            </button>
           </div>
         </div>
       </div>
 
       {/* Nodes Canvas with Curved Winding Path */}
-      <div className="fp-v2-nodes-wrapper">
-        {/* Start Node */}
-        <div className="fp-v2-start-node">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#22C55E] animate-pulse" />
-          <Target size={13} />
-          <span>Start</span>
-        </div>
+      <div
+        className="fp-v2-serpentine-canvas"
+        style={{
+          transform: `scale(${zoomLevel})`,
+          transformOrigin: 'top center',
+          transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        <div ref={trackRef} className="fp-v2-serpentine-track">
+          {/* Continuous Winding SVG Serpentine Path */}
+          <svg className="fp-v2-serpentine-svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="serpentineFlowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#22C55E" />
+                <stop offset="25%" stopColor="#F59E0B" />
+                <stop offset="50%" stopColor="#8B5CF6" />
+                <stop offset="75%" stopColor="#10B981" />
+                <stop offset="100%" stopColor="#6366F1" />
+              </linearGradient>
+            </defs>
 
-        {/* Milestone Cards */}
-        {filteredMilestones.map((milestone) => {
-          const mIdx = milestone.originalIndex
-          const theme = MILESTONE_THEMES[mIdx % MILESTONE_THEMES.length]
-          const mTasks = allTasks.filter(t => t.milestoneIndex === mIdx)
-          const mDone = mTasks.filter(t => completed.includes(t.id)).length
-          const isDone = mTasks.length > 0 && mDone === mTasks.length
-          const isInProgress = mDone > 0 && !isDone
-          const isSelected = activeMilestoneIndex === mIdx
+            {pathData.path && (
+              <>
+                {/* Background Wide Glow Path */}
+                <path
+                  d={pathData.path}
+                  fill="none"
+                  stroke="rgba(245, 158, 11, 0.12)"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                />
 
-          return (
-            <div
-              key={milestone.title + mIdx}
-              onClick={() => onSelectMilestone(mIdx)}
-              className={`fp-v2-milestone-card ${isSelected ? 'selected' : ''}`}
-              style={{
-                backgroundColor: theme.cardBg,
-                borderColor: isSelected ? '#1D1B18' : theme.border,
-              }}
-            >
-              <div className="fp-v2-mcard-left">
-                {/* Number Badge */}
-                <span className="fp-v2-num-badge" style={{ backgroundColor: theme.numBg }}>
-                  {String(mIdx + 1).padStart(2, '0')}
-                </span>
+                {/* Main Serpentine Spine Path */}
+                <path
+                  d={pathData.path}
+                  fill="none"
+                  stroke="#E2E8F0"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
 
-                <div className="fp-v2-mcard-body">
-                  <span className="fp-v2-mcard-title">{milestone.title}</span>
-                  <div className="fp-v2-mcard-sub">
-                    <span>{mDone}/{mTasks.length} tasks</span>
+                {/* Colored Gradient Overlay Path with moving dash */}
+                <path
+                  d={pathData.path}
+                  fill="none"
+                  stroke="url(#serpentineFlowGrad)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeDasharray="6 4"
+                  className="fp-v2-serpentine-flow-anim"
+                />
+
+                {/* Milestone Junction Circular Nodes 'o' */}
+                {pathData.nodes.map((node) => (
+                  <g key={node.index} className="fp-v2-junction-node">
+                    {node.isSelected && (
+                      <circle
+                        cx={node.x}
+                        cy={node.y}
+                        r="14"
+                        fill="none"
+                        stroke={node.theme.numBg}
+                        strokeWidth="2"
+                        opacity="0.6"
+                      />
+                    )}
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r="10"
+                      fill="#FFFFFF"
+                      stroke={node.isSelected ? '#1D1B18' : node.theme.border}
+                      strokeWidth="2.5"
+                    />
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r="5"
+                      fill={node.theme.numBg}
+                    />
+                  </g>
+                ))}
+              </>
+            )}
+          </svg>
+
+          {/* Start Node at Top */}
+          <div className="fp-v2-start-node-wrapper">
+            <div ref={startNodeRef} className="fp-v2-start-node">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#22C55E] animate-pulse" />
+              <Target size={13} />
+              <span>Start</span>
+            </div>
+          </div>
+
+          {/* Alternating Milestone Rows */}
+          <div className="fp-v2-serpentine-rows">
+            {filteredMilestones.map((milestone, idx) => {
+              const mIdx = milestone.originalIndex
+              const isLeft = idx % 2 === 0
+              const theme = MILESTONE_THEMES[mIdx % MILESTONE_THEMES.length]
+              const mTasks = allTasks.filter((t) => t.milestoneIndex === mIdx)
+              const mDone = mTasks.filter((t) => completed.includes(t.id)).length
+              const isDone = mTasks.length > 0 && mDone === mTasks.length
+              const isInProgress = mDone > 0 && !isDone
+              const isSelected = activeMilestoneIndex === mIdx
+
+              return (
+                <div
+                  key={milestone.title + mIdx}
+                  className={`fp-v2-serpentine-row ${isLeft ? 'is-left' : 'is-right'}`}
+                >
+                  <div
+                    ref={(el) => (cardRefs.current[mIdx] = el)}
+                    onClick={() => onSelectMilestone(mIdx)}
+                    className={`fp-v2-milestone-card ${isSelected ? 'selected' : ''} ${
+                      isLeft ? 'card-left' : 'card-right'
+                    }`}
+                    style={{
+                      backgroundColor: theme.cardBg,
+                      borderColor: isSelected ? '#1D1B18' : theme.border,
+                    }}
+                  >
+                    <div className="fp-v2-mcard-left">
+                      {/* Number Badge */}
+                      <span
+                        className="fp-v2-num-badge"
+                        style={{ backgroundColor: theme.numBg }}
+                      >
+                        {String(mIdx + 1).padStart(2, '0')}
+                      </span>
+
+                      <div className="fp-v2-mcard-body">
+                        <span className="fp-v2-mcard-title">{milestone.title}</span>
+                        <div className="fp-v2-mcard-sub">
+                          <span>
+                            {mDone}/{mTasks.length} tasks
+                          </span>
+                          <span
+                            className="fp-v2-mcard-status"
+                            style={{
+                              backgroundColor: isDone
+                                ? '#ECFDF5'
+                                : isInProgress
+                                ? '#EFF6FF'
+                                : '#F3F4F6',
+                              color: isDone
+                                ? '#065F46'
+                                : isInProgress
+                                ? '#1D4ED8'
+                                : '#4B5563',
+                            }}
+                          >
+                            {isDone
+                              ? '✓ Completed'
+                              : isInProgress
+                              ? '⏳ In Progress'
+                              : '⏱ Not Started'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category Pill on Right */}
+                    <div className="fp-v2-mcard-right">
+                      <span
+                        className="fp-v2-category-pill"
+                        style={{
+                          backgroundColor: theme.catBg,
+                          color: theme.catColor,
+                          borderColor: theme.catBorder,
+                        }}
+                      >
+                        <span className="font-mono text-xs">{theme.icon}</span>
+                        <span>{milestone.category || theme.category}</span>
+                      </span>
+                    </div>
+
+                    {/* Connecting Notch on the center-facing edge */}
                     <span
-                      className="fp-v2-mcard-status"
-                      style={{
-                        backgroundColor: isDone ? '#ECFDF5' : isInProgress ? '#EFF6FF' : '#F3F4F6',
-                        color: isDone ? '#065F46' : isInProgress ? '#1D4ED8' : '#4B5563',
-                      }}
-                    >
-                      {isDone ? '✓ Completed' : isInProgress ? '⏳ In Progress' : '⏱ Not Started'}
-                    </span>
+                      className={`fp-v2-card-connector-notch ${
+                        isLeft ? 'notch-right' : 'notch-left'
+                      }`}
+                      style={{ backgroundColor: theme.numBg }}
+                    />
                   </div>
                 </div>
-              </div>
+              )
+            })}
+          </div>
 
-              {/* Category Pill on Right */}
-              <div className="fp-v2-mcard-right">
-                <span
-                  className="fp-v2-category-pill"
-                  style={{
-                    backgroundColor: theme.catBg,
-                    color: theme.catColor,
-                    borderColor: theme.catBorder,
-                  }}
-                >
-                  <span className="font-mono text-xs">{theme.icon}</span>
-                  <span>{milestone.category || theme.category}</span>
-                </span>
-              </div>
+          {/* Launch Ready Ending Node */}
+          <div className="fp-v2-launch-node-wrapper">
+            <div ref={launchNodeRef} className="fp-v2-launch-node">
+              <span>🏁</span>
+              <span>Launch Ready!</span>
             </div>
-          )
-        })}
-
-        {/* Launch Ready Ending Node */}
-        <div className="fp-v2-launch-node">
-          <span>🏁</span>
-          <span>Launch Ready!</span>
+          </div>
         </div>
       </div>
 
@@ -4619,18 +4867,6 @@ export default function FlightPlan() {
               </section>
             ) : (
               <div className="fp-v2-container">
-                {/* Top Sub-Nav Bar */}
-                <FlightPlanTopNav
-                  project={project}
-                  projects={projectsWithPlans}
-                  onSelectProject={(id) => {
-                    setSelectedId(id)
-                    setSelectedMilestone(0)
-                    setNotice('')
-                    setError('')
-                  }}
-                />
-
                 {/* Hero Banner with Mascot & Speech Bubble */}
                 <FlightPlanHeroBanner
                   project={project}
