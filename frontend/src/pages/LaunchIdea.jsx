@@ -33,12 +33,6 @@ const FLOW_STEPS = [
   { emoji: '📈', title: 'Business Model' },
 ]
 
-const DOMAIN_OPTIONS = [
-  { key: 'software', label: 'Software', icon: <Code2 size={13} />, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', desc: 'Web, mobile, SaaS, APIs' },
-  { key: 'hardware', label: 'Hardware', icon: <Cpu size={13} />, color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', desc: 'Circuits, Arduino, IoT devices' },
-  { key: 'hybrid', label: 'Software + Hardware', icon: <Zap size={13} />, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', desc: 'IoT app, robot + dashboard' },
-]
-
 export default function LaunchIdea() {
   const navigate = useNavigate()
   const fileInput = useRef(null)
@@ -51,25 +45,26 @@ export default function LaunchIdea() {
   const [domain, setDomain] = useState('software')
   const [domainClassifying, setDomainClassifying] = useState(false)
   const [domainReasoning, setDomainReasoning] = useState('')
-  const [userOverrodeDomain, setUserOverrodeDomain] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const classifyTimer = useRef(null)
 
-  // Auto-classify domain via AI as user types (debounced 900ms)
+  // Auto-classify domain via AI as user types in background (debounced 700ms)
   useEffect(() => {
-    if (userOverrodeDomain) return
-    if (idea.trim().length < 25) return
+    if (idea.trim().length < 15) return
     clearTimeout(classifyTimer.current)
     classifyTimer.current = setTimeout(async () => {
       setDomainClassifying(true)
       try {
         const result = await classifyProjectDomain(idea.trim(), intent)
-        setDomain(result.domain)
-        setDomainReasoning(result.reasoning || '')
+        if (result?.domain) {
+          setDomain(result.domain)
+          setDomainReasoning(result.reasoning || '')
+        }
       } catch { /* use current domain */ }
       finally { setDomainClassifying(false) }
-    }, 900)
+    }, 700)
     return () => clearTimeout(classifyTimer.current)
-  }, [idea, intent, userOverrodeDomain])
+  }, [idea, intent])
 
   async function addAttachment(e) {
     const file = e.target.files?.[0]
@@ -84,19 +79,40 @@ export default function LaunchIdea() {
     setAttachmentNotice('')
   }
 
-  function launch(e) {
+  async function launch(e) {
     e.preventDefault()
-    if (!idea.trim()) {
+    const cleanIdea = idea.trim()
+    if (!cleanIdea) {
       setError('Add a few words about your idea first.')
       document.getElementById('launch-idea-input')?.focus()
       return
     }
     setError('')
+    setIsSubmitting(true)
+
+    let finalDomain = domain
+    let finalReasoning = domainReasoning
+
+    // Always calculate domain directly if not yet classified or currently classifying
+    if (!finalReasoning || domainClassifying) {
+      try {
+        const result = await classifyProjectDomain(cleanIdea, intent)
+        if (result?.domain) {
+          finalDomain = result.domain
+          finalReasoning = result.reasoning || ''
+        }
+      } catch (err) {
+        console.error('Domain classification failed:', err)
+      }
+    }
+
     const draft = {
       projectId: globalThis.crypto?.randomUUID?.() || 'proj_' + Date.now(),
-      idea: idea.trim(),
+      idea: cleanIdea,
       projectType: intent,
-      domain,
+      domain: finalDomain,
+      aiPickDomain: finalDomain,
+      aiPickReasoning: finalReasoning,
       attachment: attachment ?? null,
       currentStage: 0,
       completedStages: [],
@@ -241,10 +257,20 @@ export default function LaunchIdea() {
 
                 <button
                   type="submit"
-                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl bg-[#8E4B49] hover:bg-[#723B39] text-white text-sm font-black transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shrink-0"
+                  disabled={isSubmitting}
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl bg-[#8E4B49] hover:bg-[#723B39] text-white text-sm font-black transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 cursor-pointer shrink-0 disabled:opacity-80 disabled:cursor-wait"
                 >
-                  <span>Start Launch</span>
-                  <Sparkles size={14} className="text-[#FBE191]" />
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin text-[#FBE191]" />
+                      <span>Calculating…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Start Launch</span>
+                      <Sparkles size={14} className="text-[#FBE191]" />
+                    </>
+                  )}
                 </button>
               </div>
             </form>

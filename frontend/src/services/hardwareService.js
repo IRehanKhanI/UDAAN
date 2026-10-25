@@ -122,57 +122,91 @@ export async function classifyProjectDomain(idea, projectType = 'Startup') {
 
 function classifyDomainFallback(idea = '') {
   const lower = idea.toLowerCase()
-  const hwSignals = ['arduino', 'raspberry pi', 'esp8266', 'esp32', 'sensor', 'motor', 'servo', 'circuit', 'pcb', 'iot', 'drone', 'robot', 'electronics', '3d print', 'actuator', 'led', 'battery', 'prototype', 'embedded', 'hardware', 'rfid', 'bluetooth module', 'gpio', 'microcontroller', 'soldering', 'breadboard', 'resistor', 'capacitor']
-  const swSignals = ['app', 'website', 'platform', 'dashboard', 'api', 'software', 'web app', 'mobile app', 'saas', 'backend', 'frontend', 'database', 'cloud', 'deployment', 'server']
-  const hwScore = hwSignals.filter(k => lower.includes(k)).length
-  const swScore = swSignals.filter(k => lower.includes(k)).length
+  const hwSignals = [
+    'arduino', 'raspberry pi', 'rpi', 'esp8266', 'esp32', 'sensor', 'sensors', 'motor', 'motors',
+    'servo', 'circuit', 'pcb', 'iot', 'drone', 'robot', 'robotics', 'electronics', '3d print',
+    'actuator', 'led', 'battery', 'prototype', 'embedded', 'hardware', 'wearable', 'cane', 'stick',
+    'rfid', 'bluetooth module', 'gpio', 'microcontroller', 'breadboard', 'ultrasonic', 'gps',
+    'buzzer', 'accelerometer', 'gyroscope', 'relay', 'camera module', 'solenoid', 'antenna', 'transmitter',
+    'resistor', 'capacitor', 'soldering', 'micro-controller', 'transceiver'
+  ]
+  const swSignals = [
+    'app', 'website', 'platform', 'dashboard', 'api', 'software',
+    'web app', 'mobile app', 'saas', 'backend', 'frontend', 'database', 'cloud', 'portal', 'crm', 'marketplace'
+  ]
+  const foundHw = hwSignals.filter(k => lower.includes(k))
+  const foundSw = swSignals.filter(k => lower.includes(k))
+  const hwScore = foundHw.length
+  const swScore = foundSw.length
+
   let domain = 'software'
-  if (hwScore >= 2 && swScore >= 2) domain = 'hybrid'
-  else if (hwScore >= 2) domain = 'hardware'
-  return { domain, confidence: 0.7, reasoning: 'Detected via keyword analysis', detected_keywords: [] }
+  let reasoning = 'Detected software requirements from idea.'
+  if (hwScore >= 1 && swScore >= 1) {
+    domain = 'hybrid'
+    reasoning = `Detected hardware components (${foundHw.slice(0, 3).join(', ')}) with software integration (${foundSw.slice(0, 3).join(', ')}).`
+  } else if (hwScore >= 1) {
+    domain = 'hardware'
+    reasoning = `Detected physical hardware components (${foundHw.slice(0, 3).join(', ')}).`
+  }
+  return { domain, confidence: 0.85, reasoning, detected_keywords: [...foundHw, ...foundSw] }
 }
 
 // ─── API: Generate Bill of Materials via backend AI ──────────────────────────
-export async function generateBillOfMaterials(idea, understanding = {}) {
+export async function generateBillOfMaterials(ideaOrProject, understanding = {}) {
+  const ideaText = typeof ideaOrProject === 'string'
+    ? ideaOrProject
+    : (ideaOrProject?.idea || ideaOrProject?.title || ideaOrProject?.name || ideaOrProject?.description || '')
+  const problemStatement = understanding?.problem_statement || (typeof ideaOrProject === 'object' ? (ideaOrProject?.description || '') : '') || ''
+  const expectedOutcome = understanding?.expected_outcome || (typeof ideaOrProject === 'object' ? (ideaOrProject?.outcome || '') : '') || ''
+
   try {
     const result = await apiRequest('/api/ideas/hardware-bom/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        idea,
-        problem_statement: understanding.problem_statement || '',
-        expected_outcome: understanding.expected_outcome || '',
+        idea: ideaText,
+        problem_statement: problemStatement,
+        expected_outcome: expectedOutcome,
       }),
     })
     return result?.components || []
   } catch {
     // Return illustrative fallback components
-    return generateFallbackBOM(idea)
+    return generateFallbackBOM(ideaText)
   }
 }
 
 function generateFallbackBOM(idea = '') {
-  const lower = idea.toLowerCase()
+  const lower = String(idea || '').toLowerCase()
   const components = []
 
-  if (lower.includes('arduino') || lower.includes('microcontroller') || lower.includes('sensor') || lower.includes('iot')) {
+  if (lower.includes('arduino') || lower.includes('microcontroller') || lower.includes('sensor') || lower.includes('iot') || lower.includes('stick') || lower.includes('cane')) {
     components.push({
       id: 'uc1',
-      name: 'Arduino Uno R3',
+      name: 'Arduino Uno R3 (ATmega328P)',
       category: 'Microcontroller',
       quantity: 1,
       unit: 'pcs',
-      priceMin: 350,
-      priceMax: 600,
+      priceMin: 450,
+      priceMax: 650,
+      unit_price: 450,
+      total_price: 450,
       currency: 'INR',
       icon: '🔲',
       color: '#2563EB',
       bg: '#EFF6FF',
       image: 'https://upload.wikimedia.org/wikipedia/commons/3/38/Arduino_Uno_-_R3.jpg',
-      description: 'Main controller for reading sensors and driving outputs',
+      description: 'Industry-standard microcontroller board for reading sensor inputs and controlling outputs.',
+      wiring_tip: 'Power via 5V USB cable or external 9V battery with 2.1mm DC barrel connector.',
       learnUrl: 'https://www.arduino.cc/en/Guide/ArduinoUno',
       searchQuery: 'Arduino Uno R3',
       required: true,
+      availability: 'In Stock (MakerBazar)',
+      vendors: [
+        { vendor: 'MakerBazar', tagline: 'Default Maker Store', is_default: true, direct_search_url: 'https://makerbazar.in/search?q=Arduino+Uno+R3', availability: 'In Stock (MakerBazar)', color: '#F97316' },
+        { vendor: 'Robocraze', tagline: 'Robotics & IoT India', is_default: false, direct_search_url: 'https://robocraze.com/search?type=product&q=Arduino+Uno+R3', availability: 'In Stock', color: '#2563EB' },
+        { vendor: 'Roboin', tagline: 'Indian Robotics Distributor', is_default: false, direct_search_url: 'https://www.roboin.io/?s=Arduino+Uno+R3', availability: 'In Stock', color: '#16A34A' },
+      ],
     })
   }
 

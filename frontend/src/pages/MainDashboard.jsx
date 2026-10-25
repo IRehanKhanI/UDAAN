@@ -338,7 +338,7 @@ export default function MainDashboard() {
           {/* ── Top Bar / Date ─────────────────────────────────────────── */}
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-xs font-semibold text-[#8C847E] tracking-wider uppercase">Overview</span>
+              <span className="text-xs font-semibold text-[#8C847E] tracking-wider uppercase">Home</span>
               <h1 className="text-xl sm:text-2xl font-black text-[#1D1B18] tracking-tight">Today, {todayStr}</h1>
             </div>
             <div className="flex items-center gap-2">
@@ -435,7 +435,10 @@ export default function MainDashboard() {
 
                 {/* Card 1: Active Project (Berry Pink Gradient) */}
                 <div
-                  onClick={() => navigate('/flight-plan')}
+                  onClick={() => {
+                    localStorage.setItem('udaan:selected-project', currentProject.id)
+                    navigate(`/flight-plan?project=${encodeURIComponent(currentProject.id)}`)
+                  }}
                   className="rounded-3xl bg-gradient-to-br from-[#FF6384] to-[#F04368] p-5 text-white shadow-md flex flex-col justify-between min-h-[190px] cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden group"
                 >
                   <div className="flex items-center justify-between">
@@ -482,6 +485,7 @@ export default function MainDashboard() {
                     if (secondaryProject.id !== 'starter-2') {
                       setSelectedProjectId(secondaryProject.id)
                       localStorage.setItem('udaan:selected-project', secondaryProject.id)
+                      navigate(`/flight-plan?project=${encodeURIComponent(secondaryProject.id)}`)
                     } else {
                       navigate('/launch')
                     }

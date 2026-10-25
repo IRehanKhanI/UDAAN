@@ -143,14 +143,25 @@ function ProjectCard({ project, menuOpen, deleting, onOptions, onDelete, onSelec
           <span className="text-[11px] text-[#7C766F] ml-3">{project.updated}</span>
         </div>
 
-        <Link
-          to={`/flight-plan?project=${encodeURIComponent(project.id)}`}
-          onClick={() => onSelect(project)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shadow-xs group-hover:scale-105 no-underline"
-        >
-          <span>Open Plan</span>
-          <ArrowRight size={13} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/team?project=${encodeURIComponent(project.id)}`}
+            onClick={() => onSelect(project)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF4F0] hover:bg-[#FFE8E0] text-[#8E4B49] text-xs font-bold transition-all border border-[#F3D7CC] no-underline"
+            title="Manage Team for this project"
+          >
+            <Users size={13} />
+            <span>Team</span>
+          </Link>
+          <Link
+            to={`/flight-plan?project=${encodeURIComponent(project.id)}`}
+            onClick={() => onSelect(project)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shadow-xs group-hover:scale-105 no-underline"
+          >
+            <span>Open Plan</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
       </div>
     </article>
   )

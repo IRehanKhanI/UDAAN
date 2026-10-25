@@ -15,9 +15,36 @@ import { parseRepositoryUrl, syncAndAnalyzeRepository, associateProjectRepositor
 import { initializeTeamWorkspace } from '../services/teamService.js'
 import { createGitHubRepo, getTechHistory, saveTechHistory, getYouTubeVideos } from '../services/githubService.js'
 import { startGitHubLogin } from '../services/authService.js'
-import { INDIAN_VENDORS, generateBillOfMaterials, searchHardwareProducts, predictBestRevenueModel, getComponentLiveImage } from '../services/hardwareService.js'
+import { INDIAN_VENDORS, generateBillOfMaterials, searchHardwareProducts, predictBestRevenueModel, getComponentLiveImage, classifyProjectDomain } from '../services/hardwareService.js'
 import InteractiveMascot from '../components/mascot/InteractiveMascot.jsx'
 import Interactive3DCharacter from '../components/mascot/Interactive3DCharacter.jsx'
+
+const DOMAIN_DETAILS = {
+  software: {
+    label: 'Software',
+    icon: '💻',
+    shortDesc: 'Web, mobile, SaaS, APIs',
+    color: '#2563EB',
+    bg: '#EFF6FF',
+    border: '#BFDBFE',
+  },
+  hardware: {
+    label: 'Hardware',
+    icon: '📟',
+    shortDesc: 'Circuits, Arduino, IoT, robotics',
+    color: '#059669',
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
+  },
+  hybrid: {
+    label: 'Software + Hardware',
+    icon: '⚡',
+    shortDesc: 'Hardware device + companion app',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+  },
+}
 
 function getYouTubeThumb(url) {
   if (!url) return null
@@ -298,7 +325,56 @@ export default function IdeaAnalysis() {
 
   // Domain & Stages
   const [domain, setDomain] = useState(draft?.domain || 'software')
+  const [aiPickDomain, setAiPickDomain] = useState(draft?.aiPickDomain || draft?.domain || 'software')
+  const [domainDropdownOpen, setDomainDropdownOpen] = useState(false)
+  const domainDropdownRef = useRef(null)
   const stages = useMemo(() => getStagesForDomain(domain), [domain])
+
+  // Close domain dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (domainDropdownRef.current && !domainDropdownRef.current.contains(e.target)) {
+        setDomainDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Auto-calculate domain if missing or unclassified
+  useEffect(() => {
+    if (draft?.idea && (!draft?.aiPickDomain || !draft?.domain)) {
+      classifyProjectDomain(draft.idea, draft.projectType || 'Startup').then(res => {
+        if (res?.domain) {
+          setDomain(res.domain)
+          setAiPickDomain(res.domain)
+          const updated = {
+            ...(draft || {}),
+            domain: res.domain,
+            aiPickDomain: res.domain,
+            aiPickReasoning: res.reasoning,
+          }
+          setDraft(updated)
+          try {
+            localStorage.setItem(draftKey, JSON.stringify(updated))
+            sessionStorage.setItem(draftKey, JSON.stringify(updated))
+          } catch {}
+        }
+      })
+    }
+  }, [draft?.idea])
+
+  function handleDomainChange(newDomain) {
+    setDomain(newDomain)
+    setDomainDropdownOpen(false)
+    const updated = { ...(draft || {}), domain: newDomain }
+    setDraft(updated)
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(updated))
+      sessionStorage.setItem(draftKey, JSON.stringify(updated))
+    } catch {}
+    persist({ domain: newDomain })
+  }
 
   // Step 0: Understanding
   const [understanding, setUnderstanding] = useState(
@@ -836,29 +912,72 @@ export default function IdeaAnalysis() {
             </div>
             {/* Top Right: AI Domain Pick Dropdown & Idea chip */}
             <div className="flex items-center gap-2 shrink-0">
-              <div className="relative flex items-center">
-                <select
-                  value={domain}
-                  onChange={(e) => {
-                    const nextDomain = e.target.value
-                    setDomain(nextDomain)
-                    try {
-                      const updated = { ...(draft || {}), domain: nextDomain }
-                      setDraft(updated)
-                      localStorage.setItem('udaan:idea-draft', JSON.stringify(updated))
-                    } catch {}
-                  }}
-                  className="appearance-none cursor-pointer pl-3 pr-7 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] text-xs font-bold shadow-xs hover:border-[#D1D5DB] transition focus:outline-none"
+              <div className="relative" ref={domainDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setDomainDropdownOpen(prev => !prev)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] hover:border-[#D1D5DB] text-xs font-bold shadow-xs transition-all cursor-pointer select-none"
                   style={{
-                    color: domain === 'hardware' ? '#059669' : domain === 'hybrid' ? '#D97706' : '#2563EB',
+                    color: DOMAIN_DETAILS[domain]?.color || '#2563EB',
                   }}
                   title="Project Type (AI Pick) · Click to change domain"
                 >
-                  <option value="software">💻 Software {domain === 'software' ? '· AI Pick' : ''}</option>
-                  <option value="hardware">📟 Hardware {domain === 'hardware' ? '· AI Pick' : ''}</option>
-                  <option value="hybrid">⚡ Software + Hardware {domain === 'hybrid' ? '· AI Pick' : ''}</option>
-                </select>
-                <ChevronDown size={13} className="absolute right-2.5 pointer-events-none text-[#7C766F]" />
+                  <span className="text-sm">{DOMAIN_DETAILS[domain]?.icon || '💻'}</span>
+                  <span>{DOMAIN_DETAILS[domain]?.label || 'Software'}</span>
+                  {domain === aiPickDomain ? (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-[#FFF1ED] text-[#8E4B49] border border-[#FFAAA6]">
+                      AI Pick
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[#F3EDE7] text-[#7C766F]">
+                      Manual
+                    </span>
+                  )}
+                  <ChevronDown
+                    size={13}
+                    className={`text-[#7C766F] transition-transform duration-150 ${domainDropdownOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {domainDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-64 rounded-2xl bg-white border border-[#EFEAE4] shadow-xl z-50 p-1.5 space-y-1 animate-fadeIn">
+                    <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#7C766F] border-b border-[#F3EDE7]">
+                      Select Project Type
+                    </div>
+                    {Object.entries(DOMAIN_DETAILS).map(([key, item]) => {
+                      const isCurrent = domain === key
+                      const isAiPick = aiPickDomain === key
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handleDomainChange(key)}
+                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
+                            isCurrent
+                              ? 'bg-[#FFF8F3] border border-[#FFCDB8]'
+                              : 'hover:bg-[#FAF8F5] border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{item.icon}</span>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-[#1D1B18]">{item.label}</span>
+                                {isAiPick && (
+                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full bg-[#FFAAA6] text-[#7A3C3A]">
+                                    AI Pick
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-[#7C766F] block leading-tight">{item.shortDesc}</span>
+                            </div>
+                          </div>
+                          {isCurrent && <Check size={14} className="text-[#8E4B49] shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Idea chip */}
@@ -946,29 +1065,6 @@ export default function IdeaAnalysis() {
                       <button key={cat} type="button" onClick={() => { setProjectType(cat); persist({ projectType: cat }) }}
                         className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${projectType === cat ? 'bg-[#1D1B18] text-white' : 'bg-[#FFF8F3] border border-[#EFEAE4] text-[#534342] hover:bg-[#EDE7E2]'}`}>
                         {cat}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Domain Toggle */}
-                  <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#EFEAE4]">
-                    <span className="text-xs font-bold text-[#534342]">Project Domain:</span>
-                    {[
-                      { key: 'software', icon: '💻', label: 'Software' },
-                      { key: 'hardware', icon: '🔧', label: 'Hardware' },
-                      { key: 'hybrid',   icon: '⚡', label: 'Software + Hardware' },
-                    ].map(opt => (
-                      <button
-                        key={opt.key}
-                        type="button"
-                        onClick={() => { setDomain(opt.key); persist({ domain: opt.key }) }}
-                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                          domain === opt.key
-                            ? 'bg-[#8E4B49] text-white shadow-xs'
-                            : 'bg-[#FFF8F3] border border-[#EFEAE4] text-[#534342] hover:bg-[#EDE7E2]'
-                        }`}
-                      >
-                        {opt.icon} {opt.label}
                       </button>
                     ))}
                   </div>
@@ -1283,9 +1379,20 @@ export default function IdeaAnalysis() {
                                 </button>
                               </div>
                               <h3 className="text-xs font-bold text-[#1D1B18] mt-1 truncate">{comp.name}</h3>
-                              <span className="text-[11px] font-bold text-[#D97706]">
-                                ₹{comp.priceMin} – ₹{comp.priceMax} <small className="text-[#7C766F] font-normal">({comp.quantity || 1} {comp.unit || 'pcs'})</small>
-                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                <span className="text-[11px] font-black text-[#D97706]">
+                                  ₹{(comp.unit_price || comp.priceMin || 0) * (comp.quantity || 1)}
+                                </span>
+                                <span className="text-[9.5px] font-semibold text-[#534342] bg-[#FAF8F5] px-1.5 py-0.2 rounded border border-[#EFEAE4]">
+                                  {comp.quantity || 1} {comp.unit || 'pcs'} @ ₹{comp.unit_price || comp.priceMin || 0}/{comp.unit || 'pcs'}
+                                </span>
+                              </div>
+                              <div className="pt-1 flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0] px-1.5 py-0.2 rounded-full">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
+                                  {comp.availability || 'In Stock (MakerBazar)'}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
@@ -1310,11 +1417,19 @@ export default function IdeaAnalysis() {
                                   href={v.direct_search_url || v.link}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-white hover:bg-[#FAF8F5] transition-colors"
-                                  style={{ color: v.color || '#534342', borderColor: '#EFEAE4' }}
+                                  className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md border transition-colors flex items-center gap-1 ${
+                                    v.vendor === 'MakerBazar' || vi === 0
+                                      ? 'bg-[#FFF7ED] text-[#C2410C] border-[#FDBA74] hover:bg-[#FFEDD5]'
+                                      : 'bg-white text-[#534342] border-[#EFEAE4] hover:bg-[#FAF8F5]'
+                                  }`}
                                   title={`Buy from ${v.vendor || v.name}`}
                                 >
                                   🛒 {v.vendor || v.name}
+                                  {(v.vendor === 'MakerBazar' || vi === 0) && (
+                                    <span className="text-[7.5px] font-black uppercase bg-[#F97316] text-white px-0.8 rounded">
+                                      Default
+                                    </span>
+                                  )}
                                 </a>
                               ))}
                             </div>

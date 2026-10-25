@@ -960,14 +960,16 @@ Provide clear reasoning and list key hardware or software signals identified."""
     # Heuristic fallback
     lower = idea_str.lower()
     hw_signals = [
-        'arduino', 'raspberry pi', 'esp8266', 'esp32', 'sensor', 'motor', 'servo',
-        'circuit', 'pcb', 'iot', 'drone', 'robot', 'electronics', '3d print',
-        'actuator', 'led', 'battery', 'prototype', 'embedded', 'hardware',
-        'rfid', 'bluetooth module', 'gpio', 'microcontroller', 'breadboard'
+        'arduino', 'raspberry pi', 'rpi', 'esp8266', 'esp32', 'sensor', 'sensors', 'motor', 'motors',
+        'servo', 'circuit', 'pcb', 'iot', 'drone', 'robot', 'robotics', 'electronics', '3d print',
+        'actuator', 'led', 'battery', 'prototype', 'embedded', 'hardware', 'wearable', 'cane', 'stick',
+        'rfid', 'bluetooth module', 'gpio', 'microcontroller', 'breadboard', 'ultrasonic', 'gps',
+        'buzzer', 'accelerometer', 'gyroscope', 'relay', 'camera module', 'solenoid', 'antenna', 'transmitter',
+        'resistor', 'capacitor', 'soldering', 'micro-controller', 'transceiver'
     ]
     sw_signals = [
         'app', 'website', 'platform', 'dashboard', 'api', 'software',
-        'web app', 'mobile app', 'saas', 'backend', 'frontend', 'database', 'cloud'
+        'web app', 'mobile app', 'saas', 'backend', 'frontend', 'database', 'cloud', 'portal', 'crm', 'marketplace'
     ]
     found_hw = [k for k in hw_signals if k in lower]
     found_sw = [k for k in sw_signals if k in lower]

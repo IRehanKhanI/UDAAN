@@ -13,7 +13,6 @@ import MarketingStudio from '../pages/MarketingStudio.jsx'
 import DeveloperProfile from '../pages/DeveloperProfile.jsx'
 import TestPilot from '../pages/TestPilot.jsx'
 import Verification from '../pages/Verification.jsx'
-import Glimpse from '../pages/Glimpse.jsx'
 import BusinessModel from '../pages/BusinessModel.jsx'
 import ProjectSettings from '../pages/ProjectSettings.jsx'
 
@@ -33,7 +32,7 @@ export default function App() {
     <Route path="/team" element={<TeamWorkspace />} />
     <Route path="/learning" element={<Learning />} />
     <Route path="/marketing-studio" element={<MarketingStudio />} />
-    <Route path="/glimpse" element={<Glimpse />} />
+    <Route path="/glimpse" element={<Navigate to="/" replace />} />
     <Route path="/issues" element={<Navigate to="/" replace />} />
     <Route path="/testpilot" element={<TestPilot />} />
     <Route path="/verification" element={<Verification />} />

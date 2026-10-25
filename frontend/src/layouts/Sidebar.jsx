@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
-  Code2, Flame, FolderOpen, Gauge, LogOut,
-  Megaphone, Rocket, Sparkles, UserRound, Users, X, CircleDollarSign
+  FolderOpen, Home, LogOut,
+  Megaphone, Sparkles, UserRound, CircleDollarSign
 } from 'lucide-react'
 import { NavLink, Link } from 'react-router-dom'
 import './Sidebar.css'
@@ -11,15 +11,10 @@ import { readSavedProjects } from '../services/projectStorage.js'
 import CommandPalette from '../components/modals/CommandPalette.jsx'
 
 const navigation = [
-  { label: 'Overview', icon: Gauge, to: '/' },
+  { label: 'Home', icon: Home, to: '/' },
   { label: 'My Projects', icon: FolderOpen, to: '/projects' },
-  { label: 'Flight Plan', icon: Rocket, to: '/flight-plan' },
   { label: 'Business Model', icon: CircleDollarSign, to: '/business-model' },
-  { label: 'Repository', icon: Code2, to: '/repository' },
-  { label: 'TestPilot', icon: Flame, to: '/testpilot' },
-  { label: 'Team Workspace', icon: Users, to: '/team' },
   { label: 'Marketing Studio', icon: Megaphone, to: '/marketing-studio' },
-  { label: 'Glimpse', icon: Sparkles, to: '/glimpse' },
 ]
 
 export default function Sidebar({ open = false, onClose = () => {} }) {

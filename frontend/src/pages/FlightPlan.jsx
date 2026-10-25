@@ -41,6 +41,7 @@ import {
   UploadCloud,
   UserCheck,
   UsersRound,
+  Users,
   Share2,
   X,
   BookOpen,
@@ -2560,11 +2561,26 @@ function HardwareBomFlightPlanView({
                       </div>
 
                       <h4 className="text-xs font-bold text-[#1D1B18] mt-1 line-clamp-1">{comp.name}</h4>
-                      <div className="text-xs font-bold text-[#D97706]">
-                        ₹{comp.priceMin} – ₹{comp.priceMax}{' '}
-                        <small className="text-[#7C766F] font-normal">
-                          ({comp.quantity || 1} {comp.unit || 'pcs'})
-                        </small>
+                      
+                      {/* Units required and total pricing */}
+                      <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                        <span className="text-xs font-black text-[#D97706]">
+                          ₹{(comp.unit_price || comp.priceMin || 0) * (comp.quantity || 1)}
+                        </span>
+                        <span className="text-[10px] font-semibold text-[#534342] bg-[#FAF8F5] px-1.5 py-0.5 rounded border border-[#EFEAE4]">
+                          {comp.quantity || 1} {comp.unit || 'pcs'} required @ ₹{comp.unit_price || comp.priceMin || 0}/{comp.unit || 'pcs'}
+                        </span>
+                      </div>
+
+                      {/* Stock availability */}
+                      <div className="pt-1 flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0] px-2 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
+                          {comp.availability || 'In Stock (MakerBazar)'}
+                        </span>
+                        <span className="text-[9.5px] text-[#7C766F]">
+                          Alternative: Robocraze / Roboin
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -2585,9 +2601,12 @@ function HardwareBomFlightPlanView({
                   )}
                 </div>
 
-                {/* Vendor Action Buttons */}
+                {/* Vendor Action Buttons - MakerBazar Default */}
                 <div className="pt-2 border-t border-[#F3EDE7] space-y-1.5">
-                  <span className="text-[10px] font-bold text-[#7C766F] block">Buy directly from store:</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#7C766F] block">Direct Store Procurement:</span>
+                    <span className="text-[9px] font-bold text-[#F97316] uppercase">MakerBazar Default</span>
+                  </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {(comp.vendors || []).map((v, vi) => (
                       <a
@@ -2595,11 +2614,19 @@ function HardwareBomFlightPlanView({
                         href={v.direct_search_url || v.link}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg border bg-white hover:bg-[#FAF8F5] transition-colors shadow-2xs no-underline"
-                        style={{ color: v.color || '#534342', borderColor: '#EFEAE4' }}
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all shadow-2xs no-underline flex items-center gap-1 ${
+                          v.vendor === 'MakerBazar' || vi === 0
+                            ? 'bg-[#FFF7ED] text-[#C2410C] border-[#FDBA74] hover:bg-[#FFEDD5]'
+                            : 'bg-white text-[#534342] border-[#EFEAE4] hover:bg-[#FAF8F5]'
+                        }`}
                         title={`Search and buy on ${v.vendor || v.name}`}
                       >
                         🛒 {v.vendor || v.name}
+                        {(v.vendor === 'MakerBazar' || vi === 0) && (
+                          <span className="text-[8px] uppercase font-black px-1 py-0.2 bg-[#F97316] text-white rounded">
+                            Primary
+                          </span>
+                        )}
                       </a>
                     ))}
 
@@ -2959,6 +2986,14 @@ function FlightPlanHeroBanner({
         </div>
 
         <div className="fp-v2-stats-actions">
+          <Link
+            to={`/team?project=${encodeURIComponent(project?.id || '')}`}
+            className="fp-v2-edit-btn no-underline inline-flex items-center gap-1.5"
+            style={{ textDecoration: 'none' }}
+          >
+            <Users size={13} />
+            <span>Team Workspace</span>
+          </Link>
           <button
             type="button"
             onClick={onReplan}
@@ -3900,8 +3935,9 @@ export default function FlightPlan() {
     if (!hardwareSearchQuery.trim()) return
     setHardwareSearching(true)
     try {
-      const results = await searchHardwareProducts(hardwareSearchQuery.trim())
-      setHardwareSearchResults(results || [])
+      const res = await searchHardwareProducts(hardwareSearchQuery.trim())
+      const items = Array.isArray(res) ? res : (res?.results || [])
+      setHardwareSearchResults(items)
     } catch (err) {
       console.warn('Hardware search error:', err)
     } finally {
@@ -3913,12 +3949,12 @@ export default function FlightPlan() {
     if (!project) return
     setGeneratingBom(true)
     try {
-      const generated = await generateBillOfMaterials({
-        title: project.title || project.name || '',
-        description: project.description || project.summary || '',
-        domain: project.domain || 'hardware',
-        budget: project.business_model?.budget || 25000,
-      })
+      const ideaText = project.idea || project.title || project.name || project.summary || ''
+      const understanding = {
+        problem_statement: project.problem || project.description || '',
+        expected_outcome: project.outcome || '',
+      }
+      const generated = await generateBillOfMaterials(ideaText, understanding)
       if (generated && generated.length > 0) {
         setHardwareBom(generated)
         updateSavedProject(project.id, { hardware_bom: generated })

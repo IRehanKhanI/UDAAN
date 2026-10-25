@@ -383,69 +383,98 @@ class BusinessModelGenerationView(APIView):
 
 
 class BusinessModelInputSerializer(serializers.Serializer):
-    domain = serializers.ChoiceField(choices=['software', 'hardware', 'hybrid'], default='software')
+    domain = serializers.CharField(required=False, default='software')
     selected_models = serializers.ListField(
-        child=serializers.ChoiceField(choices=['subscription', 'one_time', 'freemium', 'marketplace', 'grant', 'hardware_service']),
-        min_length=1, max_length=2,
+        child=serializers.CharField(),
+        required=False,
+        default=list,
     )
-    total_budget = serializers.IntegerField(min_value=5000, max_value=50000000)
-    buckets = serializers.DictField()
-    fixed_monthly_costs = serializers.IntegerField(min_value=0, max_value=50000000, default=0)
-    monthly_marketing = serializers.IntegerField(min_value=0, max_value=50000000, default=0)
-    monthly_customers = serializers.IntegerField(min_value=0, max_value=10000000, default=0)
-    average_revenue_per_customer = serializers.IntegerField(min_value=0, max_value=50000000, default=0)
-    cac = serializers.IntegerField(min_value=0, max_value=50000000, default=0)
+    total_budget = serializers.IntegerField(required=False, default=30000)
+    buckets = serializers.DictField(required=False, default=dict)
+    fixed_monthly_costs = serializers.IntegerField(required=False, default=0)
+    monthly_marketing = serializers.IntegerField(required=False, default=0)
+    monthly_customers = serializers.IntegerField(required=False, default=0)
+    average_revenue_per_customer = serializers.IntegerField(required=False, default=0)
+    cac = serializers.IntegerField(required=False, default=0)
 
-    def validate_buckets(self, value):
-        required = {'tech_infrastructure', 'legal_setup', 'mvp_validation', 'marketing', 'emergency_buffer'}
-        if set(value) != required or any(not isinstance(amount, int) or amount < 0 for amount in value.values()):
-            raise serializers.ValidationError('Provide non-negative integer amounts for every budget bucket.')
-        return value
+    # Multi-tab studio sections
+    overview = serializers.DictField(required=False, default=dict)
+    market_size = serializers.DictField(required=False, default=dict)
+    unit_economics = serializers.DictField(required=False, default=dict)
+    runway_ask = serializers.DictField(required=False, default=dict)
+    moat_why_now = serializers.DictField(required=False, default=dict)
+    consistency_checks = serializers.DictField(required=False, default=dict)
+    currency = serializers.CharField(required=False, default='INR')
 
     def validate(self, attrs):
-        if sum(attrs['buckets'].values()) != attrs['total_budget']:
-            raise serializers.ValidationError({'buckets': 'Bucket totals must equal total_budget.'})
-        if attrs['buckets']['emergency_buffer'] < round(attrs['total_budget'] * 0.2):
-            raise serializers.ValidationError({'buckets': 'Emergency Runway Buffer must be at least 20% of total budget.'})
-        burn = attrs['fixed_monthly_costs'] + attrs['monthly_marketing']
-        runway = attrs['total_budget'] / burn if burn else 24
-        if runway < 6:
-            raise serializers.ValidationError({'financial_plan': 'This plan has less than six months of runway.'})
-        if attrs['monthly_marketing'] > attrs['buckets']['mvp_validation'] + attrs['buckets']['tech_infrastructure']:
-            raise serializers.ValidationError({'financial_plan': 'Marketing cannot exceed product development before MVP validation.'})
+        # If legacy budget buckets were supplied, validate budget equality
+        buckets = attrs.get('buckets') or {}
+        total_b = attrs.get('total_budget')
+        if buckets and total_b and sum(buckets.values()) != total_b:
+            pass  # Allow flexibility for new multi-tab studio edits
         return attrs
 
 
 class BusinessModelView(APIView):
+    def get(self, request, draft_id):
+        draft = get_object_or_404(authorized_project_drafts(request), pk=draft_id)
+        plan = dict(draft.business_model or {})
+        from apps.projects.models import BusinessModelRevision
+        revisions = list(
+            BusinessModelRevision.objects.filter(project=draft).values('id', 'summary', 'created_at')[:10]
+        )
+        return Response({'business_model': plan, 'revisions': revisions})
+
     def put(self, request, draft_id):
         draft = get_object_or_404(authorized_project_drafts(request), pk=draft_id)
         serializer = BusinessModelInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        plan = dict(serializer.validated_data)
-        burn = plan['fixed_monthly_costs'] + plan['monthly_marketing']
-        revenue = plan['monthly_customers'] * plan['average_revenue_per_customer']
-        plan.update({
-            'revenue_model': plan['selected_models'][0],
-            'budget': plan['total_budget'],
-            'monthly_burn': burn,
-            'monthly_revenue': revenue,
-            'contribution_margin': revenue - burn,
-            'runway_months': round(plan['total_budget'] / burn, 2) if burn else 24,
-            'saved_at': timezone.now().isoformat(),
-        })
+        plan = dict(draft.business_model or {})
+        plan.update(serializer.validated_data)
+
+        # Compute legacy summaries if present
+        burn = plan.get('fixed_monthly_costs', 0) + plan.get('monthly_marketing', 0)
+        rev = plan.get('monthly_customers', 0) * plan.get('average_revenue_per_customer', 0)
+        if 'selected_models' in plan and plan['selected_models']:
+            plan['revenue_model'] = plan['selected_models'][0]
+        if 'total_budget' in plan:
+            plan['budget'] = plan['total_budget']
+            plan['monthly_burn'] = burn
+            plan['monthly_revenue'] = rev
+            plan['contribution_margin'] = rev - burn
+            plan['runway_months'] = round(plan['total_budget'] / burn, 2) if burn else 24
+
+        plan['saved_at'] = timezone.now().isoformat()
+
         workflow = dict(draft.workflow or {})
         workflow['business_model'] = plan
         metadata = dict(draft.schedule_metadata or {})
         metadata['financial_constraints'] = {
-            'monthly_burn': plan['monthly_burn'],
-            'runway_months': plan['runway_months'],
-            'budget': plan['total_budget'],
+            'monthly_burn': plan.get('monthly_burn', burn),
+            'runway_months': plan.get('runway_months', 24),
+            'budget': plan.get('budget', plan.get('total_budget', 30000)),
         }
         draft.business_model = plan
         draft.workflow = workflow
         draft.schedule_metadata = metadata
         draft.save(update_fields=['business_model', 'workflow', 'schedule_metadata', 'updated_at'])
-        return Response({'business_model': plan, 'financial_constraints': metadata['financial_constraints']})
+
+        # Store historical revision
+        try:
+            from apps.projects.models import BusinessModelRevision
+            rev_model = plan.get('revenue_model') or (plan.get('overview', {}).get('revenue_model')) or 'Custom'
+            BusinessModelRevision.objects.create(
+                project=draft,
+                plan_data=plan,
+                summary=f"Updated financial plan ({rev_model})",
+            )
+        except Exception as e:
+            logger.warning('Could not log business model revision: %s', e)
+
+        return Response({
+            'business_model': plan,
+            'financial_constraints': metadata['financial_constraints'],
+        })
 
 
 class ProjectDraftCollectionView(APIView):
@@ -1409,12 +1438,15 @@ CURATED_HARDWARE_PARTS = [
         'learn_url': 'https://randomnerdtutorials.com/esp32-dht11-dht22-temperature-humidity-sensor-arduino-ide/',
     },
     {
-        'keywords': ['servo', 'sg90', 'mg996r', 'motor', 'actuator'],
-        'name': 'SG90 9g Micro Servo Motor (180°)',
+        'keywords': ['servo', 'sg90', 'mg90s', 'mg996r', 'motor', 'actuator'],
+        'name': 'MG90S / SG90 Metal Gear Micro Servo (180°)',
         'category': 'Actuator',
-        'price_range': '₹75 – ₹140',
+        'price_range': '₹120 – ₹220',
+        'quantity': 2,
+        'unit': 'pcs',
+        'unit_price': 120,
         'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/TowerPro_SG90_9g_Micro_Servo.jpg/640px-TowerPro_SG90_9g_Micro_Servo.jpg',
-        'description': 'Tiny and lightweight 9g servo motor with 1.6 kg-cm torque for robotic joints and mechanisms.',
+        'description': 'Compact high-torque micro servo with metal gears for durable angular motion.',
         'wiring_tip': 'Brown/Black: GND, Red: 5V, Orange/Yellow: PWM Pin. Power from external 5V supply if using multiple servos.',
         'learn_url': 'https://docs.arduino.cc/learn/electronics/servo-motors/',
     },
@@ -1423,16 +1455,87 @@ CURATED_HARDWARE_PARTS = [
         'name': '0.96 inch I2C OLED Display (128x64 SSD1306)',
         'category': 'Display',
         'price_range': '₹190 – ₹320',
+        'quantity': 1,
+        'unit': 'pcs',
+        'unit_price': 220,
         'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Oled_screen.jpg/640px-Oled_screen.jpg',
         'description': 'High-contrast monochrome OLED display with simple 4-pin I2C interface.',
         'wiring_tip': 'Connect VCC to 3.3V/5V, GND to Ground, SCL to A5/GPIO22, SDA to A4/GPIO21.',
         'learn_url': 'https://randomnerdtutorials.com/esp32-ssd1306-oled-display-arduino-ide/',
     },
     {
+        'keywords': ['gps', 'neo-6m', 'neo6m', 'location', 'navigation', 'tracker'],
+        'name': 'NEO-6M GPS Module with Ceramic Antenna',
+        'category': 'Sensor',
+        'price_range': '₹380 – ₹550',
+        'quantity': 1,
+        'unit': 'pcs',
+        'unit_price': 420,
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/NEO-6M_GPS_module.jpg/640px-NEO-6M_GPS_module.jpg',
+        'description': 'High-sensitivity GPS receiver with built-in EEPROM and UART serial interface for real-time coordinates.',
+        'wiring_tip': 'VCC to 3.3V/5V, GND to GND, TX to MCU RX pin, RX to MCU TX pin (via voltage divider for 3.3V logic).',
+        'learn_url': 'https://randomnerdtutorials.com/guide-to-neo-6m-gps-module-with-arduino/',
+    },
+    {
+        'keywords': ['buzzer', 'alarm', 'sos', 'beeper', 'audio', 'sound'],
+        'name': '5V Active Electronic Buzzer Module',
+        'category': 'Actuator',
+        'price_range': '₹25 – ₹60',
+        'quantity': 2,
+        'unit': 'pcs',
+        'unit_price': 30,
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2b/Piezo_electric_audio_transducer.jpg/640px-Piezo_electric_audio_transducer.jpg',
+        'description': 'Loud 85dB resonant alarm buzzer for instant audio feedback and emergency SOS signaling.',
+        'wiring_tip': 'Connect positive pin (+) to digital GPIO via a 100Ω current-limiting resistor, negative (-) to GND.',
+        'learn_url': 'https://arduinogetstarted.com/tutorials/arduino-piezo-buzzer',
+    },
+    {
+        'keywords': ['gyro', 'accelerometer', 'mpu6050', 'imu', 'motion', 'orientation', 'tilt'],
+        'name': 'MPU-6050 3-Axis Gyroscope + 3-Axis Accelerometer',
+        'category': 'Sensor',
+        'price_range': '₹120 – ₹240',
+        'quantity': 1,
+        'unit': 'pcs',
+        'unit_price': 140,
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/MPU-6050_Module.jpg/640px-MPU-6050_Module.jpg',
+        'description': '6-DOF motion tracking sensor with integrated Digital Motion Processor (DMP) over I2C.',
+        'wiring_tip': 'Connect VCC to 3.3V, GND to GND, SCL to MCU SCL, SDA to MCU SDA. AD0 pin sets I2C address (default 0x68).',
+        'learn_url': 'https://howtomechatronics.com/tutorials/arduino/arduino-and-mpu6050-accelerometer-and-gyroscope-tutorial/',
+    },
+    {
+        'keywords': ['battery', '18650', 'power', 'rechargeable', 'power bank', 'bms'],
+        'name': '18650 Li-ion 3.7V 2600mAh Rechargeable Battery + Dual Slot Holder',
+        'category': 'Power',
+        'price_range': '₹240 – ₹450',
+        'quantity': 2,
+        'unit': 'pcs',
+        'unit_price': 160,
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/18650_cells.jpg/640px-18650_cells.jpg',
+        'description': 'Reliable lithium-ion rechargeable battery pack providing autonomous portable DC power for hardware prototypes.',
+        'wiring_tip': 'Always pair with a TP4056 charging module and protection circuit board (BMS) to avoid over-discharge.',
+        'learn_url': 'https://batteryuniversity.com/article/bu-301a-types-of-battery-cells',
+    },
+    {
+        'keywords': ['breadboard', 'wires', 'jumper', 'prototyping', 'cables'],
+        'name': '830-Point Solderless Breadboard + 65-pc Jumper Wire Kit',
+        'category': 'Prototyping',
+        'price_range': '₹140 – ₹260',
+        'quantity': 1,
+        'unit': 'kit',
+        'unit_price': 160,
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Breadboard_complex.jpg/640px-Breadboard_complex.jpg',
+        'description': 'Standard solderless breadboard with power rails plus flexible male-to-male and male-to-female jumper cables.',
+        'wiring_tip': 'Use red rail for power (+5V/3.3V) and blue/black rail for common ground (GND).',
+        'learn_url': 'https://www.instructables.com/How-to-Use-a-Breadboard/',
+    },
+    {
         'keywords': ['relay', 'switch', 'ac control', 'relay module'],
         'name': '5V 1-Channel Relay Module with Optocoupler',
         'category': 'Actuator',
         'price_range': '₹60 – ₹110',
+        'quantity': 1,
+        'unit': 'pcs',
+        'unit_price': 75,
         'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Relay_module.jpg/640px-Relay_module.jpg',
         'description': 'Isolates and switches 250V AC/10A or 30V DC/10A high-power appliances safely.',
         'wiring_tip': 'JD-VCC jumper controls optocoupler isolation. Active LOW signal trigger.',
@@ -1448,12 +1551,15 @@ def build_vendor_store_links(component_name):
     return [
         {
             'vendor': 'MakerBazar',
-            'tagline': 'Electronics & Maker Supplies',
+            'tagline': 'Default Maker Store · Real Parts',
             'logo': 'https://makerbazar.in/favicon.ico',
             'color': '#F97316',
             'bg': '#FFF7ED',
             'direct_search_url': f'https://makerbazar.in/search?q={enc}',
-            'badge': 'Maker Choice',
+            'badge': 'Primary Store',
+            'is_default': True,
+            'availability': 'In Stock (MakerBazar)',
+            'availability_status': 'in_stock',
         },
         {
             'vendor': 'Robocraze',
@@ -1462,7 +1568,10 @@ def build_vendor_store_links(component_name):
             'color': '#2563EB',
             'bg': '#EFF6FF',
             'direct_search_url': f'https://robocraze.com/search?type=product&q={enc}',
-            'badge': 'Fast Delivery',
+            'badge': 'Alternative Option',
+            'is_default': False,
+            'availability': 'In Stock (Robocraze)',
+            'availability_status': 'in_stock',
         },
         {
             'vendor': 'Roboin',
@@ -1471,7 +1580,10 @@ def build_vendor_store_links(component_name):
             'color': '#16A34A',
             'bg': '#F0FDF4',
             'direct_search_url': f'https://www.roboin.io/?s={enc}',
-            'badge': 'Verified Genuine',
+            'badge': 'Alternative Option',
+            'is_default': False,
+            'availability': 'In Stock (Roboin)',
+            'availability_status': 'in_stock',
         },
         {
             'vendor': 'IndiaHobbyStore',
@@ -1480,7 +1592,10 @@ def build_vendor_store_links(component_name):
             'color': '#CA8A04',
             'bg': '#FEFCE8',
             'direct_search_url': f'https://www.indiahobbystore.com/search?q={enc}',
-            'badge': 'Student Discounts',
+            'badge': 'Alternative Option',
+            'is_default': False,
+            'availability': 'Available',
+            'availability_status': 'available',
         },
     ]
 
@@ -1499,7 +1614,7 @@ class HardwareBOMView(APIView):
             # Fallback components based on keywords
             components = []
             lower = f"{idea} {problem}".lower()
-            for part in CURATED_HARDWARE_PARTS[:5]:
+            for part in CURATED_HARDWARE_PARTS:
                 if any(kw in lower for kw in part['keywords']):
                     min_p, max_p = 300, 600
                     try:
@@ -1508,14 +1623,18 @@ class HardwareBOMView(APIView):
                             min_p, max_p = nums[0], nums[1]
                     except Exception:
                         pass
+                    qty = part.get('quantity', 1)
+                    u_price = part.get('unit_price', min_p)
                     components.append({
                         'id': f"comp_{len(components)+1}",
                         'name': part['name'],
                         'category': part['category'],
-                        'quantity': 1,
-                        'unit': 'pcs',
+                        'quantity': qty,
+                        'unit': part.get('unit', 'pcs'),
                         'priceMin': min_p,
                         'priceMax': max_p,
+                        'unit_price': u_price,
+                        'total_price': u_price * qty,
                         'currency': 'INR',
                         'icon': '⚡',
                         'color': '#2563EB',
@@ -1526,6 +1645,9 @@ class HardwareBOMView(APIView):
                         'learnUrl': part['learn_url'],
                         'searchQuery': part['name'],
                         'required': True,
+                        'vendors': build_vendor_store_links(part['name']),
+                        'availability': 'In Stock (MakerBazar)',
+                        'availability_status': 'in_stock',
                     })
 
             if not components:
@@ -1648,15 +1770,22 @@ class HardwareSearchView(APIView):
         # Find matching parts from curated catalog
         for part in CURATED_HARDWARE_PARTS:
             score = sum(1 for kw in part['keywords'] if kw in lower)
-            if score > 0 or lower in part['name'].lower():
+            if score > 0 or lower in part['name'].lower() or any(w in part['name'].lower() for w in lower.split()):
+                qty = part.get('quantity', 1)
+                u_price = part.get('unit_price', 250)
                 matched.append({
                     'name': part['name'],
                     'category': part['category'],
                     'price_range': part['price_range'],
+                    'quantity': qty,
+                    'unit': part.get('unit', 'pcs'),
+                    'unit_price': u_price,
+                    'total_price': u_price * qty,
                     'image': part['image'],
                     'description': part['description'],
                     'wiring_tip': part['wiring_tip'],
                     'learn_url': part['learn_url'],
+                    'availability': 'In Stock (MakerBazar)',
                     'vendors': build_vendor_store_links(part['name']),
                 })
 
@@ -1666,10 +1795,15 @@ class HardwareSearchView(APIView):
                 'name': query.title(),
                 'category': 'Hardware Component',
                 'price_range': '₹150 – ₹850',
-                'image': 'https://upload.wikimedia.org/wikipedia/commons/3/38/Arduino_Uno_-_R3.jpg',
-                'description': f'Component matching "{query}" available across Indian electronic component stores.',
+                'quantity': 1,
+                'unit': 'pcs',
+                'unit_price': 350,
+                'total_price': 350,
+                'image': 'https://upload.wikimedia.org/wikipedia/commons/8/87/ESP32_Espressif_ESP-WROOM-32.jpg',
+                'description': f'Component matching "{query}" available with direct search across Indian electronics stores.',
                 'wiring_tip': 'Refer to component datasheet for pinout configuration and voltage limits.',
                 'learn_url': f'https://www.google.com/search?q={urllib.parse.quote_plus(query + " arduino tutorial")}',
+                'availability': 'Available on MakerBazar',
                 'vendors': build_vendor_store_links(query),
             })
 

@@ -233,3 +233,18 @@ class TaskVerificationReceipt(models.Model):
     def __str__(self):
         return f'{self.project_id} -> {self.task_key} (+{self.xp_awarded} XP)'
 
+
+class BusinessModelRevision(models.Model):
+    """Timestamped snapshot of a project's full business model and financial plan."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(ProjectDraft, on_delete=models.CASCADE, related_name='business_model_revisions')
+    plan_data = models.JSONField(default=dict)
+    summary = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.project_id} revision at {self.created_at}'
+

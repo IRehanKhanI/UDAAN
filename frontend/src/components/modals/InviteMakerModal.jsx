@@ -11,6 +11,7 @@ export default function InviteMakerModal({ isOpen, onClose, onInviteSent, projec
   const [role, setRole] = useState('Co-Maker')
   const [invited, setInvited] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
+  const [deliveryStatus, setDeliveryStatus] = useState('link_only')
   const [copied, setCopied] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -47,8 +48,12 @@ export default function InviteMakerModal({ isOpen, onClose, onInviteSent, projec
     setBusy(true)
 
     try {
-      if (projectId && projectId !== 'starter') {
-        const res = await createTeamInvitations(projectId, [{
+      const activeProjectId = (projectId && projectId !== 'starter')
+        ? projectId
+        : (localStorage.getItem('udaan:selected-project') || '')
+
+      if (activeProjectId) {
+        const res = await createTeamInvitations(activeProjectId, [{
           email: targetEmail,
           role,
           name: name.trim() || (githubUsername.trim() ? `@${githubUsername.trim()}` : targetEmail.split('@')[0]),
@@ -57,6 +62,10 @@ export default function InviteMakerModal({ isOpen, onClose, onInviteSent, projec
         if (created?.invite_link) {
           setInviteLink(created.invite_link)
         }
+        setDeliveryStatus(created?.delivery || 'link_only')
+      } else {
+        setInviteLink(`${window.location.origin}/team/invite/starter-${Date.now()}`)
+        setDeliveryStatus('link_only')
       }
       setInvited(true)
       if (onInviteSent) onInviteSent({ email: targetEmail, role, name: name.trim() })
@@ -122,15 +131,33 @@ export default function InviteMakerModal({ isOpen, onClose, onInviteSent, projec
 
         {invited ? (
           <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-[#2A5D54]/10 border border-[#2A5D54]/30 text-[#2A5D54] text-xs font-bold text-center flex items-center justify-center gap-2">
+            <div className={`p-4 rounded-2xl border text-xs font-bold text-center flex items-center justify-center gap-2 ${
+              deliveryStatus === 'sent'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : 'bg-[#2A5D54]/10 border-[#2A5D54]/30 text-[#2A5D54]'
+            }`}>
               <Check size={18} />
-              <span>Invitation generated for {name || email || `@${githubUsername}`}!</span>
+              <span>
+                {deliveryStatus === 'sent'
+                  ? `Invitation email sent to ${email || name || `@${githubUsername}`}!`
+                  : `Invitation link generated for ${name || email || `@${githubUsername}`}!`}
+              </span>
             </div>
+
+            {deliveryStatus === 'sent' ? (
+              <p className="text-[11px] text-[#2A5D54] text-center font-medium px-2">
+                Your collaborator has been emailed their invitation. You can also share the direct link below:
+              </p>
+            ) : (
+              <p className="text-[11px] text-[#7C766F] text-center font-medium px-2">
+                Share this direct invite link via WhatsApp, Slack, or email so your collaborator can join this workspace:
+              </p>
+            )}
 
             {inviteLink && (
               <div className="space-y-1.5 p-3.5 rounded-2xl bg-white border border-[#EFEAE4]">
                 <label className="block text-[11px] font-bold text-[#534342] uppercase tracking-wider">
-                  Copyable Invite Link (Send via Slack, Discord or Email):
+                  Direct Invitation Link:
                 </label>
                 <div className="flex items-center gap-2">
                   <input
@@ -142,7 +169,7 @@ export default function InviteMakerModal({ isOpen, onClose, onInviteSent, projec
                   <button
                     type="button"
                     onClick={copyToClipboard}
-                    className="px-3.5 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold shrink-0 hover:bg-black flex items-center gap-1"
+                    className="px-3.5 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold shrink-0 hover:bg-black flex items-center gap-1 cursor-pointer"
                   >
                     {copied ? <Check size={13} /> : <Copy size={13} />}
                     <span>{copied ? 'Copied!' : 'Copy'}</span>
