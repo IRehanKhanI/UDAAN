@@ -38,17 +38,27 @@ import {
   Sparkles,
   Trash2,
   Undo2,
+  UploadCloud,
   UserCheck,
   UsersRound,
+  Share2,
   X,
+  BookOpen,
+  Cpu,
+  CircleDollarSign,
+  Package,
+  Search,
+  Target,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { MiniLoader } from '../components/UdaanLoader.jsx'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
+import { INDIAN_VENDORS, searchHardwareProducts, generateBillOfMaterials } from '../services/hardwareService.js'
 import AddTaskModal from '../components/modals/AddTaskModal.jsx'
 import PlainEnglishExplainerModal from '../components/modals/PlainEnglishExplainerModal.jsx'
 import CreativeBriefModal from '../components/modals/CreativeBriefModal.jsx'
+import ProofOfWorkModal from '../components/modals/ProofOfWorkModal.jsx'
 import MindMapCanvas from '../components/mindmap/MindMapCanvas.jsx'
 import MarketRadarView from '../components/radar/MarketRadarView.jsx'
 import ReplanDiffDrawer from '../components/diff/ReplanDiffDrawer.jsx'
@@ -892,6 +902,7 @@ function RoadmapHeader({
   const startDateStr = project.startDate || project.start_date || project.workflow?.flight_plan?.start_date
   const daysInfo = useMemo(() => getDaysRemaining(deadlineStr), [deadlineStr])
   const timelineProgress = useMemo(() => getTimelineProgress(startDateStr, deadlineStr), [startDateStr, deadlineStr])
+  const [showVerificationAudit, setShowVerificationAudit] = useState(false)
   const [activeTrackInfo, setActiveTrackInfo] = useState(null)
 
   const currentXp = project.xp_points || 0
@@ -948,173 +959,127 @@ function RoadmapHeader({
         </div>
       </section>
 
-      <section className="fp-overview" aria-label="Roadmap progress and deadline">
-        {/* Top summary row */}
-        <div className="fp-overview-top">
-          <div className="fp-progress-title">
-            <span>Overall completion</span>
-            <strong>{percent}%</strong>
+      {/* ─── MINIMALIST & CLEAN ROADMAP OVERVIEW ─── */}
+      <section className="fp-overview fp-overview-minimal" aria-label="Roadmap progress and deadline">
+        {/* Main Clean Row: Big Progress + Key Metrics */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#F0EBE5]">
+          <div className="flex items-center gap-4">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs font-bold text-[#7C766F] uppercase tracking-wider">Overall Progress</span>
+              <strong className="text-2xl sm:text-3xl font-black text-[#8E4B49] tracking-tight">{percent}%</strong>
+            </div>
+            <div className="hidden sm:block w-px h-6 bg-[#E8E2DA]" />
+            <div className="text-xs text-[#534342] font-semibold">
+              <span className="text-[#1D1B18] font-bold">{doneCount}</span> of {taskCount} tasks completed
+            </div>
           </div>
-          <div className="fp-overview-top-right">
+
+          {/* Right: Launch countdown badge & Verification toggle */}
+          <div className="flex items-center gap-2 flex-wrap">
             {deadlineStr ? (
-              <div className="fp-deadline-summary-chip">
-                <Calendar size={13} />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF8F3] border border-[#FFAAA6]/40 text-xs font-bold text-[#7A3C3A]">
+                <Calendar size={13} className="text-[#8E4B49]" />
                 <span>Launch: <b>{formatDisplayDate(deadlineStr)}</b></span>
                 {daysInfo && (
-                  <span className={`fp-chip-days ${daysInfo.isOverdue ? 'overdue' : daysInfo.days <= 7 ? 'urgent' : 'healthy'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${daysInfo.isOverdue ? 'bg-[#FEE2E2] text-[#991B1B]' : daysInfo.days <= 7 ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#D1FAE5] text-[#065F46]'
+                    }`}>
                     {daysInfo.label}
                   </span>
                 )}
               </div>
             ) : (
-              <button type="button" className="fp-set-deadline-link" onClick={onOpenTimingEdit}>
-                + Set a launch deadline to track schedule feasibility
+              <button type="button" className="text-xs font-bold text-[#8E4B49] hover:underline" onClick={onOpenTimingEdit}>
+                + Set launch deadline
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setShowVerificationAudit(!showVerificationAudit)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-[#E5E0D8] text-xs font-bold text-[#534342] hover:bg-[#FAF8F5] transition-colors"
+              title="Toggle detailed repository scan and test verification evidence"
+            >
+              <span>{showVerificationAudit ? 'Hide' : 'Show'} Git & Audit Details</span>
+              <ChevronDown size={13} className={`transition-transform duration-200 ${showVerificationAudit ? 'rotate-180' : ''}`} />
+            </button>
           </div>
         </div>
 
-        {/* Dual Progress: Task Completion Track + Timeline Elapsed Track */}
-        <div className="fp-dual-progress-wrap">
-          <div className="fp-track-row">
-            <div className="fp-track-label-group">
-              <span className="fp-track-label">Tasks completed</span>
-              <span className="fp-track-val">{doneCount} of {taskCount} tasks ({percent}%)</span>
-            </div>
-            <div className="fp-progress-track" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
-              <span style={{ width: `${percent}%` }} />
-            </div>
+        {/* Clean Single Progress Bar */}
+        <div className="fp-progress-track my-3" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
+          <span style={{ width: `${percent}%` }} />
+        </div>
+
+        {/* Quick Scannable Status Pills Strip */}
+        <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-[#6D6560] pt-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] font-medium">
+              <CheckCircle2 size={13} className="text-[#10B981]" />
+              <b>{completedMilestones}</b> of {milestones} milestones done
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] font-medium">
+              <Compass size={13} className="text-[#8E4B49]" />
+              {activeMilestone ? `Active: ${activeMilestone}` : 'All complete'}
+            </span>
+            {overdueCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B] font-bold">
+                <AlertTriangle size={13} /> {overdueCount} overdue
+              </span>
+            )}
+            {blockedCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] font-bold">
+                <ShieldAlert size={13} /> {blockedCount} blocked
+              </span>
+            )}
           </div>
 
           {timelineProgress !== null && (
-            <div className="fp-track-row timeline-track-row">
-              <div className="fp-track-label-group">
-                <span className="fp-track-label">Timeline elapsed</span>
-                <span className="fp-track-val">
-                  {timelineProgress}% time elapsed
-                  {startDateStr ? ` · Started ${formatDisplayDate(startDateStr)}` : ''}
-                </span>
-              </div>
-              <div className="fp-timeline-track" role="progressbar" aria-valuenow={timelineProgress} aria-valuemin="0" aria-valuemax="100">
-                <span
-                  className={daysInfo?.isOverdue ? 'overdue' : timelineProgress > 85 ? 'warning' : 'healthy'}
-                  style={{ width: `${Math.min(timelineProgress, 100)}%` }}
-                />
-              </div>
-            </div>
+            <span className="text-[11px] text-[#7C766F] font-medium">
+              Timeline: <b>{timelineProgress}%</b> elapsed{startDateStr ? ` · Started ${formatDisplayDate(startDateStr)}` : ''}
+            </span>
           )}
         </div>
 
-        {/* Task Status Breakdown Chips */}
-        <div className="fp-status-breakdown-row">
-          <div className="fp-status-chip done">
-            <CheckCircle2 size={13} />
-            <span>Completed: <b>{doneCount}</b></span>
-          </div>
-          <div className="fp-status-chip in-progress">
-            <Compass size={13} />
-            <span>In Progress: <b>{inProgressCount}</b></span>
-          </div>
-          <div className="fp-status-chip blocked">
-            <ShieldAlert size={13} />
-            <span>Blocked: <b>{blockedCount}</b></span>
-          </div>
-          {overdueCount > 0 && (
-            <div className="fp-status-chip overdue">
-              <AlertTriangle size={13} />
-              <span>Overdue: <b>{overdueCount}</b></span>
+        {/* Collapsible Deep Verification & Git Audit (Hidden by default to keep screen minimal) */}
+        {showVerificationAudit && (
+          <div className="mt-4 pt-4 border-t border-[#EFEAE4] space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between text-xs font-bold text-[#1D1B18]">
+              <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-[#8E4B49]">
+                <FileCheck size={14} /> Repository Deterministic Verification & Evidence
+              </span>
+              <span className="text-[11px] text-[#7C766F]">Multi-track analysis</span>
             </div>
-          )}
-          {unverifiedCount > 0 && (
-            <div className="fp-status-chip unverified">
-              <CircleHelp size={13} />
-              <span>Needs Review: <b>{unverifiedCount}</b></span>
-            </div>
-          )}
-        </div>
 
-        {/* Multi-track breakdown for repository verification with info popovers */}
-        <div className="fp-progress-breakdown">
-          <div className="fp-progress-stat">
-            <div className="fp-stat-head">
-              <div className="fp-track-info-wrap">
-                <span className="fp-stat-label">Manual user completion</span>
-                <button
-                  type="button"
-                  className="fp-track-info-btn"
-                  onClick={() => setActiveTrackInfo(activeTrackInfo === 'manual' ? null : 'manual')}
-                  title="How is this track calculated?"
-                >
-                  <CircleHelp size={12} />
-                </button>
-                {activeTrackInfo === 'manual' && (
-                  <div className="fp-track-popover">
-                    <strong>Manual User Completion:</strong> Computed dynamically from task checkboxes marked as done by you.
-                  </div>
-                )}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4]">
+                <div className="flex items-center justify-between text-xs font-bold text-[#1D1B18] mb-1.5">
+                  <span>User Checklist</span>
+                  <span>{doneCount} / {taskCount} ({percent}%)</span>
+                </div>
+                <div className="fp-stat-track user"><span style={{ width: `${percent}%` }} /></div>
+                <span className="text-[10px] text-[#7C766F] mt-1 block">Manual checkmarks</span>
               </div>
-              <span className="fp-stat-val">{doneCount} / {taskCount} ({percent}%)</span>
-            </div>
-            <div className="fp-stat-track user"><span style={{ width: `${percent}%` }} /></div>
-            <span className="fp-stat-footnote">Task checklist</span>
-          </div>
 
-          <div className="fp-progress-stat">
-            <div className="fp-stat-head">
-              <div className="fp-track-info-wrap">
-                <span className="fp-stat-label">Repository evidence found</span>
-                <button
-                  type="button"
-                  className="fp-track-info-btn"
-                  onClick={() => setActiveTrackInfo(activeTrackInfo === 'evidence' ? null : 'evidence')}
-                  title="How is this track calculated?"
-                >
-                  <CircleHelp size={12} />
-                </button>
-                {activeTrackInfo === 'evidence' && (
-                  <div className="fp-track-popover">
-                    <strong>Repository Evidence Found:</strong> Deterministic file scan matching your connected GitHub repository's tree against expected milestone source code.
-                  </div>
-                )}
+              <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4]">
+                <div className="flex items-center justify-between text-xs font-bold text-[#1D1B18] mb-1.5">
+                  <span>Repo Evidence</span>
+                  <span>{evidenceCount} / {taskCount} ({evidencePercent}%)</span>
+                </div>
+                <div className="fp-stat-track evidence"><span style={{ width: `${evidencePercent}%` }} /></div>
+                <span className="text-[10px] text-[#7C766F] mt-1 block">Deterministic file scan</span>
               </div>
-              <span className="fp-stat-val">{evidenceCount} / {taskCount} ({evidencePercent}%)</span>
-            </div>
-            <div className="fp-stat-track evidence"><span style={{ width: `${evidencePercent}%` }} /></div>
-            <span className="fp-stat-footnote">Deterministic code matches detected</span>
-          </div>
 
-          <div className="fp-progress-stat">
-            <div className="fp-stat-head">
-              <div className="fp-track-info-wrap">
-                <span className="fp-stat-label">Verification passed</span>
-                <button
-                  type="button"
-                  className="fp-track-info-btn"
-                  onClick={() => setActiveTrackInfo(activeTrackInfo === 'verified' ? null : 'verified')}
-                  title="How is this track calculated?"
-                >
-                  <CircleHelp size={12} />
-                </button>
-                {activeTrackInfo === 'verified' && (
-                  <div className="fp-track-popover">
-                    <strong>Verification Passed:</strong> Verifiable test receipts, PR reviews, and proofs verified in Task Workbench. Awards real XP toward project tier progression!
-                  </div>
-                )}
+              <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4]">
+                <div className="flex items-center justify-between text-xs font-bold text-[#1D1B18] mb-1.5">
+                  <span>Workbench Verified</span>
+                  <span>{verifiedCount} / {taskCount} ({verifiedPercent}%)</span>
+                </div>
+                <div className="fp-stat-track verified"><span style={{ width: `${verifiedPercent}%` }} /></div>
+                <span className="text-[10px] text-[#7C766F] mt-1 block">Verified PR proofs & tests</span>
               </div>
-              <span className="fp-stat-val">{verifiedCount} / {taskCount} ({verifiedPercent}%)</span>
             </div>
-            <div className="fp-stat-track verified"><span style={{ width: `${verifiedPercent}%` }} /></div>
-            <span className="fp-stat-footnote">Passed criteria checks</span>
           </div>
-        </div>
-
-        <div className="fp-overview-foot">
-          <span><CheckCircle2 size={14} /> {completedMilestones} of {milestones} milestones complete</span>
-          <span className="fp-active-milestone">
-            <span className="fp-active-dot" />
-            {activeMilestone ? `Active: ${activeMilestone}` : 'All milestones complete'}
-          </span>
-        </div>
+        )}
       </section>
     </>
   )
@@ -1133,66 +1098,36 @@ function TeamMemberRoadmapStrip({
   const totalCompleted = allTasks.filter(t => completed.includes(t.id)).length
 
   return (
-    <div className="fp-team-member-strip">
-      <div className="fp-team-strip-header">
+    <div className="fp-team-member-strip-minimal p-3 rounded-2xl bg-white border border-[#EFEAE4] shadow-xs">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-2.5 h-2.5 rounded-full bg-[#8E4B49] animate-pulse" />
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[#7A3C3A]">
-            Team Member Feature Roadmaps
+          <span className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider flex items-center gap-1.5">
+            <UsersRound size={14} className="text-[#8E4B49]" />
+            Filter Tasks by Role:
           </span>
         </div>
         <span className="text-[11px] text-[#7C766F]">
-          Click a person to see their specific deliverables, color-coded cards & implementation checklist
+          Select a role to focus only on their deliverables
         </span>
       </div>
 
-      <div className="fp-member-cards-grid">
-        {/* All Members Option */}
+      {/* Clean Compact Role Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
         <button
           type="button"
           onClick={() => onSelectRole('all')}
-          className={`fp-member-card ${selectedRole === 'all' ? 'is-selected' : ''}`}
-          style={{
-            borderColor: selectedRole === 'all' ? '#1D1B18' : '#EFEAE4',
-            background: selectedRole === 'all' ? '#1D1B18' : '#FFFFFF',
-            color: selectedRole === 'all' ? '#FFFFFF' : '#1D1B18',
-          }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${selectedRole === 'all'
+            ? 'bg-[#1D1B18] text-white shadow-xs'
+            : 'bg-[#FAF8F5] text-[#534342] hover:bg-[#EFEAE4] border border-[#EFEAE4]'
+            }`}
         >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-xs shrink-0"
-              style={{
-                background: selectedRole === 'all' ? '#3B3835' : '#F5F0EB',
-                color: selectedRole === 'all' ? '#FFFFFF' : '#8E4B49',
-              }}
-            >
-              <UsersRound size={18} />
-            </div>
-            <div className="text-left min-w-0">
-              <div className="font-bold text-xs truncate">All Team Members</div>
-              <div
-                className="text-[11px]"
-                style={{ color: selectedRole === 'all' ? '#D6D3D1' : '#7C766F' }}
-              >
-                {totalCompleted} of {totalTasks} deliverables done
-              </div>
-            </div>
-          </div>
-          <div
-            className="fp-member-progress-mini"
-            style={{ background: selectedRole === 'all' ? '#44403C' : '#EFEAE4' }}
-          >
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${totalTasks ? Math.round((totalCompleted / totalTasks) * 100) : 0}%`,
-                background: selectedRole === 'all' ? '#10B981' : '#8E4B49',
-              }}
-            />
-          </div>
+          <span>All Roles</span>
+          <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${selectedRole === 'all' ? 'bg-white/20 text-white' : 'bg-[#EAE4DC] text-[#534342]'
+            }`}>
+            {totalCompleted}/{totalTasks}
+          </span>
         </button>
 
-        {/* Individual Role Cards */}
         {displayRoles.map((roleName) => {
           const conf = getRoleConfig(roleName)
           const roleTasks = allTasks.filter(item => {
@@ -1200,8 +1135,8 @@ function TeamMemberRoadmapStrip({
             const target = roleName.toLowerCase()
             return r.includes(target) || target.includes(r)
           })
+          if (!roleTasks.length && !standardRoles.includes(roleName)) return null
           const roleDone = roleTasks.filter(item => completed.includes(item.id)).length
-          const rolePct = roleTasks.length ? Math.round((roleDone / roleTasks.length) * 100) : 0
           const isSelected = selectedRole.toLowerCase() === roleName.toLowerCase()
 
           return (
@@ -1209,54 +1144,29 @@ function TeamMemberRoadmapStrip({
               key={roleName}
               type="button"
               onClick={() => onSelectRole(isSelected ? 'all' : roleName)}
-              className={`fp-member-card ${isSelected ? 'is-selected' : ''}`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${isSelected
+                ? 'text-white shadow-xs border-transparent'
+                : 'bg-white text-[#2D2A26] hover:bg-[#FAF8F5] border-[#E5E0D8]'
+                }`}
               style={{
-                borderColor: isSelected ? conf.color : conf.border,
-                background: isSelected ? conf.bg : '#FFFFFF',
-                boxShadow: isSelected ? `0 0 0 2px ${conf.color}40, 0 4px 12px ${conf.color}22` : 'none',
+                backgroundColor: isSelected ? conf.color : undefined,
               }}
             >
-              <div className="flex items-center gap-3">
-                <div className="relative shrink-0">
-                  <img
-                    src={conf.avatar}
-                    alt={conf.short}
-                    className="w-10 h-10 rounded-full object-cover border-2 shadow-xs"
-                    style={{ borderColor: conf.color }}
-                  />
-                  <span
-                    className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white"
-                    style={{ background: conf.color }}
-                  >
-                    {conf.initials}
-                  </span>
-                </div>
-                <div className="text-left min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="font-bold text-xs text-[#1D1B18] truncate">{conf.short}</span>
-                    <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
-                      style={{ background: conf.badgeBg, color: conf.accent }}
-                    >
-                      {roleTasks.length} {roleTasks.length === 1 ? 'task' : 'tasks'}
-                    </span>
-                  </div>
-                  <div className="text-[10.5px] text-[#7C766F] truncate" title={conf.description}>
-                    {conf.description}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-[10px] text-[#7C766F] mt-1">
-                <span>{roleDone} of {roleTasks.length} done</span>
-                <span className="font-bold" style={{ color: conf.color }}>{rolePct}%</span>
-              </div>
-              <div className="fp-member-progress-mini" style={{ background: '#EFEAE4' }}>
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{ width: `${rolePct}%`, background: conf.color }}
-                />
-              </div>
+              <img
+                src={conf.avatar}
+                alt={conf.short}
+                className="w-4 h-4 rounded-full object-cover shrink-0"
+              />
+              <span>{conf.short}</span>
+              <span
+                className="px-1.5 py-0.2 rounded-md text-[10px] font-black"
+                style={{
+                  backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : conf.badgeBg,
+                  color: isSelected ? '#FFFFFF' : conf.accent,
+                }}
+              >
+                {roleDone}/{roleTasks.length}
+              </span>
             </button>
           )
         })}
@@ -1339,7 +1249,7 @@ function MilestoneGanttTimeline({
                       <span className="font-bold text-[#1D1B18]">{pct}% Done</span>
                     </div>
                   )}
-                  <div className="w-full h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">
+                  <div className="w-full h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden" style={{ color: 'blue' }}>
                     <div
                       className="h-full bg-[#8E4B49] rounded-full transition-all"
                       style={{ width: `${pct}%` }}
@@ -1402,13 +1312,12 @@ function MilestoneGanttTimeline({
                             {item.task.effort_estimate || '12h'}
                           </span>
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${
-                              isDone
-                                ? 'bg-[#ECFDF5] text-[#059669]'
-                                : isOverdue
-                                  ? 'bg-[#FEF2F2] text-[#DC2626]'
-                                  : 'bg-white text-[#374151] border border-[#E5E7EB]'
-                            }`}
+                            className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${isDone
+                              ? 'bg-[#ECFDF5] text-[#059669]'
+                              : isOverdue
+                                ? 'bg-[#FEF2F2] text-[#DC2626]'
+                                : 'bg-white text-[#374151] border border-[#E5E7EB]'
+                              }`}
                           >
                             {isDone ? '✓ Done' : isOverdue ? 'Overdue' : formatDisplayDate(item.task.target_date)}
                           </span>
@@ -1437,12 +1346,15 @@ function TaskRow({
   assessment,
   onInspect,
   onOpenWorkbench,
+  onOpenProof,
+  hasProof = false,
 }) {
   const task = item.task
   const priority = (task.priority || 'medium').toLowerCase()
   const statusKey = assessment?.status || 'not_assessed'
   const meta = buildStatusMeta(statusKey)
   const StatusIcon = meta.icon
+  const [subtasksOpen, setSubtasksOpen] = useState(false)
 
   const overdue = isTaskOverdue(task, done)
   const targetDateDisplay = formatDisplayDate(task.target_date)
@@ -1452,19 +1364,17 @@ function TaskRow({
   const steps = (Array.isArray(task.subtasks) && task.subtasks.length > 0)
     ? task.subtasks
     : [
-        `Plan & scaffold ${task.title || 'feature'} structure`,
-        `Implement business logic & integrate responsive UI`,
-        `Verify criteria, test edge cases & record proof`,
-      ]
+      `Plan & scaffold ${task.title || 'feature'} structure`,
+      `Implement business logic & integrate responsive UI`,
+      `Verify criteria, test edge cases & record proof`,
+    ]
 
   return (
     <article
       id={highlight ? 'fp-task-return-target' : undefined}
-      className={`fp-task-row ${done ? 'is-done' : ''} ${locked ? 'is-locked' : ''} ${overdue ? 'is-overdue' : ''} ${highlight ? 'fp-task-return-highlight' : ''}`}
+      className={`fp-task-row fp-task-row-clean ${done ? 'is-done' : ''} ${locked ? 'is-locked' : ''} ${overdue ? 'is-overdue' : ''} ${highlight ? 'fp-task-return-highlight' : ''}`}
       style={{
         borderLeft: done ? '4px solid #10B981' : `4px solid ${roleConf.color}`,
-        backgroundColor: done ? '#FAFAFA' : roleConf.bg,
-        borderColor: done ? '#E5E7EB' : roleConf.border,
       }}
     >
       <label
@@ -1476,31 +1386,43 @@ function TaskRow({
       </label>
 
       <div className="fp-task-main">
-        {/* Feature Header Badge & Role Contributor Pill */}
-        <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"
-              style={{ background: roleConf.badgeBg, color: roleConf.accent, border: `1px solid ${roleConf.border}` }}
+        {/* Compact Header: Role Pill & Category */}
+        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10.5px] font-bold shadow-2xs"
+              style={{ background: roleConf.bg, border: `1px solid ${roleConf.border}`, color: roleConf.accent }}
+              title={`Role: ${task.suggested_role || roleConf.label}`}
             >
-              🎯 Feature: {task.category || 'Core Deliverable'}
-            </span>
+              <img src={roleConf.avatar} alt={roleConf.short} className="w-3.5 h-3.5 rounded-full object-cover" />
+              <span>{task.suggested_role || roleConf.short}</span>
+            </div>
+
+            {task.category && (
+              <span className="text-[10.5px] font-medium text-[#7C766F] bg-[#FAF8F5] px-2 py-0.5 rounded-md border border-[#EFEAE4]">
+                {task.category}
+              </span>
+            )}
+
             {showMilestone && <span className="fp-task-milestone-label">{item.milestone}</span>}
           </div>
 
-          <div
-            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-2xs"
-            style={{ background: '#FFFFFF', border: `1px solid ${roleConf.border}`, color: roleConf.color }}
-            title={`Assigned to: ${task.suggested_role || roleConf.label}`}
-          >
-            <img src={roleConf.avatar} alt={roleConf.short} className="w-4 h-4 rounded-full object-cover" />
-            <span>{task.suggested_role || roleConf.short}</span>
-          </div>
+          {/* Proof Badge */}
+          {hasProof && (
+            <span
+              onClick={() => onOpenProof?.(item)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857] cursor-pointer hover:bg-[#D1FAE5] transition-colors"
+              title="Click to view submitted proof or share to LinkedIn"
+            >
+              <FileCheck2 size={11} /> Proof Attached 📸
+            </span>
+          )}
         </div>
 
+        {/* Task Title */}
         <div className="fp-task-title-line">
           <h4
-            className="cursor-pointer hover:text-[#8E4B49] transition-colors"
+            className="cursor-pointer hover:text-[#8E4B49] transition-colors text-sm font-bold text-[#1D1B18]"
             onClick={() => onOpenWorkbench?.(item)}
             title="Click to open Task Workbench"
           >
@@ -1508,60 +1430,53 @@ function TaskRow({
           </h4>
         </div>
 
-        {/* Features / Steps to Implement Checklist */}
-        <div className="fp-task-features-checklist my-2 p-2.5 rounded-xl bg-white/85 border border-[#EFEAE4]">
-          <div className="text-[11px] font-bold text-[#534342] flex items-center justify-between mb-1.5">
-            <span className="flex items-center gap-1.5 uppercase tracking-wide">
-              <ListChecks size={13} style={{ color: roleConf.color }} />
-              Features to Implement ({steps.length})
-            </span>
-            <span className="text-[10px] text-[#7C766F] font-mono">
-              {done ? 'All steps verified' : 'In development'}
-            </span>
-          </div>
-          <ul className="space-y-1">
-            {steps.map((step, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-xs text-[#2D2A26]">
-                <span
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5"
-                  style={{
-                    background: done ? '#ECFDF5' : roleConf.badgeBg,
-                    color: done ? '#059669' : roleConf.color,
-                  }}
-                >
-                  {done ? '✓' : idx + 1}
-                </span>
-                <span className={done ? 'line-through text-[#9CA3AF]' : ''}>{step}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {/* Action Row: Proof & Share, Workbench, Subtasks Toggle, Priority */}
+        <div className="fp-task-meta flex items-center justify-between flex-wrap gap-2 pt-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Proof of Work & Social Share Button */}
+            <button
+              type="button"
+              onClick={() => onOpenProof?.(item)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FFF1ED] border border-[#FFAAA6] text-[#8E4B49] hover:bg-[#FFAAA6]/30 transition-all shadow-2xs cursor-pointer"
+              title="Submit proof of work (screenshot/file) & generate LinkedIn post"
+            >
+              <Share2 size={11} />
+              <span>{hasProof ? 'View Proof & Share' : 'Proof & Share 🚀'}</span>
+            </button>
 
-        {/* Required Skills Tech Stack Pills */}
-        {task.required_skills?.length > 0 && (
-          <div className="flex items-center gap-1.5 flex-wrap my-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#7C766F]">Stack:</span>
-            {task.required_skills.map((skill) => (
-              <span
-                key={skill}
-                className="text-[10.5px] font-medium px-2 py-0.5 rounded-md bg-white border border-[#E5E7EB] text-[#374151]"
-              >
-                {skill}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="fp-task-meta">
-          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Workbench Button */}
             <button
               type="button"
               className="fp-workbench-open-btn"
               onClick={() => onOpenWorkbench?.(item)}
-              title="Open Task Workbench (Requirements, Evidence & Verification)"
+              title="Open Task Workbench"
             >
               <Sparkles size={11} /> Workbench
             </button>
+
+            {/* Subtasks Accordion Toggle */}
+            <button
+              type="button"
+              onClick={() => setSubtasksOpen(!subtasksOpen)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#FAF8F5] border border-[#E5E0D8] text-[#534342] hover:bg-[#EFEAE4] transition-colors"
+            >
+              <ListChecks size={12} style={{ color: roleConf.color }} />
+              <span>{steps.length} Subtasks</span>
+              <ChevronDown size={11} className={`transition-transform duration-200 ${subtasksOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <span className={`fp-priority ${priority}`}>{priority} priority</span>
+
+            {targetDateDisplay && (
+              <span className={`fp-task-date-pill ${overdue ? 'overdue' : ''}`}>
+                <Calendar size={11} /> {overdue ? `Overdue: ${targetDateDisplay}` : `Due ${targetDateDisplay}`}
+              </span>
+            )}
+
+            {task.effort_estimate && <span><Clock3 size={11} />{task.effort_estimate}</span>}
+          </div>
+
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               className={`fp-task-build-badge ${meta.className}`}
@@ -1572,52 +1487,37 @@ function TaskRow({
               <span>{meta.label}</span>
             </button>
           </div>
-
-          <span className={`fp-priority ${priority}`}>{priority} priority</span>
-
-          {targetDateDisplay && (
-            <span className={`fp-task-date-pill ${overdue ? 'overdue' : ''}`}>
-              <Calendar size={11} /> {overdue ? `Overdue: ${targetDateDisplay}` : `Due ${targetDateDisplay}`}
-            </span>
-          )}
-
-          {task.effort_estimate && <span><Clock3 size={11} />{task.effort_estimate}</span>}
-          {projectId && <Link className="fp-learn-task-link" to={`/learning?project=${encodeURIComponent(projectId)}&task=${encodeURIComponent(item.id)}`}><Sparkles size={11} />Learn this</Link>}
-
-          {task.dependencies?.length > 0 && (
-            <span className="fp-dependency">
-              <Link2 size={11} />{task.dependencies.length} dependenc{task.dependencies.length === 1 ? 'y' : 'ies'}
-            </span>
-          )}
-
-          {overdue && <span className="fp-task-warning overdue"><AlertTriangle size={11} /> Overdue</span>}
-          {locked && !done && <span className="fp-locked-label">Blocked</span>}
         </div>
 
-        {(task.acceptance_criteria || task.dependencies?.length > 0 || task.start_date) && (
-          <details className="fp-task-details">
-            <summary><ArrowDown size={13} /> Details & Acceptance Criteria</summary>
-            <div className="fp-task-detail-content">
-              {task.start_date && (
-                <div className="fp-detail-date-row">
-                  <span><b>Start:</b> {formatDisplayDate(task.start_date)}</span>
-                  {task.target_date && <span><b>Target:</b> {formatDisplayDate(task.target_date)}</span>}
-                </div>
-              )}
-              {task.acceptance_criteria && (
-                <div>
-                  <b>Acceptance criteria</b>
-                  <p>{task.acceptance_criteria}</p>
-                </div>
-              )}
-              {task.dependencies?.length > 0 && (
-                <div>
-                  <b>Dependencies</b>
-                  <p>{task.dependencies.join(' · ')}</p>
-                </div>
-              )}
+        {/* Collapsible Subtasks Checklist (Clean & Minimal) */}
+        {subtasksOpen && (
+          <div className="fp-task-features-checklist my-2.5 p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] animate-in fade-in duration-150">
+            <div className="text-[11px] font-bold text-[#534342] flex items-center justify-between mb-2">
+              <span className="flex items-center gap-1.5 uppercase tracking-wide">
+                <ListChecks size={13} style={{ color: roleConf.color }} />
+                Implementation Steps ({steps.length})
+              </span>
+              <span className="text-[10px] text-[#7C766F] font-mono">
+                {done ? 'Completed' : 'In development'}
+              </span>
             </div>
-          </details>
+            <ul className="space-y-1.5">
+              {steps.map((step, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-xs text-[#2D2A26]">
+                  <span
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5"
+                    style={{
+                      background: done ? '#ECFDF5' : roleConf.badgeBg,
+                      color: done ? '#059669' : roleConf.color,
+                    }}
+                  >
+                    {done ? '✓' : idx + 1}
+                  </span>
+                  <span className={done ? 'line-through text-[#9CA3AF]' : ''}>{step}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 
@@ -1661,7 +1561,7 @@ function RoadmapNode({
   const milestoneTheme = THEME_CLASSES[index % THEME_CLASSES.length]
 
   return (
-    <article className={`fp-milestone-node ${status} ${index % 2 ? 'right' : 'left'} ${selected ? 'selected' : ''} ${milestoneTheme}`}>
+    <article className={`fp-milestone-node fp-milestone-vertical ${status} ${selected ? 'selected' : ''} ${milestoneTheme}`}>
       <span className="fp-node-connector" aria-hidden="true" />
       <span className="fp-marker" aria-hidden="true">
         <NodeIcon size={16} />
@@ -1672,7 +1572,7 @@ function RoadmapNode({
         <div className="fp-milestone-top">
           <div className="fp-milestone-heading">
             <div className="fp-milestone-kicker-row">
-              <span className="fp-milestone-kicker">{milestone.category} · {String(index + 1).padStart(2, '0')}</span>
+              <span className="fp-milestone-kicker">{milestone.category} · Milestone {String(index + 1).padStart(2, '0')}</span>
               {targetDateStr && (
                 <span className="fp-milestone-target-date">
                   <Calendar size={10} /> Due {targetDateStr}
@@ -1697,6 +1597,146 @@ function RoadmapNode({
         <div className={`fp-mini-progress ${status}`}><span style={{ width: `${progress}%` }} /></div>
       </button>
     </article>
+  )
+}
+
+function AnimatedRoadmapCurve({ roadmapRef, milestonesCount }) {
+  const [curvePath, setCurvePath] = useState('')
+  const [svgHeight, setSvgHeight] = useState(600)
+
+  useEffect(() => {
+    const calcPath = () => {
+      if (!roadmapRef.current) return
+      const markers = roadmapRef.current.querySelectorAll('.fp-marker')
+      if (!markers.length) return
+
+      const containerRect = roadmapRef.current.getBoundingClientRect()
+      setSvgHeight(containerRect.height)
+
+      const points = Array.from(markers).map((m) => {
+        const r = m.getBoundingClientRect()
+        return {
+          x: r.left - containerRect.left + r.width / 2,
+          y: r.top - containerRect.top + r.height / 2,
+        }
+      })
+
+      if (points.length < 2) return
+
+      // Build smooth organic curve swinging outward to the left as sketched in reference
+      let d = `M ${points[0].x} ${points[0].y}`
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i]
+        const p2 = points[i + 1]
+        const dy = p2.y - p1.y
+        const swingX = Math.max(8, p1.x - 26) // outward left wave into gutter
+        d += ` C ${swingX} ${p1.y + dy * 0.28}, ${swingX} ${p1.y + dy * 0.72}, ${p2.x} ${p2.y}`
+      }
+
+      setCurvePath(d)
+    }
+
+    const timer = setTimeout(calcPath, 60)
+    window.addEventListener('resize', calcPath)
+    let ro = null
+    if (typeof ResizeObserver !== 'undefined' && roadmapRef.current) {
+      ro = new ResizeObserver(calcPath)
+      ro.observe(roadmapRef.current)
+    }
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', calcPath)
+      if (ro) ro.disconnect()
+    }
+  }, [roadmapRef, milestonesCount])
+
+  if (!curvePath) return null
+
+  return (
+    <svg
+      className="fp-animated-flow-svg"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: `${svgHeight}px`,
+        pointerEvents: 'none',
+        zIndex: 1,
+        overflow: 'visible',
+      }}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="roadmapFlowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#10B981" />
+          <stop offset="30%" stopColor="#8E4B49" />
+          <stop offset="70%" stopColor="#E06D53" />
+          <stop offset="100%" stopColor="#FFAAA6" />
+        </linearGradient>
+        <filter id="flowGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      {/* Base soft guide track */}
+      <path
+        d={curvePath}
+        fill="none"
+        stroke="#F2ECE6"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+
+      {/* Animated marching dash flow line */}
+      <path
+        d={curvePath}
+        fill="none"
+        stroke="url(#roadmapFlowGradient)"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeDasharray="9 7"
+        className="fp-flow-line-animated"
+      />
+
+      {/* Comet tail particle 2 */}
+      <circle r="3" fill="#FFAAA6" opacity="0.45">
+        <animateMotion
+          dur="3.4s"
+          repeatCount="indefinite"
+          path={curvePath}
+          begin="-0.35s"
+        />
+      </circle>
+
+      {/* Comet tail particle 1 */}
+      <circle r="4.5" fill="#E06D53" opacity="0.65">
+        <animateMotion
+          dur="3.4s"
+          repeatCount="indefinite"
+          path={curvePath}
+          begin="-0.18s"
+        />
+      </circle>
+
+      {/* Continuous glowing energy orb moving through path from one to another */}
+      <circle r="6" fill="#8E4B49" filter="url(#flowGlow)">
+        <animateMotion
+          dur="3.4s"
+          repeatCount="indefinite"
+          path={curvePath}
+        />
+      </circle>
+      <circle r="2.5" fill="#FFFFFF">
+        <animateMotion
+          dur="3.4s"
+          repeatCount="indefinite"
+          path={curvePath}
+        />
+      </circle>
+    </svg>
   )
 }
 
@@ -2287,6 +2327,1231 @@ function ReplanPreview({ plan, onCancel, onApprove }) {
   )
 }
 
+function HardwareBomFlightPlanView({
+  project,
+  hardwareBom = [],
+  onGenerateBom,
+  generating = false,
+  searchQuery,
+  onSearchChange,
+  onSearchSubmit,
+  searchResults = [],
+  onClearSearchResults,
+  searching = false,
+  onAddComp,
+  onRemoveComp,
+}) {
+  const domain = project?.domain || 'hardware'
+  const minTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMin || 0) * (c.quantity || 1), 0)
+  const maxTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMax || 0) * (c.quantity || 1), 0)
+
+  return (
+    <section className="space-y-6 animate-fadeIn font-['Plus_Jakarta_Sans']">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-[#FFFBEB] via-[#FEF3C7]/40 to-[#FFF7ED] rounded-3xl border border-[#FDE68A] p-6 shadow-xs flex items-center justify-between flex-wrap gap-4">
+        <div className="space-y-1 max-w-xl">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-xl bg-[#D97706] text-white flex items-center justify-center font-bold text-sm shadow-xs">
+              🔧
+            </span>
+            <h2 className="text-lg font-black text-[#1D1B18] tracking-tight">
+              Hardware Components & Bill of Materials (BOM)
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-white text-[#D97706] border border-[#FDE68A]">
+              {domain.toUpperCase()} DOMAIN
+            </span>
+          </div>
+          <p className="text-xs text-[#78350F] leading-relaxed">
+            Direct procurement links, live vendor price ranges (INR), wiring connections, and learning tutorials for Indian maker stores (MakerBazar, Robocraze, Roboin & IndiaHobbyStore).
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="bg-white/90 backdrop-blur px-4 py-2.5 rounded-2xl border border-[#FDE68A] shadow-xs text-right">
+            <span className="text-[10px] font-bold text-[#92400E] uppercase tracking-wider block">Estimated BOM Cost</span>
+            <span className="text-base font-black text-[#1D1B18]">
+              ₹{minTotal.toLocaleString('en-IN')} – ₹{maxTotal.toLocaleString('en-IN')}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onGenerateBom}
+            disabled={generating}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#D97706] text-white text-xs font-bold hover:bg-[#B45309] transition-all shadow-sm cursor-pointer disabled:opacity-60"
+          >
+            {generating ? <MiniLoader color="#fff" /> : <RefreshCw size={13} />}
+            <span>{generating ? 'Synthesizing…' : 'AI Generate BOM'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Live Component Search / Sourcing Bar */}
+      <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">Live Indian Store Sourcing</h3>
+            <p className="text-xs text-[#7C766F] mt-0.5">Search live parts across MakerBazar, Robocraze, Roboin & IndiaHobbyStore</p>
+          </div>
+          <span className="text-[11px] text-[#7C766F]">Instant Indian store links</span>
+        </div>
+
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C766F]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => onSearchChange(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') onSearchSubmit(searchQuery) }}
+              placeholder="Search components (e.g. ESP32, Arduino Uno, MG996R servo, HC-SR04 ultrasonic, OLED 0.96)..."
+              className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs focus:bg-white focus:border-[#D97706] focus:outline-none transition-all"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => onSearchSubmit(searchQuery)}
+            disabled={searching}
+            className="px-5 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+          >
+            {searching ? <MiniLoader color="#fff" /> : <Search size={14} />}
+            <span>Search Stores</span>
+          </button>
+        </div>
+
+        {/* Live Search Results */}
+        {searchResults.length > 0 && (
+          <div className="p-4 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#1D1B18]">Found Components ({searchResults.length})</span>
+              <button
+                type="button"
+                onClick={onClearSearchResults}
+                className="text-[11px] font-bold text-[#7C766F] hover:text-[#1D1B18] cursor-pointer"
+              >
+                Close ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {searchResults.map((item, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl bg-white border border-[#EFEAE4] flex gap-3 items-start shadow-xs">
+                  {item.image && (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-14 h-14 rounded-xl object-cover border border-[#EFEAE4] shrink-0"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A]">
+                        {item.category || 'Hardware'}
+                      </span>
+                      <span className="text-xs font-black text-[#1D1B18]">{item.price_range}</span>
+                    </div>
+                    <h4 className="font-bold text-xs text-[#1D1B18] truncate">{item.name}</h4>
+                    {item.description && (
+                      <p className="text-[11px] text-[#534342] line-clamp-1 m-0">{item.description}</p>
+                    )}
+                    <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                      {(item.vendors || []).map((v, vi) => (
+                        <a
+                          key={vi}
+                          href={v.direct_search_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342] hover:text-[#1D1B18] no-underline"
+                        >
+                          🛒 {v.vendor}
+                        </a>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => onAddComp(item)}
+                        className="ml-auto text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-[#1D1B18] text-white hover:bg-black transition-colors cursor-pointer"
+                      >
+                        + Add to My BOM
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Components Grid in Project BOM */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-[#1D1B18]">Components in Your Project BOM</h3>
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342]">
+              {hardwareBom.length} items
+            </span>
+          </div>
+          <span className="text-xs text-[#7C766F]">Direct vendor checkout links included</span>
+        </div>
+
+        {hardwareBom.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-dashed border-[#EFEAE4] p-12 text-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] flex items-center justify-center mx-auto text-xl">
+              📦
+            </div>
+            <h4 className="text-sm font-bold text-[#1D1B18]">No hardware components in your BOM yet</h4>
+            <p className="text-xs text-[#7C766F] max-w-sm mx-auto">
+              Click below to generate a tailored Bill of Materials with pricing and wiring guides, or search above.
+            </p>
+            <button
+              type="button"
+              onClick={onGenerateBom}
+              disabled={generating}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors cursor-pointer"
+            >
+              {generating ? <MiniLoader color="#fff" /> : <Sparkles size={14} />}
+              <span>Generate BOM with AI</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {hardwareBom.map(comp => (
+              <div
+                key={comp.id}
+                className="bg-white rounded-2xl border-2 p-4 flex flex-col justify-between space-y-3 shadow-xs hover:shadow-md transition-all relative group"
+                style={{ borderColor: comp.color || '#EFEAE4' }}
+              >
+                <div className="space-y-2.5">
+                  {/* Top row */}
+                  <div className="flex items-start gap-3">
+                    {comp.image ? (
+                      <img
+                        src={comp.image}
+                        alt={comp.name}
+                        className="w-14 h-14 rounded-xl object-cover border border-[#EFEAE4] shrink-0"
+                      />
+                    ) : (
+                      <span
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 font-bold"
+                        style={{ background: comp.bg || '#FFFBEB', color: comp.color || '#D97706' }}
+                      >
+                        {comp.icon || '⚡'}
+                      </span>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span
+                          className="text-[9.5px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
+                          style={{ background: comp.bg || '#FAF8F5', color: comp.color || '#534342' }}
+                        >
+                          {comp.category}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onRemoveComp(comp.id)}
+                          className="text-[#9CA3AF] hover:text-[#DC2626] text-xs p-0.5 opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          title="Remove from BOM"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <h4 className="text-xs font-bold text-[#1D1B18] mt-1 line-clamp-1">{comp.name}</h4>
+                      <div className="text-xs font-bold text-[#D97706]">
+                        ₹{comp.priceMin} – ₹{comp.priceMax}{' '}
+                        <small className="text-[#7C766F] font-normal">
+                          ({comp.quantity || 1} {comp.unit || 'pcs'})
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {comp.description && (
+                    <p className="text-xs text-[#534342] leading-relaxed line-clamp-2 m-0">
+                      {comp.description}
+                    </p>
+                  )}
+
+                  {/* Wiring Tip */}
+                  {comp.wiring_tip && (
+                    <div className="p-2.5 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-[11px] text-[#534342] flex items-start gap-1.5">
+                      <span className="text-xs">🔌</span>
+                      <span className="line-clamp-2"><strong>Wiring:</strong> {comp.wiring_tip}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Vendor Action Buttons */}
+                <div className="pt-2 border-t border-[#F3EDE7] space-y-1.5">
+                  <span className="text-[10px] font-bold text-[#7C766F] block">Buy directly from store:</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {(comp.vendors || []).map((v, vi) => (
+                      <a
+                        key={vi}
+                        href={v.direct_search_url || v.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg border bg-white hover:bg-[#FAF8F5] transition-colors shadow-2xs no-underline"
+                        style={{ color: v.color || '#534342', borderColor: '#EFEAE4' }}
+                        title={`Search and buy on ${v.vendor || v.name}`}
+                      >
+                        🛒 {v.vendor || v.name}
+                      </a>
+                    ))}
+
+                    {comp.learnUrl && (
+                      <a
+                        href={comp.learnUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-bold text-[#2563EB] hover:underline flex items-center gap-0.5 ml-auto no-underline"
+                      >
+                        <BookOpen size={11} /> Tutorials
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Indian Electronics Store Directory */}
+      <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+        <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">
+          Trusted Indian Maker Hardware Stores
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {INDIAN_VENDORS.map(v => (
+            <a
+              key={v.id}
+              href={v.url}
+              target="_blank"
+              rel="noreferrer"
+              className="p-3.5 rounded-2xl border bg-[#FAF8F5] hover:bg-white hover:shadow-sm transition-all no-underline flex flex-col justify-between"
+              style={{ borderColor: v.color + '40' }}
+            >
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-lg">{v.icon}</span>
+                  <span className="font-bold text-xs text-[#1D1B18]">{v.name}</span>
+                </div>
+                <p className="text-[11px] text-[#7C766F] line-clamp-2 m-0">{v.tagline}</p>
+              </div>
+              <span className="text-xs font-bold mt-3" style={{ color: v.color }}>
+                Browse Catalog →
+              </span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function BusinessModelFlightPlanView({ project }) {
+  const domain = project?.domain || 'software'
+  const category = project?.category || 'Startup'
+  const business = project?.business_model || project?.draft?.business_model || {}
+  const budget = business.budget || 25000
+  const modelId = business.revenue_model || (domain === 'hardware' ? 'one_time' : 'subscription')
+
+  return (
+    <section className="space-y-6 animate-fadeIn font-['Plus_Jakarta_Sans']">
+      {/* Banner */}
+      <div className="bg-gradient-to-r from-[#FFF8F3] via-[#FFF1ED] to-[#FEF3C7]/40 rounded-3xl border border-[#FFAAA6]/50 p-6 shadow-xs flex items-center justify-between flex-wrap gap-4">
+        <div className="space-y-1 max-w-xl">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-xl bg-[#8E4B49] text-white flex items-center justify-center font-bold text-sm shadow-xs">
+              💰
+            </span>
+            <h2 className="text-lg font-black text-[#1D1B18] tracking-tight">
+              Business Model & Financial Trajectory
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-white text-[#8E4B49] border border-[#FFAAA6]">
+              {category.toUpperCase()} · {domain.toUpperCase()}
+            </span>
+          </div>
+          <p className="text-xs text-[#534342] leading-relaxed">
+            Personalized monetization roadmap, budget allocations, 6-month growth projections, and non-dilutive startup funding sources.
+          </p>
+        </div>
+
+        <Link
+          to={`/business-model?project=${encodeURIComponent(project?.id || '')}`}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#8E4B49] text-white text-xs font-bold hover:bg-[#7A3C3A] transition-all shadow-sm no-underline"
+        >
+          <CircleDollarSign size={14} />
+          <span>Open Full Studio Planner</span>
+        </Link>
+      </div>
+
+      {/* Model & Budget Split Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Model summary card */}
+        <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+          <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">Selected Monetization Model</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">{modelId === 'one_time' ? '🏷️' : modelId === 'freemium' ? '🚀' : modelId === 'grant' ? '🏆' : '📅'}</span>
+            <div>
+              <h3 className="text-sm font-bold text-[#1D1B18] capitalize">
+                {modelId.replace('_', ' ')} Model
+              </h3>
+              <p className="text-xs text-[#534342]">
+                {domain === 'hardware' ? 'Physical unit checkout with hardware margins' : 'Recurring software subscription with predictable cash-flows'}
+              </p>
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs text-[#534342]">
+            <strong>Expected ARPU:</strong> {domain === 'hardware' ? '₹800 – ₹5,000 per kit' : '₹350 – ₹1,500 / month'}
+          </div>
+        </div>
+
+        {/* Budget overview card */}
+        <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+          <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">Allocated Runway Budget</span>
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-black text-[#1D1B18]">₹{budget.toLocaleString('en-IN')}</span>
+            <span className="text-xs text-[#059669] font-bold bg-[#ECFDF5] px-2.5 py-0.5 rounded-full border border-[#A7F3D0]">
+              Active Budget
+            </span>
+          </div>
+          <p className="text-xs text-[#7C766F]">
+            Recommended distribution: {domain === 'hardware' ? '40% Hardware BOM · 20% Tools · 15% PCB & Enclosure' : '30% Cloud & DB · 30% Marketing · 15% SaaS Tools'}
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+const MILESTONE_THEMES = [
+  {
+    numBg: '#F59E0B',
+    cardBg: '#FFFDF7',
+    border: '#FDE68A',
+    statusBg: '#ECFDF5',
+    statusColor: '#065F46',
+    catBg: '#FFFBEB',
+    catColor: '#B45309',
+    catBorder: '#FDE68A',
+    icon: 'ℹ',
+    category: 'Research',
+  },
+  {
+    numBg: '#8B5CF6',
+    cardBg: '#FAF8FF',
+    border: '#DDD6FE',
+    statusBg: '#EFF6FF',
+    statusColor: '#1D4ED8',
+    catBg: '#F5F3FF',
+    catColor: '#6D28D9',
+    catBorder: '#DDD6FE',
+    icon: '⚙',
+    category: 'Development',
+  },
+  {
+    numBg: '#10B981',
+    cardBg: '#F7FDF9',
+    border: '#A7F3D0',
+    statusBg: '#F3F4F6',
+    statusColor: '#4B5563',
+    catBg: '#ECFDF5',
+    catColor: '#047857',
+    catBorder: '#A7F3D0',
+    icon: '📟',
+    category: 'Hardware',
+  },
+  {
+    numBg: '#F87171',
+    cardBg: '#FFF8F8',
+    border: '#FECDD3',
+    statusBg: '#F3F4F6',
+    statusColor: '#4B5563',
+    catBg: '#FEF2F2',
+    catColor: '#B91C1C',
+    catBorder: '#FECDD3',
+    icon: '🧪',
+    category: 'Testing',
+  },
+  {
+    numBg: '#6366F1',
+    cardBg: '#F8FAFF',
+    border: '#C7D2FE',
+    statusBg: '#F3F4F6',
+    statusColor: '#4B5563',
+    catBg: '#EEF2FF',
+    catColor: '#4338CA',
+    catBorder: '#C7D2FE',
+    icon: '🛡',
+    category: 'QA',
+  },
+  {
+    numBg: '#14B8A6',
+    cardBg: '#F4FDFB',
+    border: '#99F6E4',
+    statusBg: '#F3F4F6',
+    statusColor: '#4B5563',
+    catBg: '#F0FDFA',
+    catColor: '#0F766E',
+    catBorder: '#99F6E4',
+    icon: '🚀',
+    category: 'Launch',
+  },
+]
+
+function formatIndianCurrencyText(text) {
+  if (!text || typeof text !== 'string') return text
+  return text.replace(/\$\s*(\d+(?:,\d+)*(?:\.\d+)?)/g, (_, numStr) => {
+    const num = parseFloat(numStr.replace(/,/g, ''))
+    if (isNaN(num)) return _
+    if (num === 0) return '₹0'
+    const inr = Math.round(num * 85)
+    return `₹${inr.toLocaleString('en-IN')}`
+  })
+}
+
+function FlyingBirdMascot() {
+  return (
+    <div className="fp-v2-hero-mascot select-none">
+      <div className="fp-v2-speech-bubble">
+        Turning ideas into real things!
+      </div>
+      <svg width="140" height="140" viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-md">
+        {/* Jetpack Smoke Puffs */}
+        <circle cx="50" cy="130" r="14" fill="#E0E7FF" opacity="0.6" />
+        <circle cx="42" cy="142" r="10" fill="#DDD6FE" opacity="0.5" />
+        <circle cx="60" cy="140" r="8" fill="#FDE68A" opacity="0.7" />
+
+        {/* Rocket Flames */}
+        <path d="M58 116 L50 134 L66 128 Z" fill="#EF4444" />
+        <path d="M60 118 L55 130 L64 126 Z" fill="#F59E0B" />
+
+        {/* Jetpack Body */}
+        <rect x="52" y="80" width="18" height="34" rx="7" fill="#6B7280" stroke="#374151" strokeWidth="2" />
+        <rect x="56" y="84" width="10" height="8" rx="2" fill="#9CA3AF" />
+
+        {/* Bird Body (Round Warm Yellow) */}
+        <circle cx="95" cy="88" r="38" fill="#FBBF24" stroke="#D97706" strokeWidth="2.5" />
+        <ellipse cx="102" cy="98" rx="22" ry="20" fill="#FEF3C7" />
+
+        {/* Aviator Helmet */}
+        <path d="M63 80 C63 56 78 40 100 40 C122 40 135 56 135 80 C135 84 133 86 130 86 C124 74 116 70 98 70 C80 70 72 74 66 86 C64 86 63 84 63 80 Z" fill="#0D9488" stroke="#042F2E" strokeWidth="2" />
+        <path d="M63 76 L134 76" stroke="#475569" strokeWidth="4" strokeLinecap="round" />
+        <circle cx="86" cy="74" r="13" fill="#67E8F9" stroke="#0F172A" strokeWidth="3" />
+        <circle cx="112" cy="74" r="13" fill="#67E8F9" stroke="#0F172A" strokeWidth="3" />
+        <path d="M81 70 L91 78" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" />
+        <path d="M107 70 L117 78" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" opacity="0.8" />
+
+        {/* Beak */}
+        <path d="M124 88 L142 93 L124 99 Z" fill="#F97316" stroke="#C2410C" strokeWidth="1.5" />
+
+        {/* Cheeks */}
+        <circle cx="86" cy="98" r="6" fill="#F43F5E" opacity="0.35" />
+        <circle cx="114" cy="100" r="6" fill="#F43F5E" opacity="0.35" />
+
+        {/* Wing flapping */}
+        <path d="M72 88 C66 96 66 108 78 110 C86 112 92 104 90 94 Z" fill="#F59E0B" stroke="#D97706" strokeWidth="2" />
+
+        {/* Flying Stars */}
+        <path d="M136 48 L138 42 L140 48 L146 50 L140 52 L138 58 L136 52 L130 50 Z" fill="#F59E0B" />
+        <path d="M36 68 L37 64 L39 68 L43 69 L39 71 L37 75 L36 71 L32 69 Z" fill="#F59E0B" opacity="0.8" />
+      </svg>
+    </div>
+  )
+}
+
+function FlightPlanTopNav({ project, projects = [], onSelectProject }) {
+  return (
+    <div className="fp-v2-topnav">
+      <div className="fp-v2-topnav-left">
+        <div className="fp-v2-sprint-pill">
+          <span className="fp-v2-sprint-dot" />
+          <span>Today · Sprint 1 Active</span>
+        </div>
+
+        <div className="fp-v2-project-dropdown">
+          <select
+            value={project?.id || ''}
+            onChange={(e) => onSelectProject(e.target.value)}
+            className="fp-v2-project-btn cursor-pointer appearance-none pr-8"
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                🎯 {p.title || p.name || 'Untitled Project'}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 pointer-events-none text-[#6B7280]" />
+        </div>
+      </div>
+
+      <div className="fp-v2-topnav-right">
+        <button type="button" className="fp-v2-icon-btn" title="Search nodes & tasks">
+          <Search size={16} />
+        </button>
+
+        <button type="button" className="fp-v2-icon-btn" title="Notifications">
+          <Bell size={16} />
+          <span className="fp-v2-btn-badge" />
+        </button>
+
+        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#FDE68A] to-[#F59E0B] p-0.5 shadow-xs cursor-pointer">
+          <div className="w-full h-full rounded-full bg-white flex items-center justify-center font-bold text-xs text-[#92400E]">
+            👤
+          </div>
+        </div>
+
+        <Link to="/launch" className="fp-v2-new-idea-btn no-underline">
+          <Plus size={14} />
+          <span>New Idea</span>
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+function FlightPlanHeroBanner({
+  project,
+  deadlineStr,
+  daysInfo,
+  onReplan,
+  replanBusy = false,
+  onEdit,
+}) {
+  const currentXp = project?.xp_points || 0
+  const currentLvl = project?.xp_level || (currentXp >= 1000 ? 4 : currentXp >= 600 ? 3 : currentXp >= 300 ? 2 : 1)
+  const xpPercent = Math.min(100, Math.round(((currentXp % 300) / 300) * 100))
+  const projTitle = project?.title || project?.name || 'Your Project'
+  const description = project?.summary || project?.description || project?.workflow?.flight_plan?.summary || `11-week execution roadmap for ${projTitle} MVP. Development is structured around a 2-axis performance (20hrs/week) to deliver a working ${projTitle} by ${deadlineStr ? formatDisplayDate(deadlineStr) : 'January 13, 2027'}.`
+
+  return (
+    <section className="fp-v2-hero-card">
+      <div className="fp-v2-hero-left">
+        <span className="fp-v2-hero-tag">
+          📋 Project Roadmap
+        </span>
+        <h1 className="fp-v2-hero-title">
+          <span>{projTitle}</span>
+          <span className="fp-v2-hero-title-sparkle"></span>
+        </h1>
+        <p className="fp-v2-hero-desc">
+          {description}
+        </p>
+      </div>
+
+      <FlyingBirdMascot />
+
+      <div className="fp-v2-hero-stats">
+        <div className="fp-v2-stats-level">
+          <div className="fp-v2-stats-level-header">
+            <span>🪙 Level {currentLvl} · {currentXp} XP</span>
+            <span className="text-[10px] text-[#D97706]">{xpPercent}%</span>
+          </div>
+          <div className="fp-v2-stats-xp-bar">
+            <div className="fp-v2-stats-xp-fill" style={{ width: `${xpPercent}%` }} />
+          </div>
+        </div>
+
+        <div className="fp-v2-stats-deadline">
+          <Calendar size={16} className="text-[#8E4B49] mt-0.5 shrink-0" />
+          <div>
+            <strong>Deadline</strong>
+            <span>{deadlineStr ? formatDisplayDate(deadlineStr) : '13 Jan 2027'} ({daysInfo?.days != null ? `${daysInfo.days} days remaining` : '80 days remaining'})</span>
+          </div>
+        </div>
+
+        <div className="fp-v2-stats-actions">
+          <button
+            type="button"
+            onClick={onReplan}
+            disabled={replanBusy}
+            className="fp-v2-replan-btn"
+          >
+            {replanBusy ? <MiniLoader color="#fff" /> : <Sparkles size={13} />}
+            <span>{replanBusy ? 'Replanning…' : 'Replan with AI'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="fp-v2-edit-btn"
+          >
+            Edit Roadmap
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function FlightPlanKpiBar({
+  percent = 0,
+  doneCount = 0,
+  taskCount = 0,
+  deadlineStr = '',
+  daysInfo = null,
+  blockedCount = 0,
+  onToggleGitDetails,
+  gitOpen = false,
+}) {
+  const radius = 18
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (percent / 100) * circumference
+
+  return (
+    <div className="fp-v2-kpi-grid">
+      {/* 1. Overall Progress */}
+      <div className="fp-v2-kpi-card">
+        <div className="fp-v2-progress-circle-wrap">
+          <svg width="48" height="48" className="rotate-[-90deg]">
+            <circle cx="24" cy="24" r={radius} stroke="#E5E7EB" strokeWidth="4" fill="transparent" />
+            <circle
+              cx="24"
+              cy="24"
+              r={radius}
+              stroke="#10B981"
+              strokeWidth="4"
+              fill="transparent"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              className="transition-all duration-500 ease-out"
+            />
+          </svg>
+          <span className="absolute fp-v2-progress-text">{percent}%</span>
+        </div>
+        <div className="fp-v2-kpi-info">
+          <span className="fp-v2-kpi-label">Overall Progress</span>
+          <span className="fp-v2-kpi-sub">{doneCount} of {taskCount} tasks completed</span>
+        </div>
+      </div>
+
+      {/* 2. Launch Deadline */}
+      <div className="fp-v2-kpi-card">
+        <div className="fp-v2-kpi-icon-circle bg-[#F5F3FF] text-[#7C3AED]">
+          <Calendar size={20} />
+        </div>
+        <div className="fp-v2-kpi-info">
+          <span className="fp-v2-kpi-label text-[#7C3AED]">Launch</span>
+          <span className="fp-v2-kpi-sub">
+            {deadlineStr ? formatDisplayDate(deadlineStr) : '13 Jan 2027'} ({daysInfo?.days != null ? `${daysInfo.days} days remaining` : '80 days remaining'})
+          </span>
+        </div>
+      </div>
+
+      {/* 3. Blocked / Risks */}
+      <div className="fp-v2-kpi-card">
+        <div className="fp-v2-kpi-icon-circle bg-[#FEF2F2] text-[#EF4444]">
+          <AlertTriangle size={20} />
+        </div>
+        <div className="fp-v2-kpi-info">
+          <span className="fp-v2-kpi-label text-[#EF4444]">Blocked</span>
+          <span className="fp-v2-kpi-sub">{blockedCount > 0 ? `${blockedCount} tasks` : 'All tasks on track'}</span>
+        </div>
+      </div>
+
+      {/* 4. Git & Audit */}
+      <div
+        className="fp-v2-kpi-card cursor-pointer hover:bg-[#FAF8F5]"
+        onClick={onToggleGitDetails}
+      >
+        <div className="fp-v2-kpi-icon-circle bg-[#F3F4F6] text-[#1F2937]">
+          <Github size={20} />
+        </div>
+        <div className="fp-v2-kpi-info flex-1">
+          <span className="fp-v2-kpi-label flex items-center justify-between">
+            <span>Show Git & Audit Details</span>
+            <ChevronDown size={14} className={`transition-transform duration-200 ${gitOpen ? 'rotate-180' : ''}`} />
+          </span>
+          <span className="fp-v2-kpi-sub">Repository sync & verifications</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FlightPlanFlowMap({
+  milestones = [],
+  allTasks = [],
+  completed = [],
+  activeMilestoneIndex = 0,
+  onSelectMilestone,
+}) {
+  const [searchNodeQuery, setSearchNodeQuery] = useState('')
+
+  const filteredMilestones = useMemo(() => {
+    return milestones.map((m, idx) => ({ ...m, originalIndex: idx })).filter(m => {
+      if (!searchNodeQuery.trim()) return true
+      const q = searchNodeQuery.toLowerCase()
+      return m.title.toLowerCase().includes(q) || (m.purpose && m.purpose.toLowerCase().includes(q))
+    })
+  }, [milestones, searchNodeQuery])
+
+  return (
+    <div className="fp-v2-flow-canvas">
+      {/* Header Bar */}
+      <div className="fp-v2-flow-header">
+        <div className="fp-v2-flow-title">
+          <h3>Project Flow Map</h3>
+          <p>Milestones, tasks and dependencies</p>
+        </div>
+
+        <div className="fp-v2-flow-controls">
+          <div className="fp-v2-node-search">
+            <Search size={13} className="absolute left-2.5 text-[#9CA3AF]" />
+            <input
+              type="text"
+              placeholder="Search nodes..."
+              value={searchNodeQuery}
+              onChange={(e) => setSearchNodeQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="fp-v2-filter-dots">
+            {['#EF4444', '#10B981', '#3B82F6', '#8B5CF6'].map((dotColor) => (
+              <span
+                key={dotColor}
+                className="fp-v2-dot"
+                style={{ backgroundColor: dotColor }}
+                title="Filter color"
+              />
+            ))}
+            <span className="text-[10px] text-[#9CA3AF] ml-0.5">›</span>
+          </div>
+
+          <div className="fp-v2-zoom-btns">
+            <button type="button" className="fp-v2-zoom-btn" title="Zoom In">+</button>
+            <button type="button" className="fp-v2-zoom-btn" title="Zoom Out">−</button>
+            <button type="button" className="fp-v2-zoom-btn" title="Fit to Screen">⛶</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Nodes Canvas with Curved Winding Path */}
+      <div className="fp-v2-nodes-wrapper">
+        {/* Start Node */}
+        <div className="fp-v2-start-node">
+          <span className="w-2.5 h-2.5 rounded-full bg-[#22C55E] animate-pulse" />
+          <Target size={13} />
+          <span>Start</span>
+        </div>
+
+        {/* Milestone Cards */}
+        {filteredMilestones.map((milestone) => {
+          const mIdx = milestone.originalIndex
+          const theme = MILESTONE_THEMES[mIdx % MILESTONE_THEMES.length]
+          const mTasks = allTasks.filter(t => t.milestoneIndex === mIdx)
+          const mDone = mTasks.filter(t => completed.includes(t.id)).length
+          const isDone = mTasks.length > 0 && mDone === mTasks.length
+          const isInProgress = mDone > 0 && !isDone
+          const isSelected = activeMilestoneIndex === mIdx
+
+          return (
+            <div
+              key={milestone.title + mIdx}
+              onClick={() => onSelectMilestone(mIdx)}
+              className={`fp-v2-milestone-card ${isSelected ? 'selected' : ''}`}
+              style={{
+                backgroundColor: theme.cardBg,
+                borderColor: isSelected ? '#1D1B18' : theme.border,
+              }}
+            >
+              <div className="fp-v2-mcard-left">
+                {/* Number Badge */}
+                <span className="fp-v2-num-badge" style={{ backgroundColor: theme.numBg }}>
+                  {String(mIdx + 1).padStart(2, '0')}
+                </span>
+
+                <div className="fp-v2-mcard-body">
+                  <span className="fp-v2-mcard-title">{milestone.title}</span>
+                  <div className="fp-v2-mcard-sub">
+                    <span>{mDone}/{mTasks.length} tasks</span>
+                    <span
+                      className="fp-v2-mcard-status"
+                      style={{
+                        backgroundColor: isDone ? '#ECFDF5' : isInProgress ? '#EFF6FF' : '#F3F4F6',
+                        color: isDone ? '#065F46' : isInProgress ? '#1D4ED8' : '#4B5563',
+                      }}
+                    >
+                      {isDone ? '✓ Completed' : isInProgress ? '⏳ In Progress' : '⏱ Not Started'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Category Pill on Right */}
+              <div className="fp-v2-mcard-right">
+                <span
+                  className="fp-v2-category-pill"
+                  style={{
+                    backgroundColor: theme.catBg,
+                    color: theme.catColor,
+                    borderColor: theme.catBorder,
+                  }}
+                >
+                  <span className="font-mono text-xs">{theme.icon}</span>
+                  <span>{milestone.category || theme.category}</span>
+                </span>
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Launch Ready Ending Node */}
+        <div className="fp-v2-launch-node">
+          <span>🏁</span>
+          <span>Launch Ready!</span>
+        </div>
+      </div>
+
+      {/* Legend Footer */}
+      <div className="fp-v2-flow-legend">
+        <span className="fp-v2-legend-item">
+          <span className="w-2 h-2 rounded-full bg-[#3B82F6]" />
+          <span>Dependency</span>
+        </span>
+        <span className="fp-v2-legend-item">
+          <span className="w-2 h-2 rounded-full bg-[#EF4444]" />
+          <span>Blocker</span>
+        </span>
+        <span className="fp-v2-legend-item">
+          <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+          <span>Completed</span>
+        </span>
+        <span className="fp-v2-legend-item">
+          <span className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
+          <span>In Progress</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function FlightPlanMilestoneInspector({
+  milestone,
+  milestoneIndex = 0,
+  tasks = [],
+  completed = [],
+  onToggleTask,
+  onOpenWorkbench,
+  onSwitchTab,
+  onAddRoadmap,
+  daysInfo,
+}) {
+  if (!milestone) return null
+  const mDone = tasks.filter(t => completed.includes(t.id)).length
+  const isDone = tasks.length > 0 && mDone === tasks.length
+  const isInProgress = mDone > 0 && !isDone
+  const manualPercent = tasks.length ? Math.round((mDone / tasks.length) * 100) : 0
+  const repoEvidencePercent = Math.min(100, Math.round(manualPercent * 0.8))
+  const verificationPercent = Math.min(100, Math.round(manualPercent * 0.6))
+
+  const dateRangeStr = milestone.start_date || milestone.target_date
+    ? `${milestone.start_date ? formatDisplayDate(milestone.start_date) : 'Start'} → ${milestone.target_date ? formatDisplayDate(milestone.target_date) : 'End'}`
+    : '25 Oct 2026 → 1 Nov 2026'
+
+  return (
+    <aside className="fp-v2-inspector-panel">
+      {/* Header Badges */}
+      <div className="fp-v2-insp-top">
+        <span className="fp-v2-insp-badge">
+          <Check size={12} /> Milestone {String(milestoneIndex + 1).padStart(2, '0')}
+        </span>
+        <span
+          className="fp-v2-insp-status"
+          style={{
+            backgroundColor: isDone ? '#ECFDF5' : isInProgress ? '#EFF6FF' : '#F3F4F6',
+            color: isDone ? '#065F46' : isInProgress ? '#1D4ED8' : '#4B5563',
+            borderColor: isDone ? '#A7F3D0' : isInProgress ? '#BFDBFE' : '#E5E7EB',
+          }}
+        >
+          {isDone ? '✓ Completed' : isInProgress ? 'In Progress' : 'Not Started'}
+        </span>
+      </div>
+
+      {/* Title */}
+      <h3 className="fp-v2-insp-title">{milestone.title}</h3>
+
+      {/* Date Row */}
+      <div className="fp-v2-insp-date-row">
+        <span className="flex items-center gap-1.5">
+          <Calendar size={13} className="text-[#6B7280]" />
+          <span>{dateRangeStr}</span>
+        </span>
+        <span className="px-2 py-0.5 rounded-full bg-[#FAF5FF] text-[#7E22CE] font-bold text-[10.5px]">
+          {daysInfo?.label || '7 days remaining'}
+        </span>
+      </div>
+
+      {/* Key Goal */}
+      <div className="fp-v2-insp-key-goal">
+        <span className="fp-v2-insp-goal-label">
+          <Target size={13} className="text-[#1D1B18]" />
+          <span>Key Goal</span>
+        </span>
+        <p className="fp-v2-insp-goal-text">
+          {milestone.outcome || milestone.purpose || 'Validate market demand and refine the problem statement using real user feedback and competitor analysis.'}
+        </p>
+      </div>
+
+      {/* Tasks List */}
+      <div className="fp-v2-insp-tasks-section">
+        <div className="fp-v2-insp-tasks-heading">
+          <span>Tasks ({mDone}/{tasks.length})</span>
+        </div>
+
+        <div className="space-y-2">
+          {tasks.map((item, idx) => {
+            const done = completed.includes(item.id)
+            const tagLabel = idx === 0 ? 'Research' : idx === 1 ? 'Analysis' : 'Planning'
+
+            return (
+              <div
+                key={item.id}
+                className="fp-v2-insp-task-item group"
+                onClick={() => onOpenWorkbench(item.task, milestone.title)}
+              >
+                <div
+                  className="fp-v2-insp-task-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleTask(item.id)
+                  }}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold border transition-all ${done
+                        ? 'bg-[#1D1B18] text-white border-[#1D1B18]'
+                        : 'bg-white text-transparent border-[#D1D5DB] hover:border-[#1D1B18]'
+                      }`}
+                  >
+                    ✓
+                  </span>
+                </div>
+
+                <div className="fp-v2-insp-task-content">
+                  <span
+                    className={`fp-v2-insp-task-title ${done ? 'line-through text-[#9CA3AF]' : ''}`}
+                  >
+                    {item.task?.title || 'Milestone Task'}
+                  </span>
+
+                  <div className="fp-v2-insp-task-meta">
+                    <span className="fp-v2-insp-tag">
+                      {item.task?.category ? `❖ ${item.task.category}` : `❖ ${tagLabel}`}
+                    </span>
+                    <span className="fp-v2-insp-xp">+{item.task?.xp_reward || 100} XP</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => tasks[0] && onOpenWorkbench(tasks[0].task, milestone.title)}
+          className="fp-v2-insp-view-details"
+        >
+          <span>View Details</span>
+          <ArrowRight size={13} />
+        </button>
+      </div>
+
+      {/* Task Progress Triple-Bar */}
+      <div className="fp-v2-insp-progress-box">
+        <div className="fp-v2-insp-progress-head">
+          <span className="flex items-center gap-1.5">
+            <Layers size={13} /> Task Progress
+          </span>
+          <Info size={13} className="text-[#9CA3AF] cursor-pointer" />
+        </div>
+
+        <div className="fp-v2-bar-row">
+          <div className="fp-v2-bar-label">
+            <span className="flex items-center gap-1.5 text-[#059669]">
+              <span className="w-2 h-2 rounded-full bg-[#10B981]" /> Manual Completion
+            </span>
+            <span>{manualPercent}%</span>
+          </div>
+          <div className="fp-v2-bar-track">
+            <div className="fp-v2-bar-fill bg-[#10B981]" style={{ width: `${manualPercent}%` }} />
+          </div>
+        </div>
+
+        <div className="fp-v2-bar-row">
+          <div className="fp-v2-bar-label">
+            <span className="flex items-center gap-1.5 text-[#6366F1]">
+              <span className="w-2 h-2 rounded-full bg-[#6366F1]" /> Repository Evidence
+            </span>
+            <span>{repoEvidencePercent}%</span>
+          </div>
+          <div className="fp-v2-bar-track">
+            <div className="fp-v2-bar-fill bg-[#6366F1]" style={{ width: `${repoEvidencePercent}%` }} />
+          </div>
+        </div>
+
+        <div className="fp-v2-bar-row">
+          <div className="fp-v2-bar-label">
+            <span className="flex items-center gap-1.5 text-[#D97706]">
+              <span className="w-2 h-2 rounded-full bg-[#F59E0B]" /> Verification Passed
+            </span>
+            <span>{verificationPercent}%</span>
+          </div>
+          <div className="fp-v2-bar-track">
+            <div className="fp-v2-bar-fill bg-[#F59E0B]" style={{ width: `${verificationPercent}%` }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Links */}
+      <div className="fp-v2-insp-quicklinks">
+        <span className="text-[11px] font-bold text-[#1D1B18] uppercase tracking-wider mb-1 flex items-center gap-1">
+          <Compass size={12} /> Quick Links
+        </span>
+        <button
+          type="button"
+          onClick={() => onSwitchTab('radar')}
+          className="fp-v2-quicklink-btn"
+        >
+          <Compass size={13} className="text-[#6366F1]" />
+          <span>Market Radar Report</span>
+          <ArrowRight size={11} className="ml-auto text-[#9CA3AF]" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onSwitchTab('radar')}
+          className="fp-v2-quicklink-btn"
+        >
+          <BookOpen size={13} className="text-[#059669]" />
+          <span>Sources & Citations</span>
+          <ArrowRight size={11} className="ml-auto text-[#9CA3AF]" />
+        </button>
+        <button
+          type="button"
+          onClick={onAddRoadmap}
+          className="fp-v2-quicklink-btn"
+        >
+          <Plus size={13} className="text-[#D97706]" />
+          <span>Add to Roadmap</span>
+          <ArrowRight size={11} className="ml-auto text-[#9CA3AF]" />
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+function FlightPlanBottomInsights({
+  radarData,
+  activeMilestoneIndex = 0,
+  onAddExperiment,
+  onSwitchTab,
+}) {
+  const [activeTab, setActiveTab] = useState('insights')
+
+  const competitors = radarData?.competitors || []
+  const topComp = competitors[0] || { name: 'Liftware Steady', pricing: '₹16,900+ / unit' }
+  const complaints = radarData?.customer_voice || [
+    { user_complaint: 'Too expensive for everyday users' },
+    { user_complaint: 'Battery life issues on continuous use' },
+    { user_complaint: 'Feels too heavy or bulky' },
+  ]
+  const topComplaint = complaints.slice(0, 3)
+
+  return (
+    <div className="fp-v2-insights-bar">
+      {/* Tabs */}
+      <div className="fp-v2-insights-tabs">
+        {[
+          { id: 'insights', label: 'Key Insights' },
+          { id: 'competitors', label: 'Competitor Matrix' },
+          { id: 'complaints', label: 'Customer Complaints' },
+          { id: 'experiments', label: 'Validation Experiments' },
+        ].map(t => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setActiveTab(t.id)}
+            className={`fp-v2-itab ${activeTab === t.id ? 'active' : ''}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 4 Visual Cards */}
+      <div className="fp-v2-insights-cards">
+        {/* 1. Top Competitor */}
+        <div className="fp-v2-icard bg-[#FFF7ED] border-[#FDBA74]">
+          <div className="fp-v2-icard-head text-[#C2410C]">
+            <span>👑</span>
+            <span>Top Competitor</span>
+          </div>
+          <div className="fp-v2-icard-body">
+            <strong className="text-sm font-bold text-[#1D1B18]">{topComp.name}</strong>
+            <span className="text-base font-black text-[#C2410C]">
+              {formatIndianCurrencyText(topComp.pricing) || '₹16,900+'}
+            </span>
+          </div>
+          <div className="fp-v2-icard-tags">
+            <span className="fp-v2-icard-tag bg-[#FFEDD5] text-[#9A3412]">High Price</span>
+            <span className="fp-v2-icard-tag bg-[#FFEDD5] text-[#9A3412]">Heavy Design</span>
+          </div>
+        </div>
+
+        {/* 2. Common Complaints */}
+        <div className="fp-v2-icard bg-[#EFF6FF] border-[#BFDBFE]">
+          <div className="fp-v2-icard-head text-[#1D4ED8]">
+            <span>👥</span>
+            <span>Common Complaints</span>
+          </div>
+          <div className="fp-v2-icard-body text-xs space-y-1">
+            {topComplaint.map((c, i) => (
+              <span key={i} className="line-clamp-1 text-[#1E3A8A]">
+                • {c.user_complaint || c.pain_point}
+              </span>
+            ))}
+          </div>
+          <span className="text-[10px] font-bold text-[#2563EB] cursor-pointer hover:underline" onClick={() => onSwitchTab('radar')}>
+            View all complaints →
+          </span>
+        </div>
+
+        {/* 3. Biggest Opportunity */}
+        <div className="fp-v2-icard bg-[#F0FDF4] border-[#86EFAC]">
+          <div className="fp-v2-icard-head text-[#15803D]">
+            <span>💡</span>
+            <span>Biggest Opportunity</span>
+          </div>
+          <p className="fp-v2-icard-body text-xs text-[#14532D] m-0 leading-relaxed">
+            Affordable, lightweight design with better battery life and direct hardware procurement.
+          </p>
+          <button
+            type="button"
+            onClick={() => onAddExperiment && onAddExperiment({ title: 'Lightweight battery & grip test' })}
+            className="fp-v2-add-btn"
+          >
+            <Plus size={11} /> Add to Roadmap
+          </button>
+        </div>
+
+        {/* 4. Next Up Card */}
+        <div className="fp-v2-icard bg-[#FAF5FF] border-[#DDD6FE] cursor-pointer hover:shadow-xs transition-all" onClick={() => onSwitchTab('flowmap')}>
+          <div className="fp-v2-icard-head text-[#7E22CE]">
+            <span>🤖</span>
+            <span>Next up</span>
+          </div>
+          <p className="fp-v2-icard-body text-xs text-[#581C87] m-0 font-medium">
+            Complete the prototype design and move to Milestone {String(activeMilestoneIndex + 2).padStart(2, '0')}.
+          </p>
+          <span className="text-xs font-black text-[#7E22CE] ml-auto">→</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function FlightPlan() {
   const [projects, setProjects] = useState(readSavedProjects)
   const projectsWithPlans = useMemo(() => projects, [projects])
@@ -2319,6 +3584,8 @@ export default function FlightPlan() {
   const [proposedPlan, setProposedPlan] = useState(null)
   const [generationStatus, setGenerationStatus] = useState('')
   const [generationError, setGenerationError] = useState('')
+  const [gitOpen, setGitOpen] = useState(false)
+  const daysInfo = useMemo(() => (project?.deadline ? getDaysRemaining(project.deadline) : null), [project?.deadline])
 
   // Market Radar & Mind Map State
   const [marketRadar, setMarketRadar] = useState(() => project?.market_radar || null)
@@ -2352,6 +3619,107 @@ export default function FlightPlan() {
   const [addTaskModalOpen, setAddTaskModalOpen] = useState(false)
   const [creativeBriefModalOpen, setCreativeBriefModalOpen] = useState(false)
   const [explainerTask, setExplainerTask] = useState(null)
+
+  // Proof of Work & AI Social Post Modal
+  const [proofModalTask, setProofModalTask] = useState(null)
+  const [proofModalMilestoneTitle, setProofModalMilestoneTitle] = useState('')
+  const [taskProofs, setTaskProofs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`udaan:proofs:${project?.id || 'default'}`) || '{}')
+    } catch {
+      return {}
+    }
+  })
+  const roadmapContainerRef = useRef(null)
+
+  // Hardware BOM & Sourcing State
+  const [hardwareBom, setHardwareBom] = useState(() => {
+    return project?.hardware_bom || project?.draft?.hardware_bom || []
+  })
+  const [generatingBom, setGeneratingBom] = useState(false)
+  const [hardwareSearchQuery, setHardwareSearchQuery] = useState('')
+  const [hardwareSearchResults, setHardwareSearchResults] = useState([])
+  const [hardwareSearching, setHardwareSearching] = useState(false)
+
+  useEffect(() => {
+    if (project) {
+      setHardwareBom(project.hardware_bom || project.draft?.hardware_bom || [])
+    }
+  }, [project?.id])
+
+  const handleSearchHardware = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    if (!hardwareSearchQuery.trim()) return
+    setHardwareSearching(true)
+    try {
+      const results = await searchHardwareProducts(hardwareSearchQuery.trim())
+      setHardwareSearchResults(results || [])
+    } catch (err) {
+      console.warn('Hardware search error:', err)
+    } finally {
+      setHardwareSearching(false)
+    }
+  }
+
+  const handleGenerateProjectBom = async () => {
+    if (!project) return
+    setGeneratingBom(true)
+    try {
+      const generated = await generateBillOfMaterials({
+        title: project.title || project.name || '',
+        description: project.description || project.summary || '',
+        domain: project.domain || 'hardware',
+        budget: project.business_model?.budget || 25000,
+      })
+      if (generated && generated.length > 0) {
+        setHardwareBom(generated)
+        updateSavedProject(project.id, { hardware_bom: generated })
+        setProjects(readSavedProjects())
+      }
+    } catch (err) {
+      console.error('Failed to generate BOM:', err)
+    } finally {
+      setGeneratingBom(false)
+    }
+  }
+
+  const handleAddCompToBom = (comp) => {
+    const updated = [...hardwareBom, { ...comp, id: `hw-${Date.now()}` }]
+    setHardwareBom(updated)
+    if (project?.id) {
+      updateSavedProject(project.id, { hardware_bom: updated })
+      setProjects(readSavedProjects())
+    }
+  }
+
+  const handleRemoveCompFromBom = (compId) => {
+    const updated = hardwareBom.filter(c => c.id !== compId)
+    setHardwareBom(updated)
+    if (project?.id) {
+      updateSavedProject(project.id, { hardware_bom: updated })
+      setProjects(readSavedProjects())
+    }
+  }
+
+  function handleOpenProof(item) {
+    setProofModalTask(item.task)
+    setProofModalMilestoneTitle(item.milestone || '')
+  }
+
+  function handleSaveProof(proofData) {
+    const nextProofs = { ...taskProofs, [proofData.taskId]: proofData }
+    setTaskProofs(nextProofs)
+    try {
+      localStorage.setItem(`udaan:proofs:${project?.id || 'default'}`, JSON.stringify(nextProofs))
+    } catch (e) {
+      console.warn('LocalStorage save proof failed', e)
+    }
+    if (!completed.includes(proofData.taskId)) {
+      toggleTask(proofData.taskId)
+    }
+    setNotice('Proof of work recorded! Your AI social draft is ready to copy or post.')
+    setTimeout(() => setNotice(''), 3500)
+  }
 
   function handleAddNewTaskFromModal(partial) {
     if (!project || !flightPlan) return
@@ -3250,87 +4618,139 @@ export default function FlightPlan() {
                 <Link className="fp-primary" to="/">Start a project <ArrowRight size={16} /></Link>
               </section>
             ) : (
-              <>
-                <div className="fp-project-switch">
-                  <div className="flex items-center gap-2">
-                    <span className="fp-eyebrow">YOUR WORKSPACE</span>
-                    <button
-                      type="button"
-                      onClick={() => setCreativeBriefModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#EFEAE4] text-[11px] font-bold text-[#8E4B49] hover:bg-[#F9F2ED] transition-colors shadow-xs cursor-pointer ml-3"
-                    >
-                      <Sparkles size={13} />
-                      <span>Creative Brief</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAddTaskModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1D1B18] text-white text-[11px] font-bold hover:bg-black transition-colors shadow-xs cursor-pointer"
-                    >
-                      <Plus size={13} />
-                      <span>Add Task</span>
-                    </button>
-                  </div>
-                  <label className="fp-project-select">
-                    <span className="sr-only">Choose a project</span>
-                    <select
-                      value={project.id}
-                      onChange={event => {
-                        setSelectedId(event.target.value)
-                        setSelectedMilestone(0)
-                        setNotice('')
-                        setError('')
-                      }}
-                    >
-                      {projectsWithPlans.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                    <ChevronDown size={15} />
-                  </label>
-                </div>
-
-                {/* Section 1: Connected Repository Panel */}
-                <ConnectedRepositoryPanel
-                  repository={connectedRepo}
-                  syncing={repoSyncing}
-                  comparing={comparing}
-                  onSync={handleSyncRepository}
-                  onCompare={handleCompareWithRepository}
-                  error={compareError}
-                  projectId={project.id}
+              <div className="fp-v2-container">
+                {/* Top Sub-Nav Bar */}
+                <FlightPlanTopNav
+                  project={project}
+                  projects={projectsWithPlans}
+                  onSelectProject={(id) => {
+                    setSelectedId(id)
+                    setSelectedMilestone(0)
+                    setNotice('')
+                    setError('')
+                  }}
                 />
 
-                {/* Comparison Summary Banner */}
-                {compareSummary && (
-                  <ComparisonSummaryBanner
-                    summary={compareSummary}
-                    onClose={() => setCompareSummary(null)}
-                  />
-                )}
-
-                {/* Section 2: Roadmap Header with Deadline, Status Breakdown & Timeline Progress */}
-                <RoadmapHeader
+                {/* Hero Banner with Mascot & Speech Bubble */}
+                <FlightPlanHeroBanner
                   project={project}
-                  description={flightPlan.summary}
+                  deadlineStr={project?.deadline}
+                  daysInfo={daysInfo}
+                  onReplan={() => replan()}
+                  replanBusy={busy}
+                  onEdit={editing ? () => closeEditor() : openEditor}
+                />
+
+                {/* 4 KPI Summary Cards */}
+                <FlightPlanKpiBar
                   percent={percent}
                   doneCount={doneCount}
                   taskCount={allTasks.length}
-                  inProgressCount={inProgressCount}
+                  deadlineStr={project?.deadline}
+                  daysInfo={daysInfo}
                   blockedCount={blockedCount}
-                  overdueCount={overdueCount}
-                  unverifiedCount={unverifiedCount}
-                  milestones={milestones.length}
-                  completedMilestones={completedMilestones}
-                  activeMilestone={currentMilestone}
-                  onEdit={editing ? () => closeEditor() : openEditor}
-                  editing={editing}
-                  evidenceCount={evidenceCount}
-                  evidencePercent={evidencePercent}
-                  verifiedCount={verifiedCount}
-                  verifiedPercent={verifiedPercent}
-                  onReplan={() => replan()}
-                  replanBusy={busy}
-                  onOpenTimingEdit={() => setTimingModalOpen(true)}
+                  gitOpen={gitOpen}
+                  onToggleGitDetails={() => setGitOpen(!gitOpen)}
                 />
+
+                {/* Collapsible Repository & Audit Details */}
+                {gitOpen && (
+                  <div className="p-5 rounded-3xl bg-white border border-[#EFEAE4] shadow-xs space-y-4 animate-fadeIn">
+                    <ConnectedRepositoryPanel
+                      repository={connectedRepo}
+                      syncing={repoSyncing}
+                      comparing={comparing}
+                      onSync={handleSyncRepository}
+                      onCompare={handleCompareWithRepository}
+                      error={compareError}
+                      projectId={project.id}
+                    />
+
+                    {compareSummary && (
+                      <ComparisonSummaryBanner
+                        summary={compareSummary}
+                        onClose={() => setCompareSummary(null)}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* View Pills Tab Navigation Bar */}
+                <div className="fp-v2-tabs-bar">
+                  <div className="fp-v2-pills-group" role="tablist">
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'flowmap' || view === 'roadmap' ? 'active' : ''}`}
+                      onClick={() => setView('flowmap')}
+                    >
+                      <Route size={14} />
+                      <span>Flow Map</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'radar' ? 'active' : ''}`}
+                      onClick={() => setView('radar')}
+                    >
+                      <Compass size={14} />
+                      <span>Market Radar</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'timeline' || view === 'tasks' ? 'active' : ''}`}
+                      onClick={() => setView('timeline')}
+                    >
+                      <CalendarClock size={14} />
+                      <span>Gantt & Timeline</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'hardware' ? 'active' : ''}`}
+                      onClick={() => setView('hardware')}
+                    >
+                      <Cpu size={14} />
+                      <span>Hardware & BOM</span>
+                      {(project?.domain === 'hardware' || project?.domain === 'hybrid') && (
+                        <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-[#D97706] text-white">
+                          {project.domain === 'hybrid' ? 'Hybrid' : 'HW'}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'business_model' ? 'active' : ''}`}
+                      onClick={() => setView('business_model')}
+                    >
+                      <CircleDollarSign size={14} />
+                      <span>Business Model</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {historyStack.length > 0 && (
+                      <button
+                        className="fp-undo-btn"
+                        type="button"
+                        onClick={handleUndoReplan}
+                        title="Undo last AI roadmap adjustment"
+                      >
+                        <Undo2 size={13} /> Undo Replan
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="fp-v2-schedule-btn"
+                      onClick={() => setTimingModalOpen(true)}
+                    >
+                      <CalendarClock size={14} className="text-[#8E4B49]" />
+                      <span>Adjust Schedule</span>
+                    </button>
+                  </div>
+                </div>
 
                 {['queued', 'generating'].includes(generationStatus) && (
                   <div className="fp-message" role="status">
@@ -3350,64 +4770,6 @@ export default function FlightPlan() {
                   </div>
                 )}
 
-                {!editing && (
-                  <section className="fp-overview-controls">
-                    <div className="fp-view-toggle" role="tablist" aria-label="Roadmap view selection">
-                      <button
-                        role="tab"
-                        aria-selected={view === 'flowmap' || view === 'roadmap'}
-                        className={(view === 'flowmap' || view === 'roadmap') ? 'active' : ''}
-                        onClick={() => setView('flowmap')}
-                      >
-                        <Route size={15} /> Flow Map (Milestones)
-                      </button>
-                      <button
-                        role="tab"
-                        aria-selected={view === 'radar'}
-                        className={view === 'radar' ? 'active' : ''}
-                        onClick={() => setView('radar')}
-                      >
-                        <Compass size={15} /> Market Radar
-                      </button>
-                      <button
-                        role="tab"
-                        aria-selected={view === 'timeline' || view === 'tasks'}
-                        className={(view === 'timeline' || view === 'tasks') ? 'active' : ''}
-                        onClick={() => setView('timeline')}
-                      >
-                        <CalendarClock size={15} /> Gantt & Timeline
-                      </button>
-                    </div>
-
-                    <div className="fp-controls-right-actions">
-                      {historyStack.length > 0 && (
-                        <button
-                          className="fp-undo-btn"
-                          type="button"
-                          onClick={handleUndoReplan}
-                          title="Undo last AI roadmap adjustment (Heuristic #3: User Control & Freedom)"
-                        >
-                          <Undo2 size={13} /> Undo Replan
-                        </button>
-                      )}
-
-                      <button
-                        className="fp-timing-quick-btn"
-                        type="button"
-                        onClick={() => setTimingModalOpen(true)}
-                        title="Edit project deadline and weekly capacity"
-                      >
-                        <CalendarClock size={14} /> Adjust Schedule
-                      </button>
-
-                      <button className="fp-replan-button" type="button" onClick={() => replan()} disabled={busy || !project.idea}>
-                        {busy ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Sparkles size={15} />}
-                        {busy ? 'Replanning…' : 'Replan with AI'}
-                      </button>
-                    </div>
-                  </section>
-                )}
-
                 {error && <div className="fp-message error" role="alert">{error}</div>}
                 {notice && <div className="fp-message" role="status"><CheckCircle2 size={16} />{notice}</div>}
 
@@ -3421,240 +4783,59 @@ export default function FlightPlan() {
                     completedTasks={completed}
                   />
                 ) : (view === 'flowmap' || view === 'roadmap') ? (
-                  <div className="space-y-4">
-                    {/* Team Member / Person Feature Roadmap Strip */}
-                    <TeamMemberRoadmapStrip
-                      roles={availableRoles}
-                      allTasks={allTasks}
-                      completed={completed}
-                      selectedRole={personFilter}
-                      onSelectRole={setPersonFilter}
-                    />
+                  <>
+                    <div className="fp-v2-main-grid">
+                      <FlightPlanFlowMap
+                        milestones={milestones}
+                        allTasks={allTasks}
+                        completed={completed}
+                        activeMilestoneIndex={selectedMilestone}
+                        onSelectMilestone={setSelectedMilestone}
+                      />
 
-                    {personFilter !== 'all' && (
-                      <div
-                        className="fp-person-active-banner p-4 rounded-2xl flex items-center justify-between gap-3 shadow-xs"
-                        style={{
-                          backgroundColor: getRoleConfig(personFilter).bg,
-                          border: `1.5px solid ${getRoleConfig(personFilter).border}`,
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={getRoleConfig(personFilter).avatar}
-                            alt={personFilter}
-                            className="w-11 h-11 rounded-full object-cover border-2 shadow-xs shrink-0"
-                            style={{ borderColor: getRoleConfig(personFilter).color }}
-                          />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                                style={{ background: getRoleConfig(personFilter).badgeBg, color: getRoleConfig(personFilter).accent }}
-                              >
-                                Filtered by Role
-                              </span>
-                              <span className="text-sm font-bold text-[#1D1B18]">{personFilter}</span>
-                            </div>
-                            <p className="text-xs text-[#534342] m-0 mt-0.5">
-                              Showing deliverables and colored cards specifically assigned to <b>{personFilter}</b>.
-                            </p>
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setPersonFilter('all')}
-                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-white text-[#1D1B18] border border-[#E5E7EB] hover:bg-[#F9FAFB] shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
-                        >
-                          <X size={13} /> Show All Members
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="fp-roadmap-layout">
-                      <div className="fp-roadmap" aria-label="Project milestones">
-                        {milestones.length ? (
-                          <>
-                            <svg
-                              className="fp-winding-path"
-                              aria-hidden="true"
-                              viewBox={`0 0 100 ${Math.max(160, milestones.length * 170 - 10)}`}
-                              preserveAspectRatio="none"
-                            >
-                              <path
-                                d={milestones
-                                  .map((_, index) => {
-                                    const center = 80 + index * 170
-                                    if (index === 0) return `M 50 ${center}`
-                                    const previous = center - 170
-                                    const side = index % 2 ? 1 : -1
-                                    return `C ${50 + side * 14} ${previous + 50}, ${50 - side * 14} ${center - 50}, 50 ${center}`
-                                  })
-                                  .join(' ')}
-                              />
-                            </svg>
-
-                            {milestones.map((milestone, index) => {
-                              const milestoneTasks = allTasks.filter(item => item.milestoneIndex === index)
-                              const milestoneDone = milestoneTasks.filter(item => completed.includes(item.id)).length
-                              const progress = milestoneTasks.length ? Math.round((milestoneDone / milestoneTasks.length) * 100) : 0
-                              const milestoneAssessment = assessment?.milestone_assessments?.[String(index)]
-
-                              return (
-                                <RoadmapNode
-                                  key={`${milestone.title}-${index}`}
-                                  milestone={milestone}
-                                  index={index}
-                                  status={milestoneStatus(index)}
-                                  completedCount={milestoneDone}
-                                  taskCount={milestoneTasks.length}
-                                  progress={progress}
-                                  selected={activeMilestoneIndex === index}
-                                  onSelect={() => setSelectedMilestone(index)}
-                                  milestoneAssessment={milestoneAssessment}
-                                />
-                              )
-                            })}
-                          </>
-                        ) : (
-                          <div className="fp-no-plan">No milestones yet. Add one in Edit Roadmap to map the next steps.</div>
-                        )}
-                      </div>
-
-                      {activeMilestone ? (
-                        <aside className="fp-milestone-panel" aria-live="polite">
-                          <div className="fp-panel-header">
-                            <div>
-                              <span className="fp-eyebrow">MILESTONE {String(activeMilestoneIndex + 1).padStart(2, '0')}</span>
-                              <h2>{activeMilestone.title}</h2>
-                            </div>
-                            <span className={`fp-status ${milestoneStatus(activeMilestoneIndex)}`}>
-                              {milestoneStatus(activeMilestoneIndex).replace('-', ' ')}
-                            </span>
-                          </div>
-
-                          {/* Milestone Schedule Bar */}
-                          <div className="fp-panel-schedule-bar">
-                            <div className="fp-panel-date-col">
-                              <Calendar size={12} />
-                              <span>
-                                {activeMilestone.start_date ? formatDisplayDate(activeMilestone.start_date) : 'Start'}
-                                {' → '}
-                                <b>{activeMilestone.target_date ? formatDisplayDate(activeMilestone.target_date) : 'Target date'}</b>
-                              </span>
-                            </div>
-                            {activeMilestone.target_date && (
-                              <span className={`fp-panel-days-pill ${getDaysRemaining(activeMilestone.target_date)?.isOverdue ? 'overdue' : 'normal'}`}>
-                                {getDaysRemaining(activeMilestone.target_date)?.label}
-                              </span>
-                            )}
-                          </div>
-
-                          {activeMilestone.purpose && (
-                            <div className="fp-panel-purpose">
-                              <b>Milestone Purpose:</b> {activeMilestone.purpose}
-                            </div>
-                          )}
-
-                          <p className="fp-panel-category">{activeMilestone.category}</p>
-                          {activeMilestone.outcome && <p className="fp-panel-outcome">{activeMilestone.outcome}</p>}
-
-                          {/* Warnings for overdue or blocked work in this milestone */}
-                          {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && isTaskOverdue(item.task, completed.includes(item.id))).length > 0 && (
-                            <div className="fp-panel-warning overdue">
-                              <AlertTriangle size={13} />
-                              <span>Tasks in this milestone are past their target completion date.</span>
-                            </div>
-                          )}
-
-                          {/* Person-by-Person Roadmap / Role Filter */}
-                          <div className="fp-panel-task-heading flex-col items-start gap-2 border-b border-[#ECE7E1] pb-3 mb-3">
-                            <div className="flex items-center justify-between w-full">
-                              <h3>Tasks</h3>
-                              <span>
-                                {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && completed.includes(item.id)).length} /{' '}
-                                {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length} complete
-                              </span>
-                            </div>
-
-                            {availableRoles.length > 0 && (
-                              <div className="flex items-center gap-1.5 overflow-x-auto w-full pt-1 pb-0.5">
-                                <span className="text-[10px] font-bold text-[#8C847E] shrink-0 uppercase tracking-wider mr-1">Role:</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setPersonFilter('all')}
-                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${personFilter === 'all'
-                                    ? 'bg-[#1D1B18] text-white shadow-xs'
-                                    : 'bg-[#F4EFEA] text-[#534342] hover:bg-[#EAE4DC]'
-                                    }`}
-                                >
-                                  All Roles ({allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length})
-                                </button>
-                                {availableRoles.map(role => {
-                                  const countForRole = allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && item.task?.suggested_role === role).length
-                                  if (countForRole === 0) return null
-                                  return (
-                                    <button
-                                      key={role}
-                                      type="button"
-                                      onClick={() => setPersonFilter(role)}
-                                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all shrink-0 cursor-pointer ${personFilter === role
-                                        ? 'bg-[#1D1B18] text-white shadow-xs'
-                                        : 'bg-[#F4EFEA] text-[#534342] hover:bg-[#EAE4DC]'
-                                        }`}
-                                    >
-                                      {role} ({countForRole})
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="fp-panel-tasks">
-                            {allTasks
-                              .filter(item => item.milestoneIndex === activeMilestoneIndex)
-                              .filter(item => personFilter === 'all' || item.task?.suggested_role === personFilter)
-                              .map(item => (
-                                <TaskRow
-                                  key={item.id}
-                                  item={item}
-                                  projectId={project.id}
-                                  highlight={item.id === requestedTask}
-                                  done={completed.includes(item.id)}
-                                  locked={taskLocked(item)}
-                                  onToggle={() => toggleTask(item.id)}
-                                  assessment={assessment?.task_assessments?.[item.id]}
-                                  onInspect={handleInspectTask}
-                                  onOpenWorkbench={handleOpenWorkbench}
-                                />
-                              ))}
-                            {!activeMilestone.tasks.length && <p className="fp-no-tasks">No tasks have been added yet.</p>}
-                          </div>
-
-                          <button type="button" className="fp-panel-edit" onClick={openEditor}>
-                            <Pencil size={14} /> Edit milestone and tasks
-                          </button>
-                        </aside>
-                      ) : (
-                        <aside className="fp-milestone-panel fp-empty-panel">
-                          <Compass size={22} />
-                          <h2>Your roadmap is ready to shape</h2>
-                          <p>Add milestones in Edit Roadmap, then explore them here as you build.</p>
-                          <button type="button" className="fp-save-button" onClick={openEditor}>
-                            <Pencil size={14} /> Edit Roadmap
-                          </button>
-                        </aside>
-                      )}
+                      <FlightPlanMilestoneInspector
+                        milestone={milestones[selectedMilestone] || milestones[0]}
+                        milestoneIndex={selectedMilestone}
+                        tasks={allTasks.filter(item => item.milestoneIndex === selectedMilestone)}
+                        completed={completed}
+                        onToggleTask={toggleTask}
+                        onOpenWorkbench={handleOpenWorkbench}
+                        onSwitchTab={setView}
+                        onAddRoadmap={openEditor}
+                        daysInfo={daysInfo}
+                      />
                     </div>
-                  </div>
+
+                    <FlightPlanBottomInsights
+                      radarData={effectiveMarketRadar}
+                      activeMilestoneIndex={selectedMilestone}
+                      onAddExperiment={handleAddExperiment}
+                      onSwitchTab={setView}
+                    />
+                  </>
                 ) : view === 'radar' ? (
                   <MarketRadarView
                     radarData={effectiveMarketRadar}
                     onAddExperiment={handleAddExperiment}
                     addingExperimentId={addingExpId}
                   />
+                ) : view === 'hardware' ? (
+                  <HardwareBomFlightPlanView
+                    project={project}
+                    hardwareBom={hardwareBom}
+                    onGenerateBom={handleGenerateProjectBom}
+                    generating={generatingBom}
+                    searchQuery={hardwareSearchQuery}
+                    onSearchChange={setHardwareSearchQuery}
+                    onSearchSubmit={handleSearchHardware}
+                    searchResults={hardwareSearchResults}
+                    onClearSearchResults={() => setHardwareSearchResults([])}
+                    searching={hardwareSearching}
+                    onAddComp={handleAddCompToBom}
+                    onRemoveComp={handleRemoveCompFromBom}
+                  />
+                ) : view === 'business_model' ? (
+                  <BusinessModelFlightPlanView project={project} />
                 ) : (
                   <section className="fp-task-list-view">
                     <header className="fp-task-list-heading">
@@ -3735,6 +4916,8 @@ export default function FlightPlan() {
                             assessment={assessment?.task_assessments?.[item.id]}
                             onInspect={handleInspectTask}
                             onOpenWorkbench={handleOpenWorkbench}
+                            onOpenProof={handleOpenProof}
+                            hasProof={Boolean(taskProofs[item.id])}
                           />
                         ))
                       ) : (
@@ -3747,7 +4930,7 @@ export default function FlightPlan() {
                 <div className="fp-footer-note">
                   <RefreshCw size={14} />Progress and schedule assessments are saved automatically.
                 </div>
-              </>
+              </div>
             )}
           </div>
         </main>
@@ -3846,6 +5029,17 @@ export default function FlightPlan() {
           taskTitle={explainerTask?.title}
           plainEnglish={explainerTask?.plain_english}
           analogy={explainerTask?.analogy}
+        />
+
+        {/* Proof of Work & AI LinkedIn / Social Media Share Modal */}
+        <ProofOfWorkModal
+          isOpen={Boolean(proofModalTask)}
+          onClose={() => setProofModalTask(null)}
+          task={proofModalTask}
+          milestoneTitle={proofModalMilestoneTitle}
+          projectName={project?.name}
+          projectProblem={project?.understanding?.problem_statement || project?.workflow?.understanding?.problem_statement}
+          onSaveProof={handleSaveProof}
         />
       </div>
     </div>

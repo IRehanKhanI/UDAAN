@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import UdaanLoader, { MiniLoader } from '../components/UdaanLoader.jsx'
 import {
   AlertCircle, ArrowLeft, ArrowRight, BookOpen, Check, CheckCircle2,
   Code2, Copy, ExternalLink, Github, Globe, Lightbulb, Plus, RefreshCw,
   Rocket, Save, Search, ShieldCheck, Sparkles, Target, Trash2, Users,
   X, Zap, Play, Star, Clock, ChevronDown, ChevronRight,
+  Cpu, CircleDollarSign, DollarSign, Package, ShoppingBag, Sliders,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { analyzeIdeaDraft } from '../services/ideaAnalysisService.js'
@@ -14,7 +15,9 @@ import { parseRepositoryUrl, syncAndAnalyzeRepository, associateProjectRepositor
 import { initializeTeamWorkspace } from '../services/teamService.js'
 import { createGitHubRepo, getTechHistory, saveTechHistory, getYouTubeVideos } from '../services/githubService.js'
 import { startGitHubLogin } from '../services/authService.js'
+import { INDIAN_VENDORS, generateBillOfMaterials, searchHardwareProducts, predictBestRevenueModel, getComponentLiveImage } from '../services/hardwareService.js'
 import InteractiveMascot from '../components/mascot/InteractiveMascot.jsx'
+import Interactive3DCharacter from '../components/mascot/Interactive3DCharacter.jsx'
 
 function getYouTubeThumb(url) {
   if (!url) return null
@@ -33,13 +36,73 @@ function newUuid() {
   })
 }
 
-const stages = [
-  { key: 'understanding', title: 'Pillars', icon: Target },
-  { key: 'research', title: 'Research', icon: Search },
-  { key: 'feasibility', title: 'Architecture', icon: Code2 },
-  { key: 'launch_timing', title: 'Team', icon: Users },
-  { key: 'flight_plan', title: 'Roadmap', icon: Rocket },
+export function getStagesForDomain(domain = 'software') {
+  return [
+    { key: 'understanding', title: 'Pillars', icon: Target },
+    { key: 'research', title: 'Research', icon: Search },
+    domain === 'hardware'
+      ? { key: 'components', title: 'Components & BOM', icon: Cpu }
+      : domain === 'hybrid'
+      ? { key: 'feasibility', title: 'Tech + Hardware', icon: Code2 }
+      : { key: 'feasibility', title: 'Architecture', icon: Code2 },
+    { key: 'launch_timing', title: 'Team', icon: Users },
+    { key: 'flight_plan', title: 'Roadmap', icon: Rocket },
+    { key: 'business_model', title: 'Business Model', icon: CircleDollarSign },
+  ]
+}
+
+const REVENUE_MODELS = [
+  { id: 'subscription', icon: '📅', name: 'Subscription (SaaS)', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', desc: 'Predictable monthly or annual fees per seat or tier. Best for software & dashboards.', bestFor: ['software', 'hybrid'] },
+  { id: 'one_time', icon: '🏷️', name: 'One-Time Hardware Sale', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', desc: 'Immediate cash flow per unit sold. Ideal for physical hardware kits & IoT devices.', bestFor: ['hardware', 'hybrid'] },
+  { id: 'freemium', icon: '🚀', name: 'Freemium + Upgrade', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', desc: 'Free access for rapid viral growth, convert power users to paid plans.', bestFor: ['software', 'hybrid'] },
+  { id: 'marketplace', icon: '%', name: 'Platform Commission', color: '#BE185D', bg: '#FDF2F8', border: '#FBCFE8', desc: 'Take a cut of transactions between buyers and service providers.', bestFor: ['software'] },
+  { id: 'grant', icon: '🏆', name: 'Grant & Prize Funded', color: '#059669', bg: '#F0FDF4', border: '#A7F3D0', desc: 'Non-dilutive capital from student competitions, SIH, SSIP, or university funds.', bestFor: ['software', 'hardware', 'hybrid'] },
 ]
+
+const FUNDING_SOURCES = {
+  Startup: [
+    { name: 'Startup India Seed Fund', icon: '🇮🇳', amount: 'Up to ₹20 Lakh', url: 'https://seedfund.startupindia.gov.in/', type: 'Govt Grant', color: '#16A34A', bg: '#F0FDF4' },
+    { name: 'BIRAC BIG Grant', icon: '🔬', amount: 'Up to ₹50 Lakh', url: 'https://birac.nic.in/', type: 'DeepTech', color: '#2563EB', bg: '#EFF6FF' },
+    { name: 'Indian Angel Network', icon: '👼', amount: '₹25L – ₹2 Cr', url: 'https://www.indianangelnetwork.com/', type: 'Angel Seed', color: '#D97706', bg: '#FFFBEB' },
+  ],
+  Hackathon: [
+    { name: 'Smart India Hackathon (SIH)', icon: '💡', amount: '₹1 Lakh / team', url: 'https://sih.gov.in/', type: 'Prize', color: '#D97706', bg: '#FFFBEB' },
+    { name: 'SSIP Innovation Grant', icon: '🏅', amount: 'Up to ₹5 Lakh', url: 'https://ssipgujarat.in/', type: 'Student Grant', color: '#16A34A', bg: '#F0FDF4' },
+    { name: 'Microsoft Imagine Cup', icon: '🌐', amount: '$100,000 Global', url: 'https://imaginecup.microsoft.com/', type: 'Global', color: '#7C3AED', bg: '#F5F3FF' },
+  ],
+  'College Project': [
+    { name: 'AICTE IDEA Lab Fund', icon: '🧪', amount: 'Prototyping Labs', url: 'https://ideaab.aicte-india.org/', type: 'Academic', color: '#2563EB', bg: '#EFF6FF' },
+    { name: 'DST INSPIRE / SSIP', icon: '🎓', amount: '₹80,000 – ₹2 Lakh', url: 'https://online-inspire.gov.in/', type: 'Student Research', color: '#16A34A', bg: '#F0FDF4' },
+  ],
+  'Personal Project': [
+    { name: 'Bootstrapped (Self-Funded)', icon: '💰', amount: 'Personal Savings', url: '#', type: 'Zero Debt', color: '#16A34A', bg: '#F0FDF4' },
+    { name: 'Product Hunt Launch', icon: '🚀', amount: 'Organic Users', url: 'https://producthunt.com', type: 'Community', color: '#D97706', bg: '#FFFBEB' },
+  ],
+}
+
+function getBudgetCategoriesForDomain(domain = 'software') {
+  if (domain === 'hardware') return [
+    { label: 'Components & BOM', pct: 40, color: '#D97706', icon: '🔧' },
+    { label: 'Tools & Prototyping', pct: 20, color: '#F59E0B', icon: '🛠️' },
+    { label: 'PCB & Fabrication', pct: 15, color: '#0891B2', icon: '⚡' },
+    { label: 'Testing & Enclosure', pct: 15, color: '#7C3AED', icon: '🧪' },
+    { label: 'Contingency', pct: 10, color: '#9CA3AF', icon: '🛡️' },
+  ]
+  if (domain === 'hybrid') return [
+    { label: 'Hardware Components & BOM', pct: 30, color: '#D97706', icon: '🔧' },
+    { label: 'Cloud Infrastructure & DB', pct: 25, color: '#2563EB', icon: '☁️' },
+    { label: 'Tools & Subscriptions', pct: 15, color: '#7C3AED', icon: '🛠️' },
+    { label: 'Marketing & User Acquisition', pct: 15, color: '#BE185D', icon: '📣' },
+    { label: 'Contingency', pct: 15, color: '#9CA3AF', icon: '🛡️' },
+  ]
+  return [
+    { label: 'Cloud Infrastructure & DB', pct: 30, color: '#2563EB', icon: '☁️' },
+    { label: 'Marketing & Launch', pct: 30, color: '#BE185D', icon: '📣' },
+    { label: 'Developer Tools & SaaS', pct: 15, color: '#7C3AED', icon: '🛠️' },
+    { label: 'Domain & Security', pct: 10, color: '#16A34A', icon: '🔒' },
+    { label: 'Contingency', pct: 15, color: '#9CA3AF', icon: '🛡️' },
+  ]
+}
 
 const roleOptions = ['Full-Stack Lead', 'Frontend / UI', 'Backend & API', 'QA & Testing', 'DevOps & Cloud', 'Product Lead']
 const focusPresets = ['Architecture & Core Build', 'User Interface', 'API Endpoints', 'Testing & QA', 'Deployment', 'Growth & Launch']
@@ -231,6 +294,11 @@ export default function IdeaAnalysis() {
   const [stageLoading, setStageLoading] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [mascotMode, setMascotMode] = useState('3d') // '3d' | '2d'
+
+  // Domain & Stages
+  const [domain, setDomain] = useState(draft?.domain || 'software')
+  const stages = useMemo(() => getStagesForDomain(domain), [domain])
 
   // Step 0: Understanding
   const [understanding, setUnderstanding] = useState(
@@ -240,6 +308,39 @@ export default function IdeaAnalysis() {
 
   // Steps 1-4: Workflow data
   const [workflow, setWorkflow] = useState(draft?.workflow || {})
+
+  // Hardware BOM State (Step 2 for hardware/hybrid)
+  const [hardwareBom, setHardwareBom] = useState(draft?.hardware_bom || [])
+  const [bomLoading, setBomLoading] = useState(false)
+  const [bomSearchQuery, setBomSearchQuery] = useState('')
+  const [bomSearchResults, setBomSearchResults] = useState([])
+  const [bomSearching, setBomSearching] = useState(false)
+
+  // Business Model State (Step 5)
+  const [selectedRevenueModel, setSelectedRevenueModel] = useState(
+    draft?.business_model?.revenue_model || (domain === 'hardware' ? 'one_time' : 'subscription')
+  )
+  const [projectBudget, setProjectBudget] = useState(
+    draft?.business_model?.budget || (domain === 'hardware' ? 25000 : 15000)
+  )
+  const [showRationale, setShowRationale] = useState(true)
+
+  const aiRevenueRecommendation = useMemo(() => {
+    return predictBestRevenueModel({
+      idea: draft?.idea || '',
+      problem: understanding?.problem_statement || '',
+      outcome: understanding?.expected_outcome || '',
+      domain: domain || 'software',
+      category: projectType || 'Startup',
+      targetUsers: understanding?.target_users || '',
+    })
+  }, [draft?.idea, understanding, domain, projectType])
+
+  useEffect(() => {
+    if (!draft?.business_model?.revenue_model && aiRevenueRecommendation?.modelId) {
+      setSelectedRevenueModel(aiRevenueRecommendation.modelId)
+    }
+  }, [aiRevenueRecommendation?.modelId, draft?.business_model?.revenue_model])
 
   // Step 2: Repository
   const [repoRequired, setRepoRequired] = useState(draft?.repoRequired ?? true)
@@ -288,10 +389,98 @@ export default function IdeaAnalysis() {
 
   function persist(updates = {}) {
     setDraft(cur => {
-      const next = { ...cur, understanding, workflow, startDate, deadline, teamSize, weeklyHours, projectType, repoRequired, repository: connectedRepo, teamMembers, selectedStack, ...updates }
-      try { sessionStorage.setItem(draftKey, JSON.stringify(next)); localStorage.setItem(draftKey, JSON.stringify(next)) } catch { }
+      const next = {
+        ...cur,
+        domain,
+        understanding,
+        workflow,
+        startDate,
+        deadline,
+        teamSize,
+        weeklyHours,
+        projectType,
+        repoRequired,
+        repository: connectedRepo,
+        teamMembers,
+        selectedStack,
+        hardware_bom: hardwareBom,
+        business_model: {
+          revenue_model: selectedRevenueModel,
+          budget: projectBudget,
+        },
+        ...updates,
+      }
+      try {
+        sessionStorage.setItem(draftKey, JSON.stringify(next))
+        localStorage.setItem(draftKey, JSON.stringify(next))
+      } catch { }
       return next
     })
+  }
+
+  async function fetchHardwareBom() {
+    if (bomLoading) return
+    setBomLoading(true)
+    try {
+      const comps = await generateBillOfMaterials(draft?.idea || '', understanding)
+      if (comps && comps.length) {
+        setHardwareBom(comps)
+        persist({ hardware_bom: comps })
+      }
+    } catch (e) {
+      console.error('Failed to generate BOM', e)
+    } finally {
+      setBomLoading(false)
+    }
+  }
+
+  async function handleSearchComponents(q) {
+    if (!q.trim()) { setBomSearchResults([]); return }
+    setBomSearching(true)
+    try {
+      const res = await searchHardwareProducts(q)
+      setBomSearchResults(res.results || [])
+    } catch (e) {
+      console.error('Failed searching components', e)
+    } finally {
+      setBomSearching(false)
+    }
+  }
+
+  function handleAddComponentToBom(comp) {
+    const minP = parseInt(String(comp.price_range || comp.priceMin || 250).replace(/[^\d]/g, ''), 10) || 200
+    const maxP = parseInt(String(comp.price_range || comp.priceMax || 500).replace(/[^\d]/g, ''), 10) || 500
+    const newComp = {
+      id: `custom_${Date.now()}`,
+      name: comp.name,
+      category: comp.category || 'Hardware',
+      quantity: 1,
+      unit: 'pcs',
+      priceMin: minP,
+      priceMax: maxP,
+      currency: 'INR',
+      icon: '⚡',
+      color: '#D97706',
+      bg: '#FFFBEB',
+      image: comp.image,
+      description: comp.description || 'Added component',
+      wiring_tip: comp.wiring_tip || '',
+      learnUrl: comp.learn_url || comp.learnUrl || '',
+      searchQuery: comp.name,
+      required: true,
+      vendors: comp.vendors || [],
+    }
+    const nextBom = [...hardwareBom, newComp]
+    setHardwareBom(nextBom)
+    persist({ hardware_bom: nextBom })
+    setNotice(`Added "${comp.name}" to BOM`)
+    setTimeout(() => setNotice(''), 3000)
+  }
+
+  function handleRemoveComponentFromBom(compId) {
+    const nextBom = hardwareBom.filter(c => c.id !== compId)
+    setHardwareBom(nextBom)
+    persist({ hardware_bom: nextBom })
   }
 
   // Load tech history from DB on mount
@@ -455,8 +644,30 @@ export default function IdeaAnalysis() {
     if (!name) { setError('Give your project a name in Step 1.'); setStep(0); return }
     setLoading(true); setError('')
     try {
-      const project = saveIdeaProject({ draft: { ...draft, projectId: draft.projectId, idea: draft.idea, projectType, startDate, deadline, teamSize, weeklyHours, teamMembers, repository: connectedRepo, selectedStack }, understanding, workflow })
-      try { await saveProjectDraft(draft, understanding, workflow, 'flight_plan') } catch { }
+      const project = saveIdeaProject({
+        draft: {
+          ...draft,
+          projectId: draft.projectId,
+          idea: draft.idea,
+          domain,
+          hardware_bom: hardwareBom,
+          business_model: {
+            revenue_model: selectedRevenueModel,
+            budget: projectBudget,
+          },
+          projectType,
+          startDate,
+          deadline,
+          teamSize,
+          weeklyHours,
+          teamMembers,
+          repository: connectedRepo,
+          selectedStack,
+        },
+        understanding,
+        workflow,
+      })
+      try { await saveProjectDraft({ ...draft, domain, hardware_bom: hardwareBom, business_model: { revenue_model: selectedRevenueModel, budget: projectBudget } }, understanding, workflow, 'flight_plan') } catch { }
       if (connectedRepo) {
         try { await associateProjectRepository(project.id, { repo_owner: connectedRepo.owner, repo_name: connectedRepo.name, repo_url: connectedRepo.url, selected_branch: connectedRepo.branch, connection_status: connectedRepo.isEmpty ? 'empty' : 'connected', is_empty: connectedRepo.isEmpty }) } catch { }
       }
@@ -547,19 +758,51 @@ export default function IdeaAnalysis() {
         /* ── Main Body: Left Big Mascot (Bird) + Right Stage Content (Rest things) ──── */
         <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden relative">
 
-          {/* LEFT: Big Mascot Companion Stage ("Bird") */}
+          {/* LEFT: Big Mascot Companion Stage */}
           <div className="w-full lg:w-[40%] xl:w-[36%] shrink-0 flex flex-col items-center justify-center p-5 sm:p-7 lg:p-10 bg-gradient-to-br from-[#FFF8F3] via-[#FFF2EE]/70 to-[#FFE9E4]/40 border-b lg:border-b-0 lg:border-r border-[#EFEAE4] relative overflow-hidden select-none">
             {/* Subtle Ambient Background Glows */}
             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-80 h-72 sm:h-80 bg-[#FFAAA6]/20 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-10 left-10 w-44 sm:w-52 h-44 sm:h-52 bg-[#FDE68A]/25 rounded-full blur-2xl pointer-events-none" />
 
-            {/* Big Interactive Mascot */}
-            <div className="relative z-10 flex flex-col items-center justify-center transform scale-95 sm:scale-105 lg:scale-120 xl:scale-130 py-2 sm:py-4 transition-transform duration-300">
-              <InteractiveMascot phase={step} />
+            {/* Toggle Mascot Mode */}
+            <div className="absolute top-3.5 right-4 z-20 flex items-center p-0.5 rounded-xl bg-white/90 border border-[#EFEAE4] shadow-xs backdrop-blur">
+              <button
+                type="button"
+                onClick={() => setMascotMode('3d')}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                  mascotMode === '3d'
+                    ? 'bg-[#1D1B18] text-white shadow-xs'
+                    : 'text-[#7C766F] hover:text-[#1D1B18]'
+                }`}
+              >
+                3D Character
+              </button>
+              <button
+                type="button"
+                onClick={() => setMascotMode('2d')}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                  mascotMode === '2d'
+                    ? 'bg-[#1D1B18] text-white shadow-xs'
+                    : 'text-[#7C766F] hover:text-[#1D1B18]'
+                }`}
+              >
+                2D Bird
+              </button>
+            </div>
+
+            {/* Interactive Character Component */}
+            <div className="relative z-10 flex flex-col items-center justify-center py-2 sm:py-4 transition-transform duration-300">
+              {mascotMode === '3d' ? (
+                <Interactive3DCharacter phase={step} size="lg" />
+              ) : (
+                <div className="transform scale-95 sm:scale-105 lg:scale-120 xl:scale-130">
+                  <InteractiveMascot phase={step} />
+                </div>
+              )}
             </div>
 
             {/* Companion Stage Pill */}
-            <div className="mt-4 sm:mt-6 relative z-10 text-center max-w-xs space-y-1">
+            <div className="mt-2 sm:mt-4 relative z-10 text-center max-w-xs space-y-1">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 border border-[#EFEAE4] shadow-xs text-xs font-bold text-[#1D1B18]">
                 <span className="w-2 h-2 rounded-full bg-[#8E4B49]" />
                 <span>Step {step + 1} of {stages.length} · {stages[step]?.title}</span>
@@ -601,41 +844,108 @@ export default function IdeaAnalysis() {
           {/* ─── STEP 0: PROJECT VISION ─────────────────────────────────────── */}
           {step === 0 && (
             <div className="space-y-4">
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">Project Details</span>
-                  <button type="button" onClick={analyzeUnderstanding} disabled={loading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF1ED] border border-[#FFAAA6] text-[#8E4B49] text-xs font-bold hover:bg-[#FFAAA6]/20 transition-colors">
-                    {loading ? <MiniLoader color="#8E4B49" /> : <RefreshCw size={12} />}
-                    {loading ? 'Thinking…' : 'Re-generate'}
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    { key: 'project_name', label: '🏷 Project Name', placeholder: 'e.g. WorkCraft Marketplace', rows: 1 },
-                    { key: 'target_users', label: '👥 Who is it for?', placeholder: 'Who feels this pain most?', rows: 2 },
-                    { key: 'problem_statement', label: '🎯 What problem does it solve?', placeholder: 'The exact friction users face today…', rows: 3 },
-                    { key: 'expected_outcome', label: '✅ What does success look like?', placeholder: 'What can users do after you build it?', rows: 2 },
-                  ].map(f => (
-                    <div key={f.key} className={`space-y-1 ${f.key === 'problem_statement' || f.key === 'expected_outcome' ? 'sm:col-span-1' : ''}`}>
-                      <label className="text-xs font-bold text-[#534342] block">{f.label}</label>
-                      <AutoResizeTextarea value={understanding[f.key] || ''} onChange={val => { setUnderstanding(prev => ({ ...prev, [f.key]: val })); persist({ understanding: { ...understanding, [f.key]: val } }) }} placeholder={f.placeholder} minRows={f.rows} />
+              {loading ? (
+                <div className="bg-white rounded-3xl border border-[#EFEAE4] p-8 sm:p-12 shadow-xs flex flex-col items-center justify-center text-center space-y-5 animate-fadeIn">
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-2xl bg-[#FFF1ED] border border-[#FFAAA6] flex items-center justify-center shadow-inner">
+                      <Sparkles size={28} className="text-[#8E4B49] animate-pulse" />
                     </div>
-                  ))}
-                </div>
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E76F51] animate-ping" />
+                  </div>
 
-                {/* Category pills */}
-                <div className="flex items-center gap-2 flex-wrap pt-1">
-                  <span className="text-xs font-bold text-[#534342]">Category:</span>
-                  {['Startup', 'Hackathon', 'College Project', 'Personal Project'].map(cat => (
-                    <button key={cat} type="button" onClick={() => { setProjectType(cat); persist({ projectType: cat }) }}
-                      className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${projectType === cat ? 'bg-[#1D1B18] text-white' : 'bg-[#FFF8F3] border border-[#EFEAE4] text-[#534342] hover:bg-[#EDE7E2]'}`}>
-                      {cat}
-                    </button>
-                  ))}
+                  <div className="space-y-1.5 max-w-md">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#8E4B49] px-2.5 py-1 rounded-full bg-[#FFF1ED] border border-[#FFAAA6]/50 inline-block">
+                      AI Studio Synthesis
+                    </span>
+                    <h2 className="text-xl sm:text-2xl font-black text-[#1D1B18] tracking-tight">
+                      AI is generating your project vision…
+                    </h2>
+                    <p className="text-xs text-[#534342] leading-relaxed">
+                      Deconstructing your raw idea into clear pillars: identifying target user personas, core pain points, and measurable outcomes.
+                    </p>
+                  </div>
+
+                  {/* Step status indicators */}
+                  <div className="w-full max-w-sm pt-1 space-y-2 text-left">
+                    <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
+                      <span className="w-2 h-2 rounded-full bg-[#2A9D8F] animate-pulse" />
+                      <span>Synthesizing project name & concept</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
+                      <span className="w-2 h-2 rounded-full bg-[#E76F51] animate-pulse" />
+                      <span>Mapping primary user persona & friction</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
+                      <span className="w-2 h-2 rounded-full bg-[#F4A261] animate-pulse" />
+                      <span>Defining verifiable success metrics</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs font-bold text-[#8E4B49] pt-1">
+                    <MiniLoader color="#8E4B49" />
+                    <span>Synthesizing live with Gemini…</span>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">Project Details</span>
+                    <button type="button" onClick={analyzeUnderstanding} disabled={loading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF1ED] border border-[#FFAAA6] text-[#8E4B49] text-xs font-bold hover:bg-[#FFAAA6]/20 transition-colors">
+                      {loading ? <MiniLoader color="#8E4B49" /> : <RefreshCw size={12} />}
+                      {loading ? 'Thinking…' : 'Re-generate'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      { key: 'project_name', label: '🏷 Project Name', placeholder: 'e.g. WorkCraft Marketplace', rows: 1 },
+                      { key: 'target_users', label: '👥 Who is it for?', placeholder: 'Who feels this pain most?', rows: 2 },
+                      { key: 'problem_statement', label: '🎯 What problem does it solve?', placeholder: 'The exact friction users face today…', rows: 3 },
+                      { key: 'expected_outcome', label: '✅ What does success look like?', placeholder: 'What can users do after you build it?', rows: 2 },
+                    ].map(f => (
+                      <div key={f.key} className={`space-y-1 ${f.key === 'problem_statement' || f.key === 'expected_outcome' ? 'sm:col-span-1' : ''}`}>
+                        <label className="text-xs font-bold text-[#534342] block">{f.label}</label>
+                        <AutoResizeTextarea value={understanding[f.key] || ''} onChange={val => { setUnderstanding(prev => ({ ...prev, [f.key]: val })); persist({ understanding: { ...understanding, [f.key]: val } }) }} placeholder={f.placeholder} minRows={f.rows} />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Category pills */}
+                  <div className="flex items-center gap-2 flex-wrap pt-1">
+                    <span className="text-xs font-bold text-[#534342]">Category:</span>
+                    {['Startup', 'Hackathon', 'College Project', 'Personal Project'].map(cat => (
+                      <button key={cat} type="button" onClick={() => { setProjectType(cat); persist({ projectType: cat }) }}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${projectType === cat ? 'bg-[#1D1B18] text-white' : 'bg-[#FFF8F3] border border-[#EFEAE4] text-[#534342] hover:bg-[#EDE7E2]'}`}>
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Domain Toggle */}
+                  <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-[#EFEAE4]">
+                    <span className="text-xs font-bold text-[#534342]">Project Domain:</span>
+                    {[
+                      { key: 'software', icon: '💻', label: 'Software' },
+                      { key: 'hardware', icon: '🔧', label: 'Hardware' },
+                      { key: 'hybrid',   icon: '⚡', label: 'Software + Hardware' },
+                    ].map(opt => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => { setDomain(opt.key); persist({ domain: opt.key }) }}
+                        className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
+                          domain === opt.key
+                            ? 'bg-[#8E4B49] text-white shadow-xs'
+                            : 'bg-[#FFF8F3] border border-[#EFEAE4] text-[#534342] hover:bg-[#EDE7E2]'
+                        }`}
+                      >
+                        {opt.icon} {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -690,13 +1000,56 @@ export default function IdeaAnalysis() {
                     </ul>
                   </InsightCard>
 
+                  {/* Startup Graveyard / Failed Predecessors */}
+                  <InsightCard number="3" label="Startup Graveyard: Predecessors That Failed & Why" color="#991B1B" bg="#FEF2F2" border="#FCA5A5">
+                    <p className="text-xs text-[#534342] mb-2 font-medium">
+                      Companies that previously tackled similar problem statements and their post-mortem failure causes:
+                    </p>
+                    <div className="space-y-2">
+                      {[
+                        {
+                          company: 'Early Point-Solutions & Clones',
+                          cause: '💸 High Marketing Burn / Cash Flow Exhaustion',
+                          desc: 'Spent heavily on customer acquisition before retention was sticky, running out of runway.',
+                        },
+                        {
+                          company: 'Legacy Standalone Tools',
+                          cause: '🏢 Copied or Bundled by Big Tech (Google / Apple / Microsoft)',
+                          desc: 'Tech giants integrated similar base utilities into OS updates for free, crushing standalone paid models.',
+                        },
+                        {
+                          company: 'Niche First-Movers',
+                          cause: '🔒 Monetization Friction & Lack of Direct Proof',
+                          desc: 'Enforced steep monthly paywalls before users experienced tangible value or solved their core friction.',
+                        },
+                      ].map((item, i) => (
+                        <div key={i} className="p-3 rounded-xl bg-white border border-[#FECDD3] text-xs space-y-1">
+                          <div className="flex items-center justify-between font-bold flex-wrap gap-1">
+                            <span className="text-[#991B1B]">{item.company}</span>
+                            <span className="text-[10px] text-[#B91C1C] px-2 py-0.5 rounded-full bg-[#FEE2E2] font-bold">{item.cause}</span>
+                          </div>
+                          <p className="text-[#534342] text-[11px] leading-relaxed m-0">{item.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-xs space-y-1 mt-2">
+                      <strong className="text-[#92400E] block font-bold">
+                        💡 Key Strategic Lesson for Your Build:
+                      </strong>
+                      <p className="text-[#78350F] text-[11.5px] leading-relaxed m-0">
+                        Focus on deep niche workflows and verified proof of work that Big Tech algorithms cannot bundle. Keep infrastructure costs low and validate early with real users!
+                      </p>
+                    </div>
+                  </InsightCard>
+
                   {/* Features grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <InsightCard number="3" label="Standard features expected" color="#2A5D54" bg="#F0FAF8" border="#9FD8CB">
+                    <InsightCard number="4" label="Standard features expected" color="#2A5D54" bg="#F0FAF8" border="#9FD8CB">
                       <PillList items={research.commonly_available_features || []} color="#2A5D54" bg="#E0F5F1" />
                     </InsightCard>
 
-                    <InsightCard number="4" label="Your first experiments to validate" color="#4B3B8C" bg="#F5F3FF" border="#C4B5FD">
+                    <InsightCard number="5" label="Your first experiments to validate" color="#4B3B8C" bg="#F5F3FF" border="#C4B5FD">
                       <ul className="space-y-1.5">
                         {(research.recommended_validation_actions || []).slice(0, 3).map((a, i) => (
                           <li key={i} className="flex items-start gap-1.5 text-xs text-[#1D1B18]">
@@ -730,11 +1083,283 @@ export default function IdeaAnalysis() {
             </div>
           )}
 
-          {/* ─── STEP 2: TECH STACK & REPO ──────────────────────────────────── */}
+          {/* ─── STEP 2: TECH STACK & HARDWARE BOM ─────────────────────────── */}
           {step === 2 && (
             <div className="space-y-5">
 
-              {/* 2a — Tech stack cards */}
+              {/* Hardware & BOM Sourcer for Hardware and Hybrid projects */}
+              {(domain === 'hardware' || domain === 'hybrid') && (
+                <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-5 shadow-xs">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-lg bg-[#FFFBEB] border border-[#FDE68A] flex items-center justify-center text-xs">🔧</span>
+                        <h2 className="text-sm font-bold text-[#1D1B18]">Bill of Materials (BOM) & Components</h2>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A]">
+                          {domain === 'hardware' ? 'Hardware Project' : 'IoT Hybrid Project'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#7C766F] mt-1">
+                        Sourced with verified Indian vendor pricing (INR), wiring diagrams, and direct product search for MakerBazar, Robocraze, Roboin & IndiaHobbyStore.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={fetchHardwareBom}
+                      disabled={bomLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFFBEB] border border-[#FDE68A] text-[#B45309] text-xs font-bold hover:bg-[#FDE68A]/30 transition-colors cursor-pointer"
+                    >
+                      {bomLoading ? <MiniLoader color="#B45309" /> : <RefreshCw size={12} />}
+                      <span>{bomLoading ? 'Generating BOM…' : 'Regenerate BOM'}</span>
+                    </button>
+                  </div>
+
+                  {/* Live Component Search Bar */}
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C766F]" />
+                        <input
+                          type="text"
+                          value={bomSearchQuery}
+                          onChange={e => setBomSearchQuery(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') handleSearchComponents(bomSearchQuery) }}
+                          placeholder="Search live components (e.g. ESP32, SG90 servo, HC-SR04, OLED display, Arduino)..."
+                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs focus:bg-white focus:border-[#D97706] focus:outline-none transition-all"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSearchComponents(bomSearchQuery)}
+                        disabled={bomSearching}
+                        className="px-4 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+                      >
+                        {bomSearching ? <MiniLoader color="#fff" /> : <Search size={13} />}
+                        <span>Search Stores</span>
+                      </button>
+                    </div>
+
+                    {/* Live Search Results */}
+                    {bomSearchResults.length > 0 && (
+                      <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-[#534342]">Store Search Results ({bomSearchResults.length})</span>
+                          <button type="button" onClick={() => setBomSearchResults([])} className="text-[10px] text-[#7C766F] hover:text-[#1D1B18] cursor-pointer">Close ✕</button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {bomSearchResults.map((item, idx) => (
+                            <div key={idx} className="p-2.5 rounded-xl bg-white border border-[#EFEAE4] flex gap-2.5 items-start">
+                              {item.image && (
+                                <img src={item.image} alt={item.name} className="w-12 h-12 rounded-lg object-cover border border-[#EFEAE4] shrink-0" />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="font-bold text-xs text-[#1D1B18] truncate">{item.name}</div>
+                                <div className="text-[10.5px] text-[#D97706] font-bold">{item.price_range}</div>
+                                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                  {(item.vendors || []).slice(0, 2).map((v, vi) => (
+                                    <a key={vi} href={v.direct_search_url} target="_blank" rel="noreferrer"
+                                      className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342] hover:text-[#1D1B18]">
+                                      🛒 {v.vendor}
+                                    </a>
+                                  ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddComponentToBom(item)}
+                                    className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#1D1B18] text-white hover:bg-black cursor-pointer"
+                                  >
+                                    + Add to BOM
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Total Estimated BOM Budget Bar */}
+                  {hardwareBom.length > 0 && (() => {
+                    const minTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMin || 0) * (c.quantity || 1), 0)
+                    const maxTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMax || 0) * (c.quantity || 1), 0)
+                    return (
+                      <div className="rounded-xl p-3 bg-gradient-to-r from-[#FFFBEB] via-[#FEF3C7]/40 to-[#FFF7ED] border border-[#FDE68A] flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">💰</span>
+                          <div>
+                            <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#92400E] block">Estimated Hardware BOM Budget</span>
+                            <span className="text-sm font-black text-[#1D1B18]">
+                              ₹{minTotal.toLocaleString('en-IN')} – ₹{maxTotal.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[11px] text-[#78350F] font-medium">
+                          {hardwareBom.length} components · Sourced from Indian maker suppliers
+                        </span>
+                      </div>
+                    )
+                  })()}
+
+                  {/* BOM Components List */}
+                  {bomLoading ? (
+                    <div className="py-8 flex flex-col items-center justify-center text-center space-y-2">
+                      <MiniLoader color="#D97706" />
+                      <span className="text-xs font-bold text-[#534342]">Analyzing requirements & generating Bill of Materials…</span>
+                    </div>
+                  ) : hardwareBom.length === 0 ? (
+                    <div className="p-6 rounded-xl border border-dashed border-[#EFEAE4] text-center space-y-2">
+                      <Package size={24} className="text-[#9CA3AF] mx-auto" />
+                      <p className="text-xs text-[#7C766F] m-0">No hardware components configured yet.</p>
+                      <button
+                        type="button"
+                        onClick={fetchHardwareBom}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1D1B18] text-white text-xs font-bold hover:bg-black cursor-pointer"
+                      >
+                        <Sparkles size={12} /> Auto-Generate BOM for My Idea
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {hardwareBom.map((comp) => (
+                        <div
+                          key={comp.id}
+                          className="p-3.5 rounded-2xl border-2 transition-all hover:shadow-sm space-y-2.5 relative bg-white"
+                          style={{ borderColor: comp.color || '#EFEAE4' }}
+                        >
+                          <div className="flex items-start gap-2.5">
+                            <img
+                              src={comp.image || getComponentLiveImage(comp.name, comp.category)}
+                              alt={comp.name}
+                              className="w-14 h-14 rounded-xl object-cover border border-[#EFEAE4] shrink-0 bg-[#FAF8F5]"
+                              onError={(e) => {
+                                e.target.onerror = null
+                                e.target.src = getComponentLiveImage(comp.name, comp.category)
+                              }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
+                                  style={{ background: comp.bg || '#FAF8F5', color: comp.color || '#534342' }}
+                                >
+                                  {comp.category}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveComponentFromBom(comp.id)}
+                                  className="text-[#9CA3AF] hover:text-[#DC2626] text-xs p-0.5 cursor-pointer"
+                                  title="Remove component"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <h3 className="text-xs font-bold text-[#1D1B18] mt-1 truncate">{comp.name}</h3>
+                              <span className="text-[11px] font-bold text-[#D97706]">
+                                ₹{comp.priceMin} – ₹{comp.priceMax} <small className="text-[#7C766F] font-normal">({comp.quantity || 1} {comp.unit || 'pcs'})</small>
+                              </span>
+                            </div>
+                          </div>
+
+                          {comp.description && (
+                            <p className="text-[11px] text-[#534342] leading-relaxed m-0 line-clamp-2">
+                              {comp.description}
+                            </p>
+                          )}
+
+                          {comp.wiring_tip && (
+                            <div className="p-2 rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] text-[10.5px] text-[#534342] flex items-start gap-1.5">
+                              <span className="text-xs">🔌</span>
+                              <span className="line-clamp-2"><strong>Wiring:</strong> {comp.wiring_tip}</span>
+                            </div>
+                          )}
+
+                          <div className="pt-1 border-t border-[#F3EDE7] flex items-center justify-between gap-1 flex-wrap">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {(comp.vendors || []).map((v, vi) => (
+                                <a
+                                  key={vi}
+                                  href={v.direct_search_url || v.link}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[10px] font-bold px-2 py-0.5 rounded-md border bg-white hover:bg-[#FAF8F5] transition-colors"
+                                  style={{ color: v.color || '#534342', borderColor: '#EFEAE4' }}
+                                  title={`Buy from ${v.vendor || v.name}`}
+                                >
+                                  🛒 {v.vendor || v.name}
+                                </a>
+                              ))}
+                            </div>
+
+                            {comp.learnUrl && (
+                              <a
+                                href={comp.learnUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] font-bold text-[#2563EB] hover:underline flex items-center gap-0.5"
+                              >
+                                <BookOpen size={10} /> Docs
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Direct Component Buy Links with Live Product Images */}
+                  <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#EFEAE4] space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-[#1D1B18] block">Direct Buy Links for Project Components</span>
+                        <span className="text-[11px] text-[#7C766F]">Live pricing and direct shopping links across trusted Indian distributors</span>
+                      </div>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
+                        ₹ INR Pricing
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                      {hardwareBom.slice(0, 4).map((c, i) => (
+                        <div key={i} className="p-2.5 rounded-xl border border-[#EFEAE4] bg-white flex flex-col justify-between gap-2 shadow-2xs">
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={c.image || getComponentLiveImage(c.name, c.category)}
+                              alt={c.name}
+                              className="w-10 h-10 rounded-lg object-cover border border-[#EFEAE4] shrink-0"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-xs font-bold text-[#1D1B18] truncate m-0">{c.name}</h4>
+                              <span className="text-[10.5px] font-bold text-[#D97706] block">₹{c.priceMin} – ₹{c.priceMax}</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1 pt-1.5 border-t border-[#F3EDE7]">
+                            <a
+                              href={`https://makerbazar.in/search?q=${encodeURIComponent(c.name)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[9.5px] font-bold px-1.5 py-1 rounded bg-[#FFF7ED] text-[#C2410C] hover:bg-[#FFEDD5] text-center no-underline truncate"
+                            >
+                              MakerBazar →
+                            </a>
+                            <a
+                              href={`https://robocraze.com/search?type=product&q=${encodeURIComponent(c.name)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[9.5px] font-bold px-1.5 py-1 rounded bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE] text-center no-underline truncate"
+                            >
+                              Robocraze →
+                            </a>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 2a — Tech stack cards (for Software and Hybrid) */}
+              {domain !== 'hardware' && (
               <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -833,6 +1458,7 @@ export default function IdeaAnalysis() {
                   )
                 })()}
               </div>
+              )}
 
               {/* Custom Tech Stack Modal */}
               {showCustomModal && (
@@ -1272,6 +1898,283 @@ export default function IdeaAnalysis() {
             </div>
           )}
 
+          {/* ─── STEP 5: BUSINESS MODEL & FINANCIAL PLANNER ──────────────────── */}
+          {step === 5 && (
+            <div className="space-y-5">
+              {/* Header banner */}
+              <div className="bg-gradient-to-r from-[#FFF8F3] via-[#FFF1ED] to-[#FEF3C7]/40 rounded-2xl border border-[#FFAAA6]/50 p-5 shadow-xs space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-[#8E4B49] text-white flex items-center justify-center font-bold text-xs">💰</span>
+                  <h2 className="text-sm font-black text-[#1D1B18]">Business Model & Financial Planning</h2>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#8E4B49] border border-[#FFAAA6]">
+                    {projectType} · {domain.toUpperCase()}
+                  </span>
+                </div>
+                <p className="text-xs text-[#534342] leading-relaxed">
+                  Plan how your project monetizes, allocate your capital across critical stages, and access Indian startup grants and prizes.
+                </p>
+              </div>
+
+              {/* Section A: Revenue Models */}
+              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">1. Choose Your Primary Revenue Model</h3>
+                    <p className="text-xs text-[#7C766F] mt-0.5">Select how your project will earn money and sustain development.</p>
+                  </div>
+                  {aiRevenueRecommendation && (
+                    <div className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#FFFBEB] to-[#FEF3C7] border border-[#FDE68A] flex items-center gap-2">
+                      <span className="text-xs">🤖</span>
+                      <span className="text-xs font-bold text-[#92400E]">
+                        AI Pick: <b>{aiRevenueRecommendation.title}</b>
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Rationale banner */}
+                {aiRevenueRecommendation && (
+                  <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs text-[#534342] flex items-start gap-2.5">
+                    <span className="text-[#8E4B49] font-black text-sm shrink-0">💡</span>
+                    <div>
+                      <strong className="text-[#1D1B18] font-bold block mb-0.5">Why AI picked this model:</strong>
+                      <span className="leading-relaxed">{aiRevenueRecommendation.reasoning}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {REVENUE_MODELS.map(model => {
+                    const isSelected = selectedRevenueModel === model.id
+                    const isAiPick = aiRevenueRecommendation?.modelId === model.id
+                    return (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => { setSelectedRevenueModel(model.id); persist({ business_model: { revenue_model: model.id, budget: projectBudget } }) }}
+                        className={`p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col cursor-pointer ${
+                          isSelected
+                            ? 'border-[#8E4B49] bg-[#FFFDFB] shadow-sm ring-2 ring-[#8E4B49]/10'
+                            : 'border-[#EFEAE4] bg-white hover:border-[#D4CFC9]'
+                        }`}
+                      >
+                        {isAiPick && (
+                          <span className="absolute top-2.5 right-2.5 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
+                            ★ AI Recommended
+                          </span>
+                        )}
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xl">{model.icon}</span>
+                          <span className="text-xs font-bold text-[#1D1B18]">{model.name}</span>
+                        </div>
+                        <p className="text-[11px] text-[#534342] leading-relaxed mb-3">{model.desc}</p>
+                        <div className="mt-auto pt-2 border-t border-[#F3EDE7] flex items-center justify-between text-[10px] text-[#8E4B49] font-bold">
+                          <span>{isSelected ? '✓ Selected Model' : 'Click to select'}</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Section B: Budget Allocation Planner */}
+              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">2. Project Budget & Resource Allocation</h3>
+                    <p className="text-xs text-[#7C766F] mt-0.5">Slide to set your expected budget to see smart spending recommendations.</p>
+                  </div>
+                  <div className="px-3 py-1 rounded-xl bg-[#FFF8F3] border border-[#FFAAA6] text-[#8E4B49] font-black text-sm">
+                    ₹{projectBudget.toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                <input
+                  type="range"
+                  min={0}
+                  max={150000}
+                  step={2500}
+                  value={projectBudget}
+                  onChange={e => {
+                    const val = Number(e.target.value)
+                    setProjectBudget(val)
+                    persist({ business_model: { revenue_model: selectedRevenueModel, budget: val } })
+                  }}
+                  className="w-full accent-[#8E4B49] cursor-pointer"
+                />
+
+                {/* Visual Multi-Segment Budget Bar */}
+                {(() => {
+                  const categories = getBudgetCategoriesForDomain(domain)
+                  return (
+                    <div className="space-y-3">
+                      <div className="h-4 rounded-full overflow-hidden flex bg-[#F3EDE7] shadow-inner">
+                        {categories.map((cat, i) => (
+                          <div
+                            key={i}
+                            style={{ width: `${cat.pct}%`, background: cat.color }}
+                            title={`${cat.label}: ₹${Math.round((projectBudget * cat.pct) / 100).toLocaleString('en-IN')}`}
+                          />
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                        {categories.map((cat, i) => {
+                          const amount = Math.round((projectBudget * cat.pct) / 100)
+                          return (
+                            <div key={i} className="p-2.5 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
+                                <span className="font-bold text-[#534342] text-[10.5px] truncate">{cat.label}</span>
+                              </div>
+                              <div className="font-black text-[#1D1B18] text-xs">
+                                ₹{amount.toLocaleString('en-IN')} <small className="text-[#7C766F] font-normal">({cat.pct}%)</small>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Section C: 6-Month Cash Flow & Revenue Projection */}
+              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
+                <div>
+                  <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">3. 6-Month Execution & Cash Flow Projection</h3>
+                  <p className="text-xs text-[#7C766F] mt-0.5">Conservative milestones based on a {teamSize}-person team and {totalWeeklyHrs} total hrs/week.</p>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-[#EFEAE4] bg-[#FAF8F5] text-[#534342]">
+                        <th className="py-2.5 px-3 font-bold rounded-l-xl">Timeline</th>
+                        <th className="py-2.5 px-3 font-bold">Milestone Focus</th>
+                        <th className="py-2.5 px-3 font-bold">{domain === 'hardware' ? 'Units Built' : 'Active Users'}</th>
+                        <th className="py-2.5 px-3 font-bold">Projected Revenue</th>
+                        <th className="py-2.5 px-3 font-bold">Estimated Cost</th>
+                        <th className="py-2.5 px-3 font-bold rounded-r-xl">Net Margin</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#F3EDE7]">
+                      {[
+                        {
+                          time: 'Month 1–2',
+                          focus: domain === 'hardware' ? 'BOM Sourcing & Breadboard Prototype' : 'Core Architecture & MVP Build',
+                          traction: domain === 'hardware' ? '1–2 Test Units' : '0 (Private Alpha)',
+                          revenue: '₹0',
+                          cost: `₹${Math.round(projectBudget * 0.4).toLocaleString('en-IN')}`,
+                          net: `-₹${Math.round(projectBudget * 0.4).toLocaleString('en-IN')}`,
+                          netColor: '#DC2626',
+                        },
+                        {
+                          time: 'Month 3',
+                          focus: 'Beta Release & User Validation',
+                          traction: domain === 'hardware' ? '5–10 Pilot Kits' : '50 Active Users',
+                          revenue: `₹${Math.round(projectBudget * 0.15).toLocaleString('en-IN')}`,
+                          cost: `₹${Math.round(projectBudget * 0.25).toLocaleString('en-IN')}`,
+                          net: `-₹${Math.round(projectBudget * 0.1).toLocaleString('en-IN')}`,
+                          netColor: '#D97706',
+                        },
+                        {
+                          time: 'Month 4–5',
+                          focus: 'Organic Growth & Feature Polish',
+                          traction: domain === 'hardware' ? '25 Pilot Devices' : '200 Active Users',
+                          revenue: `₹${Math.round(projectBudget * 0.55).toLocaleString('en-IN')}`,
+                          cost: `₹${Math.round(projectBudget * 0.2).toLocaleString('en-IN')}`,
+                          net: `+₹${Math.round(projectBudget * 0.35).toLocaleString('en-IN')}`,
+                          netColor: '#16A34A',
+                        },
+                        {
+                          time: 'Month 6',
+                          focus: 'Scale & Break-Even Target',
+                          traction: domain === 'hardware' ? '60+ Units' : '500+ Users',
+                          revenue: `₹${Math.round(projectBudget * 0.95).toLocaleString('en-IN')}`,
+                          cost: `₹${Math.round(projectBudget * 0.15).toLocaleString('en-IN')}`,
+                          net: `+₹${Math.round(projectBudget * 0.8).toLocaleString('en-IN')}`,
+                          netColor: '#16A34A',
+                        },
+                      ].map((row, idx) => (
+                        <tr key={idx} className="hover:bg-[#FFFDFB] transition-colors">
+                          <td className="py-2.5 px-3 font-bold text-[#1D1B18]">{row.time}</td>
+                          <td className="py-2.5 px-3 text-[#534342]">{row.focus}</td>
+                          <td className="py-2.5 px-3 font-semibold text-[#1D1B18]">{row.traction}</td>
+                          <td className="py-2.5 px-3 font-bold text-[#16A34A]">{row.revenue}</td>
+                          <td className="py-2.5 px-3 text-[#7C766F]">{row.cost}</td>
+                          <td className="py-2.5 px-3 font-black" style={{ color: row.netColor }}>{row.net}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Section D: Curated Funding Sources */}
+              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
+                <div>
+                  <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">4. Recommended Funding & Grants</h3>
+                  <p className="text-xs text-[#7C766F] mt-0.5">Top accessible grants and competition funds for {projectType} creators.</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(FUNDING_SOURCES[projectType] || FUNDING_SOURCES['Startup']).map((fund, i) => (
+                    <a
+                      key={i}
+                      href={fund.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-3.5 rounded-2xl border transition-all hover:shadow-xs no-underline flex flex-col bg-white cursor-pointer"
+                      style={{ borderColor: fund.color + '40' }}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-base">{fund.icon}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: fund.bg, color: fund.color }}>
+                          {fund.type}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-bold text-[#1D1B18] mb-1">{fund.name}</h4>
+                      <span className="text-xs font-black mb-3" style={{ color: fund.color }}>{fund.amount}</span>
+                      <span className="mt-auto text-[10.5px] font-bold text-[#8E4B49] flex items-center gap-1">
+                        Apply or Explore <ExternalLink size={11} />
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section E: AI Rationale */}
+              <div className="bg-[#FFFDF8] rounded-2xl border border-[#FDE68A] p-4 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRationale(p => !p)}
+                  className="w-full flex items-center justify-between text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Lightbulb size={14} className="text-[#D97706]" />
+                    <span className="text-xs font-black text-[#92400E]">AI Recommendation Rationale</span>
+                  </div>
+                  {showRationale ? <ChevronDown size={14} className="text-[#92400E]" /> : <ChevronRight size={14} className="text-[#92400E]" />}
+                </button>
+
+                {showRationale && (
+                  <div className="pt-2 border-t border-[#FDE68A]/60 text-xs text-[#78350F] space-y-1.5 leading-relaxed">
+                    <p className="m-0">
+                      • <strong>Domain fit:</strong> For a <strong>{domain.toUpperCase()}</strong> project, {domain === 'hardware' ? 'upfront component purchase and hardware unit sales' : domain === 'hybrid' ? 'hardware sales combined with recurring cloud subscription' : 'subscription or freemium models'} minimize burn rate while maximizing customer lifetime value (LTV).
+                    </p>
+                    <p className="m-0">
+                      • <strong>Pacing:</strong> With a <strong>{teamSize}-person team</strong> working <strong>{totalWeeklyHrs} hrs/week</strong>, Month 1–2 focuses strictly on de-risking the highest-uncertainty pillar before spending on paid marketing.
+                    </p>
+                    <p className="m-0">
+                      • <strong>Grants:</strong> Government grants and hackathons offer 100% non-dilutive capital, giving you runway without giving away early equity.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Notifications */}
           {notice && (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2A5D54]/10 border border-[#2A5D54]/30 text-[#2A5D54] text-xs font-semibold">
@@ -1299,7 +2202,7 @@ export default function IdeaAnalysis() {
                     <ArrowLeft size={13} /> Back
                   </button>
                 )}
-                {step < 4 ? (
+                {step < stages.length - 1 ? (
                   <button type="button" onClick={() => goToStage(step + 1)}
                     className="flex items-center gap-1.5 px-5 sm:px-6 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-all shadow hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
                     Continue <ArrowRight size={13} />

@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import InviteMakerModal from '../components/modals/InviteMakerModal.jsx'
+import Interactive3DCharacter from '../components/mascot/Interactive3DCharacter.jsx'
 import { fetchWorkspaceProjects } from '../services/ideaWorkflowService.js'
 import { readSavedProjects, syncBackendProjects, updateSavedProject } from '../services/projectStorage.js'
 
@@ -353,9 +354,9 @@ export default function MainDashboard() {
           </div>
 
           {/* ── Welcome Banner Card (Warm Pastel Mint with Brush Strokes) ─ */}
-          <div className="relative rounded-3xl bg-gradient-to-r from-[#EBF7EE] via-[#F4F9EA] to-[#FDF4EA] border border-[#D5EAD9] p-6 sm:p-8 overflow-hidden shadow-xs">
+          <div className="relative rounded-3xl bg-gradient-to-r from-[#EBF7EE] via-[#F4F9EA] to-[#FDF4EA] border border-[#D5EAD9] p-6 sm:p-8 overflow-hidden shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             {/* Playful abstract brush strokes in background */}
-            <div className="absolute right-0 top-0 bottom-0 w-1/2 pointer-events-none opacity-90 hidden sm:block">
+            <div className="absolute right-0 top-0 bottom-0 w-1/2 pointer-events-none opacity-80 hidden sm:block">
               <svg viewBox="0 0 400 160" fill="none" className="w-full h-full object-cover">
                 {/* Pink brush stroke */}
                 <path d="M 40 80 Q 90 20 180 70 T 320 40" stroke="#FF6584" strokeWidth="18" strokeLinecap="round" opacity="0.85" />
@@ -404,6 +405,11 @@ export default function MainDashboard() {
                   <IconChevronRight size={13} />
                 </Link>
               </div>
+            </div>
+
+            {/* Interactive 3D Companion Copilot (Clean, Large, Bubble-Free) */}
+            <div className="relative z-10 hidden sm:flex flex-col items-center select-none shrink-0 self-center">
+              <Interactive3DCharacter size="overview" showBubble={false} modelIndex={0} phase={activeJourneyIndex} />
             </div>
           </div>
 

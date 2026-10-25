@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Code2, Flame, FolderOpen, Gauge, LogOut,
-  Megaphone, Rocket, Sparkles, UserRound, Users, X
+  Megaphone, Rocket, Sparkles, UserRound, Users, X, CircleDollarSign
 } from 'lucide-react'
 import { NavLink, Link } from 'react-router-dom'
 import './Sidebar.css'
@@ -14,6 +14,7 @@ const navigation = [
   { label: 'Overview', icon: Gauge, to: '/' },
   { label: 'My Projects', icon: FolderOpen, to: '/projects' },
   { label: 'Flight Plan', icon: Rocket, to: '/flight-plan' },
+  { label: 'Business Model', icon: CircleDollarSign, to: '/business-model' },
   { label: 'Repository', icon: Code2, to: '/repository' },
   { label: 'TestPilot', icon: Flame, to: '/testpilot' },
   { label: 'Team Workspace', icon: Users, to: '/team' },

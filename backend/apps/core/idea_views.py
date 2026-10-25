@@ -9,6 +9,8 @@ from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 import logging
+import re
+import urllib.parse
 logger = logging.getLogger(__name__)
 
 # pyrefly: ignore[missing-import]
@@ -40,6 +42,8 @@ from .gemini_service import (
     generate_idea_stage,
     tutor_learning_question,
     recommend_learning_path,
+    classify_project_domain,
+    generate_hardware_bom,
 )
 
 
@@ -1234,5 +1238,343 @@ class TaskVerificationView(APIView):
             'total_xp': draft.xp_points,
             'xp_level': draft.xp_level,
             'receipt_id': str(receipt.id),
+        }, status=status.HTTP_200_OK)
+
+
+class ClassifyDomainView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        idea = str(request.data.get('idea', '')).strip()
+        project_type = str(request.data.get('project_type', 'Startup')).strip()
+        if not idea:
+            return Response({'domain': 'software', 'confidence': 0.8, 'reasoning': 'No idea text provided.'}, status=status.HTTP_200_OK)
+
+        result = classify_project_domain(idea, project_type)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+# Curated catalog of verified product images and specifications
+CURATED_HARDWARE_PARTS = [
+    {
+        'keywords': ['arduino', 'uno', 'microcontroller', 'atmega'],
+        'name': 'Arduino Uno R3 (ATmega328P)',
+        'category': 'Microcontroller',
+        'price_range': '₹450 – ₹650',
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/3/38/Arduino_Uno_-_R3.jpg',
+        'description': 'Industry-standard 8-bit microcontroller board with 14 digital I/O pins and 6 analog inputs.',
+        'wiring_tip': 'Power via 5V USB or 7-12V DC jack. Use 220Ω resistors for LED pins.',
+        'learn_url': 'https://docs.arduino.cc/hardware/uno-rev3/',
+    },
+    {
+        'keywords': ['esp32', 'nodemcu-32s', 'wifi', 'bluetooth', 'iot board'],
+        'name': 'ESP32 NodeMCU Wi-Fi + Bluetooth Dev Board',
+        'category': 'Microcontroller',
+        'price_range': '₹350 – ₹550',
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/8/87/ESP32_Espressif_ESP-WROOM-32.jpg',
+        'description': 'Dual-core 240MHz MCU with integrated 2.4GHz Wi-Fi and Bluetooth BLE for IoT devices.',
+        'wiring_tip': '3.3V logic board. Level shifter needed when interfacing with 5V sensors.',
+        'learn_url': 'https://randomnerdtutorials.com/getting-started-with-esp32/',
+    },
+    {
+        'keywords': ['raspberry pi', 'rpi', 'pi 4', 'single board computer'],
+        'name': 'Raspberry Pi 4 Model B (4GB RAM)',
+        'category': 'Single Board Computer',
+        'price_range': '₹4,500 – ₹6,200',
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/f/f1/Raspberry_Pi_4_Model_B_-_Side.jpg',
+        'description': 'Quad-core 64-bit Cortex-A72 computer with dual micro-HDMI 4K, gigabit ethernet & USB 3.0.',
+        'wiring_tip': 'Requires 5V 3A USB-C power supply. Use standard 40-pin GPIO header.',
+        'learn_url': 'https://www.raspberrypi.com/documentation/computers/getting-started.html',
+    },
+    {
+        'keywords': ['ultrasonic', 'hc-sr04', 'distance', 'sonar', 'range'],
+        'name': 'HC-SR04 Ultrasonic Distance Sensor',
+        'category': 'Sensor',
+        'price_range': '₹60 – ₹120',
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/HC-SR04_ultrasonic_sensor.jpg/640px-HC-SR04_ultrasonic_sensor.jpg',
+        'description': 'Non-contact distance measurement module with 2cm – 400cm range.',
+        'wiring_tip': 'VCC to 5V, GND to Ground. Trigger to digital pin, Echo to digital pin (use voltage divider for 3.3V MCUs).',
+        'learn_url': 'https://howtomechatronics.com/tutorials/arduino/ultrasonic-sensor-hc-sr04/',
+    },
+    {
+        'keywords': ['dht11', 'dht22', 'temperature', 'humidity'],
+        'name': 'DHT22 / AM2302 High Precision Temp & Humidity Sensor',
+        'category': 'Sensor',
+        'price_range': '₹180 – ₹320',
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/DHT22.jpg/640px-DHT22.jpg',
+        'description': 'Calibrated digital signal output temperature and humidity sensor with 0.1°C resolution.',
+        'wiring_tip': 'Connect 10kΩ pull-up resistor between VCC and Data pin.',
+        'learn_url': 'https://randomnerdtutorials.com/esp32-dht11-dht22-temperature-humidity-sensor-arduino-ide/',
+    },
+    {
+        'keywords': ['servo', 'sg90', 'mg996r', 'motor', 'actuator'],
+        'name': 'SG90 9g Micro Servo Motor (180°)',
+        'category': 'Actuator',
+        'price_range': '₹75 – ₹140',
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/TowerPro_SG90_9g_Micro_Servo.jpg/640px-TowerPro_SG90_9g_Micro_Servo.jpg',
+        'description': 'Tiny and lightweight 9g servo motor with 1.6 kg-cm torque for robotic joints and mechanisms.',
+        'wiring_tip': 'Brown/Black: GND, Red: 5V, Orange/Yellow: PWM Pin. Power from external 5V supply if using multiple servos.',
+        'learn_url': 'https://docs.arduino.cc/learn/electronics/servo-motors/',
+    },
+    {
+        'keywords': ['oled', 'display', 'i2c', 'screen', 'ssd1306', '0.96'],
+        'name': '0.96 inch I2C OLED Display (128x64 SSD1306)',
+        'category': 'Display',
+        'price_range': '₹190 – ₹320',
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/29/Oled_screen.jpg/640px-Oled_screen.jpg',
+        'description': 'High-contrast monochrome OLED display with simple 4-pin I2C interface.',
+        'wiring_tip': 'Connect VCC to 3.3V/5V, GND to Ground, SCL to A5/GPIO22, SDA to A4/GPIO21.',
+        'learn_url': 'https://randomnerdtutorials.com/esp32-ssd1306-oled-display-arduino-ide/',
+    },
+    {
+        'keywords': ['relay', 'switch', 'ac control', 'relay module'],
+        'name': '5V 1-Channel Relay Module with Optocoupler',
+        'category': 'Actuator',
+        'price_range': '₹60 – ₹110',
+        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Relay_module.jpg/640px-Relay_module.jpg',
+        'description': 'Isolates and switches 250V AC/10A or 30V DC/10A high-power appliances safely.',
+        'wiring_tip': 'JD-VCC jumper controls optocoupler isolation. Active LOW signal trigger.',
+        'learn_url': 'https://lastminuteengineers.com/one-channel-relay-module-arduino-tutorial/',
+    },
+]
+
+
+def build_vendor_store_links(component_name):
+    query = str(component_name or '').strip()
+    import urllib.parse
+    enc = urllib.parse.quote_plus(query)
+    return [
+        {
+            'vendor': 'MakerBazar',
+            'tagline': 'Electronics & Maker Supplies',
+            'logo': 'https://makerbazar.in/favicon.ico',
+            'color': '#F97316',
+            'bg': '#FFF7ED',
+            'direct_search_url': f'https://makerbazar.in/search?q={enc}',
+            'badge': 'Maker Choice',
+        },
+        {
+            'vendor': 'Robocraze',
+            'tagline': 'Robotics & IoT India',
+            'logo': 'https://robocraze.com/favicon.ico',
+            'color': '#2563EB',
+            'bg': '#EFF6FF',
+            'direct_search_url': f'https://robocraze.com/search?type=product&q={enc}',
+            'badge': 'Fast Delivery',
+        },
+        {
+            'vendor': 'Roboin',
+            'tagline': 'Indian Robotics Distributor',
+            'logo': 'https://www.roboin.io/favicon.ico',
+            'color': '#16A34A',
+            'bg': '#F0FDF4',
+            'direct_search_url': f'https://www.roboin.io/?s={enc}',
+            'badge': 'Verified Genuine',
+        },
+        {
+            'vendor': 'IndiaHobbyStore',
+            'tagline': 'DIY Electronics & Kits',
+            'logo': 'https://www.indiahobbystore.com/favicon.ico',
+            'color': '#CA8A04',
+            'bg': '#FEFCE8',
+            'direct_search_url': f'https://www.indiahobbystore.com/search?q={enc}',
+            'badge': 'Student Discounts',
+        },
+    ]
+
+
+class HardwareBOMView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        idea = str(request.data.get('idea', '')).strip()
+        problem = str(request.data.get('problem_statement', '')).strip()
+        outcome = str(request.data.get('expected_outcome', '')).strip()
+
+        components = generate_hardware_bom(idea, problem, outcome)
+        if not components:
+            # Fallback components based on keywords
+            components = []
+            lower = f"{idea} {problem}".lower()
+            for part in CURATED_HARDWARE_PARTS[:5]:
+                if any(kw in lower for kw in part['keywords']):
+                    min_p, max_p = 300, 600
+                    try:
+                        nums = [int(s.replace(',', '')) for s in re.findall(r'\d[\d,]*', part['price_range'])]
+                        if len(nums) >= 2:
+                            min_p, max_p = nums[0], nums[1]
+                    except Exception:
+                        pass
+                    components.append({
+                        'id': f"comp_{len(components)+1}",
+                        'name': part['name'],
+                        'category': part['category'],
+                        'quantity': 1,
+                        'unit': 'pcs',
+                        'priceMin': min_p,
+                        'priceMax': max_p,
+                        'currency': 'INR',
+                        'icon': '⚡',
+                        'color': '#2563EB',
+                        'bg': '#EFF6FF',
+                        'image': part['image'],
+                        'description': part['description'],
+                        'wiring_tip': part['wiring_tip'],
+                        'learnUrl': part['learn_url'],
+                        'searchQuery': part['name'],
+                        'required': True,
+                    })
+
+            if not components:
+                # Add default starter components
+                components = [
+                    {
+                        'id': 'comp_1',
+                        'name': 'ESP32 Wi-Fi + Bluetooth Dev Board',
+                        'category': 'Microcontroller',
+                        'quantity': 1,
+                        'unit': 'pcs',
+                        'priceMin': 350,
+                        'priceMax': 550,
+                        'currency': 'INR',
+                        'icon': '📶',
+                        'color': '#2563EB',
+                        'bg': '#EFF6FF',
+                        'image': 'https://upload.wikimedia.org/wikipedia/commons/8/87/ESP32_Espressif_ESP-WROOM-32.jpg',
+                        'description': 'Main controller with built-in Wi-Fi and Bluetooth for smart connectivity.',
+                        'wiring_tip': 'Connect via micro-USB or 5V VIN pin. Logic level is 3.3V.',
+                        'learnUrl': 'https://randomnerdtutorials.com/getting-started-with-esp32/',
+                        'searchQuery': 'ESP32 development board',
+                        'required': True,
+                    },
+                    {
+                        'id': 'comp_2',
+                        'name': 'Sensor Module Pack (Environment / Motion)',
+                        'category': 'Sensor',
+                        'quantity': 1,
+                        'unit': 'pcs',
+                        'priceMin': 120,
+                        'priceMax': 350,
+                        'currency': 'INR',
+                        'icon': '📡',
+                        'color': '#16A34A',
+                        'bg': '#F0FDF4',
+                        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/HC-SR04_ultrasonic_sensor.jpg/640px-HC-SR04_ultrasonic_sensor.jpg',
+                        'description': 'Captures physical data and transmits to the microcontroller.',
+                        'wiring_tip': 'Share common Ground (GND) with microcontroller board.',
+                        'learnUrl': 'https://docs.arduino.cc',
+                        'searchQuery': 'sensor module for arduino',
+                        'required': True,
+                    },
+                    {
+                        'id': 'comp_3',
+                        'name': 'Breadboard & Jumper Wire Assortment',
+                        'category': 'Prototyping',
+                        'quantity': 1,
+                        'unit': 'kit',
+                        'priceMin': 150,
+                        'priceMax': 280,
+                        'currency': 'INR',
+                        'icon': '🧪',
+                        'color': '#D97706',
+                        'bg': '#FFFBEB',
+                        'image': None,
+                        'description': '400-point solderless breadboard + 65 pcs male-to-male and male-to-female jumper wires.',
+                        'wiring_tip': 'Use horizontal power distribution rails for VCC and GND.',
+                        'learnUrl': 'https://www.instructables.com/How-to-Use-a-Breadboard/',
+                        'searchQuery': 'breadboard jumper wires kit',
+                        'required': True,
+                    },
+                    {
+                        'id': 'comp_4',
+                        'name': '5V 2A Regulated Power Supply',
+                        'category': 'Power',
+                        'quantity': 1,
+                        'unit': 'pcs',
+                        'priceMin': 180,
+                        'priceMax': 350,
+                        'currency': 'INR',
+                        'icon': '🔋',
+                        'color': '#7C3AED',
+                        'bg': '#F5F3FF',
+                        'image': None,
+                        'description': 'Stable DC power adapter to power microcontroller, sensors, and actuators without resetting.',
+                        'wiring_tip': 'Check polarity before plugging in: center-positive DC jack.',
+                        'learnUrl': 'https://www.electronics-tutorials.ws/dccircuits/power-supply.html',
+                        'searchQuery': '5V 2A adapter power supply',
+                        'required': True,
+                    },
+                ]
+
+        # Attach vendor links and ensure images
+        for comp in components:
+            comp_name = comp.get('searchQuery') or comp.get('name', '')
+            comp['vendors'] = build_vendor_store_links(comp_name)
+            if not comp.get('image'):
+                lower_name = comp_name.lower()
+                for item in CURATED_HARDWARE_PARTS:
+                    if any(kw in lower_name for kw in item['keywords']):
+                        comp['image'] = item['image']
+                        break
+
+        return Response({'components': components}, status=status.HTTP_200_OK)
+
+
+class HardwareSearchView(APIView):
+    """
+    Live component search endpoint. Searches Indian maker stores,
+    matches curated components with verified imagery, and builds direct vendor links.
+    """
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request):
+        return self._handle_search(request.GET.get('q', ''))
+
+    def post(self, request):
+        return self._handle_search(request.data.get('query', '') or request.data.get('q', ''))
+
+    def _handle_search(self, raw_query):
+        query = str(raw_query or '').strip()
+        if not query:
+            return Response({'query': '', 'results': [], 'vendors': build_vendor_store_links('Arduino')}, status=status.HTTP_200_OK)
+
+        lower = query.lower()
+        matched = []
+
+        # Find matching parts from curated catalog
+        for part in CURATED_HARDWARE_PARTS:
+            score = sum(1 for kw in part['keywords'] if kw in lower)
+            if score > 0 or lower in part['name'].lower():
+                matched.append({
+                    'name': part['name'],
+                    'category': part['category'],
+                    'price_range': part['price_range'],
+                    'image': part['image'],
+                    'description': part['description'],
+                    'wiring_tip': part['wiring_tip'],
+                    'learn_url': part['learn_url'],
+                    'vendors': build_vendor_store_links(part['name']),
+                })
+
+        # If no exact match, create dynamic result card for query
+        if not matched:
+            matched.append({
+                'name': query.title(),
+                'category': 'Hardware Component',
+                'price_range': '₹150 – ₹850',
+                'image': 'https://upload.wikimedia.org/wikipedia/commons/3/38/Arduino_Uno_-_R3.jpg',
+                'description': f'Component matching "{query}" available across Indian electronic component stores.',
+                'wiring_tip': 'Refer to component datasheet for pinout configuration and voltage limits.',
+                'learn_url': f'https://www.google.com/search?q={urllib.parse.quote_plus(query + " arduino tutorial")}',
+                'vendors': build_vendor_store_links(query),
+            })
+
+        return Response({
+            'query': query,
+            'results': matched,
+            'vendors': build_vendor_store_links(query),
         }, status=status.HTTP_200_OK)
 

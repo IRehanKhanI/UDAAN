@@ -1,16 +1,20 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft, BriefcaseBusiness, GraduationCap, Lightbulb,
-  Paperclip, Rocket, Sparkles, X, Compass, ChevronRight, CheckCircle2
+  Paperclip, Rocket, Sparkles, X, Compass, ChevronRight, CheckCircle2,
+  Cpu, Code2, Zap, Loader2,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import InteractiveMascot from '../components/mascot/InteractiveMascot.jsx'
+import { classifyProjectDomain } from '../services/hardwareService.js'
 
 const QUICK_IDEAS = [
   { label: '💼 Freelance Escrow', text: 'WorkCraft: A peer-to-peer freelance and task marketplace platform with milestone escrow and verified portfolios.' },
   { label: '🍞 Artisan Micro-Bakery', text: 'Crust & Crumb: A weekly micro-bakery drop where local food lovers reserve seasonal sourdough loaves & morning cardamom buns.' },
   { label: '⚡ DevTools CLI & AI', text: 'CodePilot CLI: An intelligent command-line tool that auto-detects flaky tests, suggests git diff fixes, and automates audits.' },
   { label: '🤖 Autonomous Sub-Agents', text: 'Nexus Studio: A multi-agent coordination platform orchestrating autonomous research, coding, and verification sub-agents.' },
+  { label: '🌱 IoT Soil Monitor', text: 'FarmPulse: A soil moisture and temperature monitoring system using Arduino sensors that sends alerts to a mobile dashboard via WiFi.' },
+  { label: '🚁 Drone Delivery Bot', text: 'SwiftDrop: An autonomous GPS-guided delivery drone with embedded Raspberry Pi control, obstacle detection, and a Flutter delivery tracker app.' },
 ]
 
 const CATEGORIES = [
@@ -26,6 +30,13 @@ const FLOW_STEPS = [
   { emoji: '💰', title: 'Budget & Pricing' },
   { emoji: '🏗️', title: 'Architecture & Stacks' },
   { emoji: '🚀', title: 'Flight Plan & Tasks' },
+  { emoji: '📈', title: 'Business Model' },
+]
+
+const DOMAIN_OPTIONS = [
+  { key: 'software', label: 'Software', icon: <Code2 size={13} />, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', desc: 'Web, mobile, SaaS, APIs' },
+  { key: 'hardware', label: 'Hardware', icon: <Cpu size={13} />, color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', desc: 'Circuits, Arduino, IoT devices' },
+  { key: 'hybrid', label: 'Software + Hardware', icon: <Zap size={13} />, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', desc: 'IoT app, robot + dashboard' },
 ]
 
 export default function LaunchIdea() {
@@ -37,6 +48,28 @@ export default function LaunchIdea() {
   const [attachment, setAttachment] = useState(null)
   const [attachmentNotice, setAttachmentNotice] = useState('')
   const [error, setError] = useState('')
+  const [domain, setDomain] = useState('software')
+  const [domainClassifying, setDomainClassifying] = useState(false)
+  const [domainReasoning, setDomainReasoning] = useState('')
+  const [userOverrodeDomain, setUserOverrodeDomain] = useState(false)
+  const classifyTimer = useRef(null)
+
+  // Auto-classify domain via AI as user types (debounced 900ms)
+  useEffect(() => {
+    if (userOverrodeDomain) return
+    if (idea.trim().length < 25) return
+    clearTimeout(classifyTimer.current)
+    classifyTimer.current = setTimeout(async () => {
+      setDomainClassifying(true)
+      try {
+        const result = await classifyProjectDomain(idea.trim(), intent)
+        setDomain(result.domain)
+        setDomainReasoning(result.reasoning || '')
+      } catch { /* use current domain */ }
+      finally { setDomainClassifying(false) }
+    }, 900)
+    return () => clearTimeout(classifyTimer.current)
+  }, [idea, intent, userOverrodeDomain])
 
   async function addAttachment(e) {
     const file = e.target.files?.[0]
@@ -63,6 +96,7 @@ export default function LaunchIdea() {
       projectId: globalThis.crypto?.randomUUID?.() || 'proj_' + Date.now(),
       idea: idea.trim(),
       projectType: intent,
+      domain,
       attachment: attachment ?? null,
       currentStage: 0,
       completedStages: [],
@@ -71,6 +105,7 @@ export default function LaunchIdea() {
     localStorage.setItem('udaan:idea-draft', JSON.stringify(draft))
     navigate('/projects/new/analysis')
   }
+
 
   return (
     <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[#FFF8F3] font-['Plus_Jakarta_Sans'] flex flex-col">
@@ -173,6 +208,44 @@ export default function LaunchIdea() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* AI Domain Detection */}
+              <div className="space-y-2 p-3 rounded-2xl border border-[#EFEAE4] bg-[#FAFAF9]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-black text-[#7C766F] uppercase tracking-wider flex items-center gap-1.5">
+                    {domainClassifying
+                      ? <><Loader2 size={11} className="animate-spin" /> AI Detecting type…</>
+                      : <><Sparkles size={11} className="text-[#8E4B49]" /> AI Project Type</>
+                    }
+                  </span>
+                  {domainReasoning && (
+                    <span className="text-[10px] text-[#7C766F] italic truncate max-w-[180px]">{domainReasoning}</span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {DOMAIN_OPTIONS.map(opt => (
+                    <button key={opt.key} type="button"
+                      onClick={() => { setDomain(opt.key); setUserOverrodeDomain(true) }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-all cursor-pointer"
+                      style={domain === opt.key
+                        ? { background: opt.bg, borderColor: opt.color, color: opt.color }
+                        : { background: 'white', borderColor: '#EFEAE4', color: '#534342' }
+                      }
+                    >
+                      <span style={{ color: domain === opt.key ? opt.color : '#9CA3AF' }}>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                      {domain === opt.key && !domainClassifying && (
+                        <span className="text-[9px] font-black uppercase ml-0.5 opacity-70">
+                          {userOverrodeDomain ? 'Manual' : 'AI Pick'}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-[#9CA3AF]">
+                  {DOMAIN_OPTIONS.find(o => o.key === domain)?.desc} — AI detects automatically, you can override.
+                </p>
               </div>
 
               {/* Attach File + Launch Button */}

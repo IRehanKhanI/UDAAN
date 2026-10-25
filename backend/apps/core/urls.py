@@ -23,6 +23,9 @@ from .idea_views import (
     RoadmapTaskAssessmentCorrectionView,
     RoadmapTaskExplanationView,
     UserRepositoriesView,
+    ClassifyDomainView,
+    HardwareBOMView,
+    HardwareSearchView,
 )
 from .views import health
 from .team_workspace import (TeamWorkspaceView, TeamMemberView, TeamTaskView, RoadmapTaskSyncView,
@@ -51,6 +54,9 @@ urlpatterns = [
     path('projects/', ProjectDraftCollectionView.as_view(), name='project-draft-list'),
     path('projects/launch/', ProjectLaunchView.as_view(), name='project-launch'),
     path('ideas/analyze/', IdeaAnalysisView.as_view(), name='idea-analysis'),
+    path('ideas/classify-domain/', ClassifyDomainView.as_view(), name='classify-domain'),
+    path('ideas/hardware-bom/', HardwareBOMView.as_view(), name='hardware-bom'),
+    path('ideas/hardware-search/', HardwareSearchView.as_view(), name='hardware-search'),
     path('glimpse/generate/', GlimpseGenerateView.as_view(), name='glimpse-generate'),
     path('ideas/workflow-stage/', IdeaWorkflowStageView.as_view(), name='idea-workflow-stage'),
     path('projects/drafts/<uuid:draft_id>/', ProjectDraftView.as_view(), name='project-draft'),

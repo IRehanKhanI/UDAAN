@@ -9,6 +9,7 @@ from .gemini_service import (
     _gemini_models,
     _generate_with_provider_fallback,
     _parse_json_candidate,
+    sanitize_currency_to_inr,
 )
 from .web_research_service import perform_full_web_research
 
@@ -326,10 +327,10 @@ RETRIEVED WEB RESEARCH FINDINGS (from Tavily Web Search & Extraction):
 
 RULES FOR SYNTHESIS:
 1. MARKET RADAR REPORT:
-   - Identify 2 to 4 real competitors with publicly listed pricing models (e.g. Free tier, $29/mo, $199 hardware, etc.).
+   - Identify 2 to 4 real competitors with publicly listed pricing models strictly in Indian Rupees (₹ / INR, e.g. Free tier, ₹1,999/mo, ₹14,999 hardware, etc.). Convert any USD or foreign pricing to approximate Indian Rupees (₹) at ~₹85/USD. NEVER use US Dollars ($).
    - Extract Voice of the Customer: 2 to 4 public user pain points and complaints found in user reviews or forums.
    - For citations, prioritize real URLs and excerpts provided in the research findings. Badge items as 'Verified Web Evidence' if backed by the sources, or 'AI Hypothesis' if an expert deduction.
-   - Provide 2 to 3 actionable, low-cost Validation Experiments with clear pass/fail metrics.
+   - Provide 2 to 3 actionable, low-cost Validation Experiments with clear pass/fail metrics and estimated_cost strictly in Indian Rupees (₹ INR, e.g. '₹0', '₹500 – ₹1,500', 'Free tier'). Never use dollars ($).
 
 2. FLIGHT PLAN:
    - Must generate exactly 4 sequenced milestones:
@@ -409,7 +410,7 @@ RULES FOR SYNTHESIS:
         milestones=milestones,
     )
 
-    return {
+    return sanitize_currency_to_inr({
         "project_name": result.get("project_name") or f"{idea[:30].strip()} Project",
         "problem_statement": result.get("problem_statement") or idea,
         "target_users": result.get("target_users") or "Early adopters and target audience",
@@ -419,7 +420,7 @@ RULES FOR SYNTHESIS:
         "mindmap_graph": mindmap,
         "total_xp_pool": total_xp,
         "web_research_sources": sources,
-    }
+    })
 
 
 def _ensure_four_milestones(milestones, idea, today):
@@ -496,7 +497,7 @@ def _build_grounded_fallback(idea, project_type, sources, today):
             {
                 "name": "Standard Market Tool A",
                 "positioning": "Enterprise standard with steep learning curve",
-                "pricing": "$49 - $199 / month",
+                "pricing": "₹3,999 – ₹15,999 / month",
                 "core_features": ["Broad functionality", "Complex dashboard"],
                 "market_presence": "High market share",
             },
@@ -535,7 +536,7 @@ def _build_grounded_fallback(idea, project_type, sources, today):
             "experiment_type": "Landing Page Smoke Test",
             "method": "Deploy 1-page creative showcase with interest capture form.",
             "pass_fail_metric": ">15% conversion rate on 100 visitors",
-            "estimated_cost": "$0 - $15",
+            "estimated_cost": "₹0 – ₹1,200",
             "effort_days": 2,
         },
         {
@@ -545,7 +546,7 @@ def _build_grounded_fallback(idea, project_type, sources, today):
             "experiment_type": "Targeted User Interview",
             "method": "5 structured 15-minute interviews with prospective users.",
             "pass_fail_metric": "4/5 participants validate problem urgency",
-            "estimated_cost": "$0",
+            "estimated_cost": "₹0",
             "effort_days": 3,
         },
     ]
