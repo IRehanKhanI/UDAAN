@@ -20,6 +20,7 @@ class ProjectDraft(models.Model):
     attachment = models.JSONField(null=True, blank=True, default=None)
     understanding = models.JSONField(default=dict, blank=True)
     workflow = models.JSONField(default=dict, blank=True)
+    business_model = models.JSONField(default=dict, blank=True)
     current_stage = models.CharField(max_length=32, default='understanding')
     start_date = models.DateField(null=True, blank=True)
     deadline = models.DateField(null=True, blank=True)
@@ -231,5 +232,4 @@ class TaskVerificationReceipt(models.Model):
 
     def __str__(self):
         return f'{self.project_id} -> {self.task_key} (+{self.xp_awarded} XP)'
-
 

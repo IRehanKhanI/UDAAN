@@ -215,6 +215,7 @@ class ProjectDraftSerializer(serializers.ModelSerializer):
             'id', 'idea', 'project_type', 'attachment', 'understanding',
             'workflow', 'current_stage', 'start_date', 'deadline',
             'team_size', 'weekly_hours', 'schedule_metadata',
+            'business_model',
             'xp_points', 'xp_level', 'market_radar', 'mindmap_graph',
             'repository', 'latest_assessment',
             'created_at', 'updated_at',
@@ -345,6 +346,106 @@ class ProjectDraftView(APIView):
             ensure_member_slots(draft, current_user=request.user)
             mark_draft_generation_changes(draft, previous_workflow, edited_stages)
         return Response(ProjectDraftSerializer(draft).data, status=status.HTTP_200_OK if existing else status.HTTP_201_CREATED)
+
+
+BUSINESS_MODEL_DEFAULTS = {
+    'software': ['subscription', 'freemium'],
+    'hardware': ['one_time', 'hardware_service'],
+    'hybrid': ['one_time', 'subscription'],
+}
+
+
+def _business_model_recommendation(draft):
+    domain = (draft.business_model or {}).get('domain') or (draft.understanding or {}).get('domain') or 'software'
+    domain = domain if domain in BUSINESS_MODEL_DEFAULTS else 'software'
+    problem = (draft.understanding or {}).get('problem_statement') or draft.idea
+    grants = {
+        'Startup': ['Startup India Seed Fund', 'MeitY TIDE 2.0'],
+        'Hackathon': ['Smart India Hackathon', 'MeitY TIDE 2.0'],
+        'College Project': ['AICTE IDEA Lab', 'SSIP / College Innovation Grant'],
+        'Personal Project': ['Local incubator or college grant', 'Startup India Seed Fund (after incorporation)'],
+    }
+    return {
+        'recommended_models': BUSINESS_MODEL_DEFAULTS[domain],
+        'reason': f'For this {domain} project ({str(problem)[:180]}), validate demand before increasing acquisition spend.',
+        'matched_grants': grants.get(draft.project_type, grants['Startup']),
+    }
+
+
+class BusinessModelGenerationView(APIView):
+    def post(self, request, draft_id):
+        draft = get_object_or_404(authorized_project_drafts(request), pk=draft_id)
+        result = _business_model_recommendation(draft)
+        requested_domain = request.data.get('domain')
+        if requested_domain in BUSINESS_MODEL_DEFAULTS:
+            result['recommended_models'] = BUSINESS_MODEL_DEFAULTS[requested_domain]
+        return Response(result)
+
+
+class BusinessModelInputSerializer(serializers.Serializer):
+    domain = serializers.ChoiceField(choices=['software', 'hardware', 'hybrid'], default='software')
+    selected_models = serializers.ListField(
+        child=serializers.ChoiceField(choices=['subscription', 'one_time', 'freemium', 'marketplace', 'grant', 'hardware_service']),
+        min_length=1, max_length=2,
+    )
+    total_budget = serializers.IntegerField(min_value=5000, max_value=50000000)
+    buckets = serializers.DictField()
+    fixed_monthly_costs = serializers.IntegerField(min_value=0, max_value=50000000, default=0)
+    monthly_marketing = serializers.IntegerField(min_value=0, max_value=50000000, default=0)
+    monthly_customers = serializers.IntegerField(min_value=0, max_value=10000000, default=0)
+    average_revenue_per_customer = serializers.IntegerField(min_value=0, max_value=50000000, default=0)
+    cac = serializers.IntegerField(min_value=0, max_value=50000000, default=0)
+
+    def validate_buckets(self, value):
+        required = {'tech_infrastructure', 'legal_setup', 'mvp_validation', 'marketing', 'emergency_buffer'}
+        if set(value) != required or any(not isinstance(amount, int) or amount < 0 for amount in value.values()):
+            raise serializers.ValidationError('Provide non-negative integer amounts for every budget bucket.')
+        return value
+
+    def validate(self, attrs):
+        if sum(attrs['buckets'].values()) != attrs['total_budget']:
+            raise serializers.ValidationError({'buckets': 'Bucket totals must equal total_budget.'})
+        if attrs['buckets']['emergency_buffer'] < round(attrs['total_budget'] * 0.2):
+            raise serializers.ValidationError({'buckets': 'Emergency Runway Buffer must be at least 20% of total budget.'})
+        burn = attrs['fixed_monthly_costs'] + attrs['monthly_marketing']
+        runway = attrs['total_budget'] / burn if burn else 24
+        if runway < 6:
+            raise serializers.ValidationError({'financial_plan': 'This plan has less than six months of runway.'})
+        if attrs['monthly_marketing'] > attrs['buckets']['mvp_validation'] + attrs['buckets']['tech_infrastructure']:
+            raise serializers.ValidationError({'financial_plan': 'Marketing cannot exceed product development before MVP validation.'})
+        return attrs
+
+
+class BusinessModelView(APIView):
+    def put(self, request, draft_id):
+        draft = get_object_or_404(authorized_project_drafts(request), pk=draft_id)
+        serializer = BusinessModelInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        plan = dict(serializer.validated_data)
+        burn = plan['fixed_monthly_costs'] + plan['monthly_marketing']
+        revenue = plan['monthly_customers'] * plan['average_revenue_per_customer']
+        plan.update({
+            'revenue_model': plan['selected_models'][0],
+            'budget': plan['total_budget'],
+            'monthly_burn': burn,
+            'monthly_revenue': revenue,
+            'contribution_margin': revenue - burn,
+            'runway_months': round(plan['total_budget'] / burn, 2) if burn else 24,
+            'saved_at': timezone.now().isoformat(),
+        })
+        workflow = dict(draft.workflow or {})
+        workflow['business_model'] = plan
+        metadata = dict(draft.schedule_metadata or {})
+        metadata['financial_constraints'] = {
+            'monthly_burn': plan['monthly_burn'],
+            'runway_months': plan['runway_months'],
+            'budget': plan['total_budget'],
+        }
+        draft.business_model = plan
+        draft.workflow = workflow
+        draft.schedule_metadata = metadata
+        draft.save(update_fields=['business_model', 'workflow', 'schedule_metadata', 'updated_at'])
+        return Response({'business_model': plan, 'financial_constraints': metadata['financial_constraints']})
 
 
 class ProjectDraftCollectionView(APIView):
@@ -1577,4 +1678,3 @@ class HardwareSearchView(APIView):
             'results': matched,
             'vendors': build_vendor_store_links(query),
         }, status=status.HTTP_200_OK)
-

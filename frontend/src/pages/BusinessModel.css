@@ -1,6 +1,47 @@
 /* BusinessModel.css - UDAAN Business Model & Financial Planner */
+.bm-alert,.bm-success{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;margin:12px 0;background:#fef2f2;color:#991b1b;font-size:13px}.bm-success{background:#f0fdf4;color:#166534}.bm-model-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:14px;border:1px solid #eee7e1;border-radius:16px;background:#fff;cursor:pointer;text-align:left}.bm-model-card.selected{border-color:#ff8f8a;background:#fff4f1;box-shadow:0 0 0 2px #ffaaa633}.bm-model-card small{color:#6b625c;line-height:1.4}.bm-model-arpu{font-size:11px;color:#8e4b49;font-weight:700}.bm-economics-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.bm-economics-grid label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:#534342}.bm-economics-grid input{border:1px solid #e5ddd7;border-radius:10px;padding:9px;background:#fff}.bm-budget-slider-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:13px;font-weight:700}.bm-budget-slider-row strong{margin-left:auto;color:#8e4b49}.bm-budget-slider-row input{width:100%;accent-color:#d97706}.bm-alloc-item{display:grid;grid-template-columns:minmax(130px,1fr) minmax(100px,1.2fr) auto;align-items:center;gap:10px;padding:9px 0;font-size:12px;color:#534342}.bm-alloc-item input{accent-color:#d97706}.bm-alloc-item b{font-size:11px;white-space:nowrap}.bm-funding-card{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;text-decoration:none;color:#1d1b18;background:#f5f3ff}.bm-funding-card span{font-size:11px;color:#6b625c;margin-left:auto}.bm-save-button{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:0;border-radius:14px;padding:13px;background:#1d1b18;color:#fff;font-weight:800;cursor:pointer}.bm-save-button:disabled{opacity:.45;cursor:not-allowed}.bm-projection-note{display:flex;gap:6px;align-items:flex-start;font-size:11px;color:#6b625c;line-height:1.45}@media(max-width:900px){.bm-economics-grid{grid-template-columns:1fr}.bm-alloc-item{grid-template-columns:1fr}.bm-alloc-item b{justify-self:start}}
+
+@media (max-width: 1024px) {
+  .bm-main {
+    width: calc(100% - 288px);
+    margin-left: 288px;
+    padding-inline: 1.25rem;
+  }
+
+  .bm-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .bm-main {
+    width: 100%;
+    margin-left: 0;
+    padding: 5.75rem 1rem 2rem;
+  }
+
+  .bm-hero {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: .85rem;
+  }
+
+  .bm-stat-chip {
+    align-self: flex-start;
+  }
+
+  .bm-model-grid,
+  .bm-projection-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .bm-card {
+    padding: 1rem;
+  }
+}
 
 .bm-page {
+  display: flex;
   font-family: 'Plus Jakarta Sans', sans-serif;
   min-height: 100vh;
   background-color: #FFF8F3;
@@ -8,13 +49,124 @@
 }
 
 .bm-main {
+  min-width: 0;
+  width: calc(100% - 320px);
+  margin-left: 320px;
   flex: 1;
-  padding: 1.5rem;
+  padding: 6.5rem 2rem 3rem;
 }
 
 .bm-content {
-  max-width: 1080px;
+  width: 100%;
+  max-width: 1180px;
   margin: 0 auto;
+}
+
+.bm-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.bm-eyebrow {
+  display: block;
+  margin-bottom: .45rem;
+  color: #A35A53;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.bm-title {
+  margin: 0;
+  color: #8E4B49;
+  font-size: clamp(1.5rem, 2.5vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -.04em;
+}
+
+.bm-subtitle {
+  margin: .5rem 0 0;
+  color: #78877D;
+  font-size: .85rem;
+}
+
+.bm-stat-chip {
+  flex: 0 0 auto;
+  padding: .7rem .9rem;
+  border: 1px solid #F0DED7;
+  border-radius: 999px;
+  background: #FFF;
+  color: #8E4B49;
+  font-size: .78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.bm-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, .9fr);
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.bm-left-col,
+.bm-right-col {
+  min-width: 0;
+}
+
+.bm-model-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.bm-model-card strong {
+  color: #1D1B18;
+  font-size: .9rem;
+}
+
+.bm-model-icon {
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.bm-projection-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .6rem;
+  margin-top: 1rem;
+}
+
+.bm-proj-stat {
+  display: grid;
+  gap: .2rem;
+  min-width: 0;
+  padding: .75rem;
+  border: 1px solid #F0DED7;
+  border-radius: .75rem;
+  background: #FFF8F3;
+}
+
+.bm-proj-stat span {
+  color: #78877D;
+  font-size: .68rem;
+}
+
+.bm-proj-stat strong {
+  overflow: hidden;
+  color: #8E4B49;
+  font-size: .9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bm-right-col {
+  display: grid;
+  gap: 0;
 }
 
 .bm-card {
