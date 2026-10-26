@@ -2010,6 +2010,152 @@ class MarketingGenerationServiceTests(SimpleTestCase):
             generate_marketing_content(mode='tool', inputs={'topic': 'An announcement'})
 
 
+class BusinessModelResearchTests(SimpleTestCase):
+    def result(self):
+        return {
+            'overview': {
+                'one_line_purpose': 'Therapy chatbot offering guided support any time',
+                'who_pays': 'Adults seeking affordable guided mental wellness support',
+                'how_much': 'Test a monthly subscription around ₹499',
+                'to_whom': 'Direct subscription to the product provider',
+                'quantified_pain': 'Users report difficulty finding timely support',
+                'current_workaround': 'Self-help content and delayed appointments',
+            },
+            'market_size': {
+                'total_customers': 100000,
+                'annual_price_per_customer': 5988,
+                'sam_percentage': 20,
+                'som_percentage': 2,
+            },
+            'unit_economics': {
+                'price_per_unit': 499,
+                'cost_to_serve': 120,
+                'cac': 800,
+                'monthly_churn_pct': 8.5,
+            },
+            'market_research': {
+                'summary': 'Directional estimate for validation.',
+                'key_findings': ['Public competitor pricing should be compared.'],
+                'assumptions': ['Monthly willingness to pay is not verified.'],
+                'validation_questions': ['Would you pay for this support?'],
+            },
+        }
+
+    @patch.dict(os.environ, {
+        'GEMINI_API_KEY': 'gemini-test-key',
+        'GEMINI_MODEL': 'test-model',
+        'GEMINI_FALLBACK_MODELS': '',
+        'GROQ_API_KEY': '',
+        'TAVILY_API_KEY': '',
+    })
+    @patch('apps.core.gemini_service._generate_content')
+    def test_research_uses_search_grounding_and_returns_only_real_source_links(self, generate):
+        from .gemini_service import research_business_model
+        generate.return_value = {
+            'candidates': [{
+                'content': {'parts': [{'text': json.dumps(self.result())}]},
+                'finishReason': 'STOP',
+                'groundingMetadata': {'groundingChunks': [
+                    {'web': {'title': 'Example market research', 'uri': 'https://example.com/report'}},
+                    {'web': {'title': 'Invalid source', 'uri': 'javascript:alert(1)'}},
+                ]},
+            }],
+        }
+
+        result = research_business_model(
+            idea='An accessible therapy chatbot',
+            project_name='Calm Chat',
+            project_type='Startup',
+            project_details={'target_users': 'Adults seeking support'},
+            purpose='Therapy chatbot for 24/7 guidance',
+            market='India',
+            currency='INR',
+        )
+
+        payload = generate.call_args.args[0]
+        self.assertEqual(payload['tools'], [{'google_search': {}}])
+        self.assertEqual(result['overview']['who_pays'], 'Adults seeking affordable guided mental wellness support')
+        self.assertEqual(len(result['market_research']['sources']), 1)
+        self.assertEqual(result['market_research']['sources'][0]['url'], 'https://example.com/report')
+        self.assertTrue(result['market_research']['has_live_sources'])
+
+    @patch.dict(os.environ, {
+        'GEMINI_API_KEY': 'gemini-test-key',
+        'GEMINI_MODEL': 'test-model',
+        'GEMINI_FALLBACK_MODELS': '',
+        'GROQ_API_KEY': '',
+        'TAVILY_API_KEY': '',
+    })
+    @patch('apps.core.gemini_service._generate_content')
+    def test_invalid_market_estimates_are_rejected(self, generate):
+        from .gemini_service import GeminiRequestError, research_business_model
+        output = self.result()
+        output['market_size']['sam_percentage'] = 101
+        generate.return_value = {
+            'candidates': [{
+                'content': {'parts': [{'text': json.dumps(output)}]},
+                'finishReason': 'STOP',
+            }],
+        }
+
+        with self.assertRaisesRegex(GeminiRequestError, 'invalid market-share percentages'):
+            research_business_model(
+                idea='A therapy chatbot',
+                project_name='',
+                project_type='Startup',
+                project_details={},
+                purpose='A therapy chatbot',
+                market='India',
+                currency='INR',
+            )
+
+
+class BusinessModelResearchApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.draft = ProjectDraft.objects.create(
+            idea='A therapy chatbot for timely mental wellness support',
+            project_type='Startup',
+            understanding={
+                'project_name': 'Calm Chat',
+                'problem_statement': 'People struggle to find timely support.',
+                'target_users': 'Adults seeking mental wellness support',
+            },
+        )
+
+    @patch('apps.core.idea_views.research_business_model')
+    def test_research_endpoint_uses_project_context_and_returns_suggestions(self, research):
+        research.return_value = {
+            'overview': {'who_pays': 'Adults seeking mental wellness support'},
+            'market_size': {'total_customers': 100000},
+            'unit_economics': {'price_per_unit': 499},
+            'market_research': {'sources': [], 'has_live_sources': False},
+        }
+
+        response = self.client.post(
+            f'/api/projects/drafts/{self.draft.id}/business-model/research/',
+            {'purpose': 'Therapy chatbot for 24/7 guidance', 'market': 'India', 'currency': 'INR'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['overview']['who_pays'], 'Adults seeking mental wellness support')
+        self.assertEqual(research.call_args.kwargs['idea'], self.draft.idea)
+        self.assertEqual(research.call_args.kwargs['project_name'], 'Calm Chat')
+        self.assertEqual(research.call_args.kwargs['market'], 'India')
+
+    @patch('apps.core.idea_views.research_business_model')
+    def test_research_endpoint_rejects_invalid_currency(self, research):
+        response = self.client.post(
+            f'/api/projects/drafts/{self.draft.id}/business-model/research/',
+            {'market': 'India', 'currency': 'EUR'},
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        research.assert_not_called()
+
+
 class FlightPlanMarketRadarTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -2154,4 +2300,3 @@ class FlightPlanMarketRadarTests(TestCase):
         self.assertEqual(res_dup.status_code, 200)
         self.assertEqual(res_dup.json()['xp_awarded'], 0)
         self.assertEqual(res_dup.json()['total_xp'], 350)
-

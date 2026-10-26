@@ -260,7 +260,7 @@ export default function TeamWorkspace() {
             }
           }}
         />
-        <main className="ud-main tw-main flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="ud-main tw-main flex-1 px-6 pb-6 pt-24 md:px-8 md:pb-8 md:pt-24 max-w-7xl w-full mx-auto">
           <div className="tw-content" style={{ padding: 0, maxWidth: '100%' }}>
             <section className="tw-live-heading">
               <div>

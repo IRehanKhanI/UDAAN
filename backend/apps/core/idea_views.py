@@ -40,6 +40,7 @@ from .gemini_service import (
     explain_roadmap_task_assessment,
     generate_glimpse_response,
     generate_idea_stage,
+    research_business_model,
     tutor_learning_question,
     recommend_learning_path,
     classify_project_domain,
@@ -382,6 +383,49 @@ class BusinessModelGenerationView(APIView):
         return Response(result)
 
 
+class BusinessModelResearchInputSerializer(serializers.Serializer):
+    purpose = serializers.CharField(max_length=2000, required=False, allow_blank=True)
+    market = serializers.CharField(max_length=120, required=False, default='India', allow_blank=False)
+    currency = serializers.ChoiceField(choices=['INR', 'USD'], required=False, default='INR')
+
+
+class BusinessModelResearchView(APIView):
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'business_model_ai'
+
+    def post(self, request, draft_id):
+        draft = get_object_or_404(authorized_project_drafts(request), pk=draft_id)
+        serializer = BusinessModelResearchInputSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {'error': 'Provide a valid project market and currency.', 'fields': serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        understanding = draft.understanding or {}
+        project_details = {
+            'problem_statement': understanding.get('problem_statement', ''),
+            'target_users': understanding.get('target_users', ''),
+            'expected_outcome': understanding.get('expected_outcome', ''),
+            'domain': understanding.get('domain', ''),
+        }
+        try:
+            result = research_business_model(
+                idea=draft.idea,
+                project_name=understanding.get('project_name', ''),
+                project_type=draft.project_type,
+                project_details=project_details,
+                purpose=serializer.validated_data.get('purpose', ''),
+                market=serializer.validated_data['market'].strip(),
+                currency=serializer.validated_data['currency'],
+            )
+        except GeminiConfigurationError as error:
+            return Response({'error': str(error), 'code': 'gemini_not_configured'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except GeminiRequestError as error:
+            return Response({'error': str(error), 'code': 'gemini_unavailable'}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(result, status=status.HTTP_200_OK)
+
+
 class BusinessModelInputSerializer(serializers.Serializer):
     domain = serializers.CharField(required=False, default='software')
     selected_models = serializers.ListField(
@@ -403,6 +447,7 @@ class BusinessModelInputSerializer(serializers.Serializer):
     unit_economics = serializers.DictField(required=False, default=dict)
     runway_ask = serializers.DictField(required=False, default=dict)
     moat_why_now = serializers.DictField(required=False, default=dict)
+    market_research = serializers.DictField(required=False, default=dict)
     consistency_checks = serializers.DictField(required=False, default=dict)
     currency = serializers.CharField(required=False, default='INR')
 

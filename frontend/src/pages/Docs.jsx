@@ -70,7 +70,7 @@ export default function Docs() {
           onToggleMobileMenu={() => setMenuOpen(value => !value)}
           onProjectSelect={selectProject}
         />
-        <main className="ud-main flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="ud-main flex-1 px-6 pb-6 pt-24 md:px-8 md:pb-8 md:pt-24 max-w-7xl w-full mx-auto">
           <div className="mx-auto max-w-5xl space-y-6">
             <section className="flex flex-wrap items-end justify-between gap-4">
               <div>

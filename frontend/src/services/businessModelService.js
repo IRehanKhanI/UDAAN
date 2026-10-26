@@ -5,6 +5,11 @@ export const generateBusinessModel = (projectId, domain) => apiRequest(
   { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) },
 )
 
+export const researchBusinessModel = (projectId, { purpose, market, currency }) => apiRequest(
+  `/api/projects/drafts/${encodeURIComponent(projectId)}/business-model/research/`,
+  { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ purpose, market, currency }) },
+)
+
 export const saveBusinessModel = (projectId, plan) => apiRequest(
   `/api/projects/drafts/${encodeURIComponent(projectId)}/business-model/`,
   { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(plan) },

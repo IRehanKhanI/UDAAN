@@ -11,7 +11,7 @@ import { fetchProjectDraft } from '../services/ideaWorkflowService.js'
 import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
 import {
   calculateBusinessMetrics, generateBusinessModel,
-  getBusinessGuardrails, saveBusinessModel
+  getBusinessGuardrails, researchBusinessModel, saveBusinessModel
 } from '../services/businessModelService.js'
 
 // Tab components
@@ -76,6 +76,9 @@ export default function BusinessModel() {
   const [lastSavedTime, setLastSavedTime] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [market, setMarket] = useState('India')
+  const [researching, setResearching] = useState(false)
+  const [researchError, setResearchError] = useState('')
 
   // Studio Data Model
   const [modelData, setModelData] = useState({
@@ -195,6 +198,58 @@ export default function BusinessModel() {
     }))
   }, [])
 
+  const handleMarketResearch = async () => {
+    if (!project?.id) {
+      setResearchError('Create or select a saved project before requesting market research.')
+      return
+    }
+    const purpose = modelData.overview.one_line_purpose || project.description || project.idea || ''
+    if (!purpose.trim()) {
+      setResearchError('Add a short description of your product before requesting market research.')
+      return
+    }
+
+    setResearching(true)
+    setResearchError('')
+    setError('')
+    setNotice('')
+    try {
+      const result = await researchBusinessModel(project.id, { purpose, market, currency })
+      const updated = {
+        ...modelData,
+        overview: {
+          ...modelData.overview,
+          ...result.overview,
+          who_pays_confidence: 'ai_estimate',
+          how_much_confidence: 'ai_estimate',
+          to_whom_confidence: 'ai_estimate',
+        },
+        market_size: {
+          ...modelData.market_size,
+          ...result.market_size,
+          tam_confidence: 'ai_estimate',
+          sam_confidence: 'ai_estimate',
+          som_confidence: 'ai_estimate',
+        },
+        unit_economics: {
+          ...modelData.unit_economics,
+          ...result.unit_economics,
+          price_confidence: 'ai_estimate',
+          cost_confidence: 'ai_estimate',
+          cac_confidence: 'ai_estimate',
+        },
+        market_research: result.market_research,
+      }
+      setModelData(updated)
+      updateSavedProject(project.id, { businessModel: updated })
+      setNotice('AI research is ready. Review its sources and assumptions, then save your business model.')
+    } catch (caught) {
+      setResearchError(caught.message || 'Could not research this market. Please try again.')
+    } finally {
+      setResearching(false)
+    }
+  }
+
   // Auto-calculated budget buckets
   const budgetBuckets = useMemo(() => {
     return buildBudget(modelData.total_budget, modelData.percentages || DEFAULT_PCTS)
@@ -226,10 +281,7 @@ export default function BusinessModel() {
         businessModel: payload,
       })
 
-      // Save to backend
-      try {
-        await saveBusinessModel(project.id, payload)
-      } catch { }
+      await saveBusinessModel(project.id, payload)
 
       setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
       setNotice('All business model sections and financials saved successfully.')
@@ -285,7 +337,7 @@ export default function BusinessModel() {
           }}
         />
 
-        <main className="flex-1 p-5 md:p-8 max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 px-5 pb-5 pt-24 md:px-8 md:pb-8 md:pt-24 max-w-7xl w-full mx-auto space-y-6">
           {/* ── Top Bar Alerts ── */}
           {notice && (
             <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-[#EBF7EE] border border-[#CDEBD4] text-[#1F7A3F] text-xs font-semibold animate-fadeIn">
@@ -413,6 +465,11 @@ export default function BusinessModel() {
                 onChange={handleSectionChange}
                 currency={currency}
                 project={project}
+                market={market}
+                onMarketChange={setMarket}
+                onResearch={handleMarketResearch}
+                researching={researching}
+                researchError={researchError}
               />
             )}
 
