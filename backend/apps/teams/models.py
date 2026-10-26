@@ -48,3 +48,10 @@ class TeamInvitation(models.Model):
             self.status = 'expired'
             self.save(update_fields=['status', 'updated_at'])
         return self.status
+
+
+class TeamMcpCredential(models.Model):
+    project = models.OneToOneField(ProjectDraft, on_delete=models.CASCADE, related_name='mcp_credential')
+    token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

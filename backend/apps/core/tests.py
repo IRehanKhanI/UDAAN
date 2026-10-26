@@ -1,11 +1,12 @@
 import json
 import os
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 from apps.projects.models import ProjectDraft, ProjectRepository, RoadmapAssessment, ProjectLearningState, MarketingContentItem
-from apps.teams.models import TeamMember
+from apps.teams.models import TeamMember, TeamMcpCredential
 from apps.roadmaps.models import ProjectTask
 
 from .gemini_service import (
@@ -550,6 +551,112 @@ class TeamWorkspaceTests(TestCase):
                 self.assertEqual(response.json()['project']['joined_count'], 1)
             self.assertTrue(TeamMember.objects.get(project=project, slot=1).is_creator)
             self.assertEqual(TeamMember.objects.filter(project=project).count(), 1)
+
+    def test_added_team_member_is_saved_and_returned_in_workspace(self):
+        client = APIClient()
+        project = self.make_project(2)
+        workspace_url = f'/api/projects/drafts/{project.id}/team-workspace/'
+        client.get(workspace_url)
+
+        response = client.post(f'{workspace_url}members/', {
+            'name': 'New teammate',
+            'email': 'teammate@example.com',
+            'role': 'Designer',
+            'skills': ['Figma', ' User research '],
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['slot'], 2)
+        self.assertEqual(TeamMember.objects.filter(project=project).count(), 2)
+        saved_member = TeamMember.objects.get(project=project, slot=2)
+        self.assertEqual(saved_member.name, 'New teammate')
+        self.assertEqual(saved_member.email, 'teammate@example.com')
+        self.assertEqual(saved_member.role, 'Designer')
+        self.assertEqual(saved_member.skills, ['Figma', 'User research'])
+        self.assertEqual(client.get(workspace_url).json()['members'][1]['email'], 'teammate@example.com')
+        self.assertEqual(client.post(f'{workspace_url}members/', {
+            'name': 'Another teammate',
+            'email': 'third@example.com',
+        }, format='json').status_code, 409)
+
+    def test_custom_task_is_persisted_assigned_and_survives_roadmap_sync(self):
+        client = APIClient()
+        project = self.make_project(3)
+        workspace_url = f'/api/projects/drafts/{project.id}/team-workspace/'
+        client.get(workspace_url)
+        member = TeamMember.objects.create(project=project, slot=2, name='Assigned teammate')
+
+        response = client.post(f'{workspace_url}tasks/', {
+            'title': 'Prepare release notes',
+            'description': 'Summarize the release.',
+            'assigned_to': member.id,
+            'milestone': 'Launch',
+            'priority': 'high',
+            'effort_hours': 2.5,
+        }, format='json')
+
+        self.assertEqual(response.status_code, 201)
+        task = ProjectTask.objects.get(pk=response.json()['id'])
+        self.assertEqual(task.assigned_to_id, member.id)
+        self.assertTrue(task.source_key.startswith('manual:'))
+        self.assertEqual(task.effort_hours, Decimal('2.5'))
+        workspace_task = next(item for item in client.get(workspace_url).json()['tasks'] if item['id'] == task.id)
+        self.assertEqual(workspace_task['assigned_to_name'], 'Assigned teammate')
+        sync = client.post(f'{workspace_url}sync-roadmap/', {'confirm': True}, format='json')
+        self.assertEqual(sync.status_code, 200)
+        task.refresh_from_db()
+        self.assertTrue(task.active)
+        self.assertEqual(task.assigned_to_id, member.id)
+
+    def test_mcp_tools_list_assign_and_complete_project_tasks(self):
+        client = APIClient()
+        project = self.make_project(3)
+        workspace_url = f'/api/projects/drafts/{project.id}/team-workspace/'
+        client.get(workspace_url)
+        member = TeamMember.objects.create(project=project, slot=2, name='Agent teammate')
+        task = ProjectTask.objects.create(project=project, source_key='manual:mcp-test', source_position='manual', title='Write tests')
+
+        issued = client.post(f'{workspace_url}mcp-token/', {}, format='json')
+        self.assertEqual(issued.status_code, 201)
+        token = issued.json()['token']
+        self.assertTrue(token.startswith('udmcp_'))
+        self.assertNotEqual(TeamMcpCredential.objects.get(project=project).token_hash, token)
+
+        mcp_client = APIClient()
+        headers = {'HTTP_AUTHORIZATION': f'Bearer {token}', 'HTTP_ACCEPT': 'application/json, text/event-stream'}
+        initialize = mcp_client.post('/api/mcp/', json.dumps({
+            'jsonrpc': '2.0', 'id': 1, 'method': 'initialize',
+            'params': {'protocolVersion': '2025-03-26', 'capabilities': {}, 'clientInfo': {'name': 'test-agent', 'version': '1'}},
+        }), content_type='application/json', **headers)
+        self.assertEqual(initialize.status_code, 200)
+        self.assertEqual(initialize.json()['result']['capabilities'], {'tools': {}})
+
+        tools = mcp_client.post('/api/mcp/', json.dumps({'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'}), content_type='application/json', **headers)
+        tool_names = {tool['name'] for tool in tools.json()['result']['tools']}
+        self.assertTrue({'list_team_tasks', 'list_team_members', 'assign_task', 'complete_task', 'update_task_status'} <= tool_names)
+
+        assigned = mcp_client.post('/api/mcp/', json.dumps({
+            'jsonrpc': '2.0', 'id': 3, 'method': 'tools/call',
+            'params': {'name': 'assign_task', 'arguments': {'task_id': task.id, 'member_id': member.id}},
+        }), content_type='application/json', **headers)
+        self.assertFalse(assigned.json()['result']['isError'])
+        task.refresh_from_db()
+        self.assertEqual(task.assigned_to_id, member.id)
+
+        completed = mcp_client.post('/api/mcp/', json.dumps({
+            'jsonrpc': '2.0', 'id': 4, 'method': 'tools/call',
+            'params': {'name': 'complete_task', 'arguments': {'task_id': task.id}},
+        }), content_type='application/json', **headers)
+        self.assertFalse(completed.json()['result']['isError'])
+        task.refresh_from_db()
+        self.assertEqual(task.status, 'completed')
+
+        rotated = client.post(f'{workspace_url}mcp-token/', {}, format='json').json()['token']
+        rejected = mcp_client.post('/api/mcp/', json.dumps({'jsonrpc': '2.0', 'id': 5, 'method': 'tools/list'}), content_type='application/json', **headers)
+        self.assertEqual(rejected.status_code, 401)
+        accepted = mcp_client.post('/api/mcp/', json.dumps({'jsonrpc': '2.0', 'id': 6, 'method': 'tools/list'}), content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {rotated}', HTTP_ACCEPT='application/json, text/event-stream')
+        self.assertEqual(accepted.status_code, 200)
 
     def test_roadmap_sync_leaves_assignments_unchanged_until_a_review_is_approved(self):
         client = APIClient()

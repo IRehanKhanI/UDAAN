@@ -726,6 +726,7 @@ function TaskRow({
 
           {task.effort_estimate && <span><Clock3 size={11} />{task.effort_estimate}</span>}
           {task.suggested_role && <span><UsersRound size={11} />{task.suggested_role}</span>}
+          {task.assigned_to_name && <span className="fp-task-assignee"><UsersRound size={11} />Assigned to {task.assigned_to_name}</span>}
           {projectId && <Link className="fp-learn-task-link" to={`/learning?project=${encodeURIComponent(projectId)}&task=${encodeURIComponent(item.id)}`}><Sparkles size={11} />Learn this</Link>}
 
           {task.dependencies?.length > 0 && (
@@ -1443,6 +1444,7 @@ function ReplanPreview({ plan, onCancel, onApprove }) {
 
 export default function FlightPlan() {
   const [projects, setProjects] = useState(readSavedProjects)
+  const [teamTasks, setTeamTasks] = useState([])
   const projectsWithPlans = useMemo(() => projects, [projects])
   const requestedProject = new URLSearchParams(window.location.search).get('project')
   const requestedTask = new URLSearchParams(window.location.search).get('task')
@@ -1522,20 +1524,39 @@ export default function FlightPlan() {
   useEffect(() => {
     let active = true
     if (!project?.id) return () => { active = false }
-    void getTeamWorkspace(project.id).then(workspace => {
-      if (!active || !workspace.tasks.length) return
-      const serverProgress = workspace.tasks.filter(task => task.status === 'completed' && task.source_position).map(task => task.source_position)
-      setProjects(current => current.map(item => {
-        if (item.id !== project.id) return item
-        const previous = item.flightPlanProgress || item.workflow?.flightPlanProgress || []
-        if (JSON.stringify([...previous].sort()) === JSON.stringify([...serverProgress].sort())) return item
-        const workflow = { ...item.workflow, flightPlanProgress: serverProgress }
-        const updated = { ...item, flightPlanProgress: serverProgress, workflow }
-        updateSavedProject(item.id, updated)
-        return updated
-      }))
-    }).catch(() => {})
-    return () => { active = false }
+    setTeamTasks([])
+    const refreshTeamTasks = () => {
+      void getTeamWorkspace(project.id).then(workspace => {
+        if (!active) return
+        const workspaceTasks = workspace.tasks || []
+        setTeamTasks(workspaceTasks)
+        const serverProgress = workspaceTasks
+          .filter(task => task.status === 'completed' && task.source_position && task.source_position !== 'manual')
+          .map(task => task.source_position)
+        setProjects(current => current.map(item => {
+          if (item.id !== project.id) return item
+          const previous = item.flightPlanProgress || item.workflow?.flightPlanProgress || []
+          if (JSON.stringify([...previous].sort()) === JSON.stringify([...serverProgress].sort())) return item
+          const workflow = { ...item.workflow, flightPlanProgress: serverProgress }
+          const updated = { ...item, flightPlanProgress: serverProgress, workflow }
+          updateSavedProject(item.id, updated)
+          return updated
+        }))
+      }).catch(err => {
+        if (active) setError(err.message || 'Could not refresh team task updates.')
+      })
+    }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refreshTeamTasks()
+    }
+    refreshTeamTasks()
+    window.addEventListener('focus', refreshTeamTasks)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      active = false
+      window.removeEventListener('focus', refreshTeamTasks)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [project?.id])
 
   // Load project's connected repository & latest assessment
@@ -1715,15 +1736,50 @@ export default function FlightPlan() {
     return () => { active = false; clearTimeout(timer) }
   }, [project?.id, generationStatus])
 
-  const milestones = normalizeMilestones(flightPlan)
-  const completed = project?.flightPlanProgress || project?.workflow?.flightPlanProgress || []
+  const baseMilestones = normalizeMilestones(flightPlan)
+  const milestones = useMemo(() => {
+    const result = baseMilestones.map((milestone, milestoneIndex) => ({
+      ...milestone,
+      tasks: milestone.tasks.map((task, taskIndex) => {
+        const sourceTask = teamTasks.find(item => item.source_position === `${milestoneIndex}-${taskIndex}`)
+        return sourceTask ? { ...task, assigned_to_name: sourceTask.assigned_to_name || '' } : task
+      }),
+    }))
+    const manualTasks = teamTasks.filter(task => task.source_position === 'manual')
+    for (const task of manualTasks) {
+      const title = task.milestone?.trim() || 'Team tasks'
+      let milestone = result.find(item => item.title.toLowerCase() === title.toLowerCase())
+      if (!milestone) {
+        milestone = { title, category: task.milestone ? 'Team milestone' : 'Team tasks', purpose: '', outcome: '', start_date: '', target_date: '', tasks: [] }
+        result.push(milestone)
+      }
+      milestone.tasks.push({
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        effort_estimate: `${task.effort_hours} hours`,
+        target_date: task.deadline || '',
+        dependencies: task.dependencies || [],
+        required_skills: task.required_skills || [],
+        assigned_to_name: task.assigned_to_name || '',
+        _teamTaskId: task.id,
+      })
+    }
+    return result
+  }, [baseMilestones, teamTasks])
+  const localCompleted = project?.flightPlanProgress || project?.workflow?.flightPlanProgress || []
+  const completed = [...new Set([
+    ...localCompleted,
+    ...teamTasks.filter(task => task.source_position === 'manual' && task.status === 'completed').map(task => `team-${task.id}`),
+  ])]
   const allTasks = milestones.flatMap((milestone, milestoneIndex) =>
     milestone.tasks.map((task, taskIndex) => ({
-      id: `${milestoneIndex}-${taskIndex}`,
+      id: task._teamTaskId ? `team-${task._teamTaskId}` : `${milestoneIndex}-${taskIndex}`,
       task,
       milestone: milestone.title,
       milestoneIndex,
       taskIndex,
+      teamTaskId: task._teamTaskId || null,
     }))
   )
 
@@ -1836,8 +1892,14 @@ export default function FlightPlan() {
 
   function toggleTask(taskId) {
     const next = completed.includes(taskId) ? completed.filter(id => id !== taskId) : [...completed, taskId]
-    persistPlan(flightPlan, next)
     const roadmapTask = allTasks.find(item => item.id === taskId)
+    if (roadmapTask?.teamTaskId) {
+      void updateTeamTask(project.id, roadmapTask.teamTaskId, { status: next.includes(taskId) ? 'completed' : 'not_started' })
+        .then(updatedTask => setTeamTasks(current => current.map(task => task.id === updatedTask.id ? updatedTask : task)))
+        .catch(err => setError(err.message || 'Could not update task progress.'))
+      return
+    }
+    persistPlan(flightPlan, next)
     if (project?.id && roadmapTask) {
       void getTeamWorkspace(project.id).then(workspace => {
         const sharedTask = workspace.tasks.find(item => item.source_position === taskId)

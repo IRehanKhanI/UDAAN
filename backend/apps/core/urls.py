@@ -22,7 +22,7 @@ from .idea_views import (
 from .views import health
 from .team_workspace import (TeamWorkspaceView, TeamMemberView, TeamTaskView, RoadmapTaskSyncView,
     TeamInvitationCollectionView, TeamInvitationManageView, PublicTeamInvitationView,
-    TeamAllocationProposalView, TeamAllocationApprovalView)
+    TeamAllocationProposalView, TeamAllocationApprovalView, TeamMcpCredentialView, TeamMcpView)
 from .marketing_views import MarketingGenerateView, MarketingContentCollectionView, MarketingContentDetailView
 from apps.users.views import GitHubLoginStartView, GitHubLoginCallbackView, AuthStatusView, DeveloperProfileView, LogoutView, CsrfTokenView
 
@@ -43,14 +43,18 @@ urlpatterns = [
     path('projects/drafts/<uuid:draft_id>/learning/tutor/', ProjectLearningTutorView.as_view(), name='project-learning-tutor'),
     path('projects/drafts/<uuid:draft_id>/learning/recommendations/', ProjectLearningRecommendationsView.as_view(), name='project-learning-recommendations'),
     path('projects/drafts/<uuid:draft_id>/team-workspace/', TeamWorkspaceView.as_view(), name='team-workspace'),
+    path('projects/drafts/<uuid:draft_id>/team-workspace/members/', TeamMemberView.as_view(), name='team-workspace-members'),
     path('projects/drafts/<uuid:draft_id>/team-workspace/members/<int:member_id>/', TeamMemberView.as_view(), name='team-workspace-member'),
+    path('projects/drafts/<uuid:draft_id>/team-workspace/tasks/', TeamTaskView.as_view(), name='team-workspace-tasks'),
     path('projects/drafts/<uuid:draft_id>/team-workspace/tasks/<int:task_id>/', TeamTaskView.as_view(), name='team-workspace-task'),
+    path('projects/drafts/<uuid:draft_id>/team-workspace/mcp-token/', TeamMcpCredentialView.as_view(), name='team-workspace-mcp-token'),
     path('projects/drafts/<uuid:draft_id>/team-workspace/allocation-proposals/', TeamAllocationProposalView.as_view(), name='team-workspace-allocation-proposals'),
     path('projects/drafts/<uuid:draft_id>/team-workspace/allocation-proposals/<int:proposal_id>/approve/', TeamAllocationApprovalView.as_view(), name='team-workspace-allocation-approval'),
     path('projects/drafts/<uuid:draft_id>/team-workspace/sync-roadmap/', RoadmapTaskSyncView.as_view(), name='team-workspace-sync-roadmap'),
     path('projects/drafts/<uuid:draft_id>/team-workspace/invitations/', TeamInvitationCollectionView.as_view(), name='team-workspace-invitations'),
     path('projects/drafts/<uuid:draft_id>/team-workspace/invitations/<int:invitation_id>/', TeamInvitationManageView.as_view(), name='team-workspace-invitation'),
     path('team/invitations/<str:token>/', PublicTeamInvitationView.as_view(), name='public-team-invitation'),
+    path('mcp/', TeamMcpView.as_view(), name='team-workspace-mcp'),
     path('projects/drafts/<uuid:draft_id>/replan/', ProjectReplanView.as_view(), name='project-replan'),
     path('projects/drafts/<uuid:draft_id>/repository/', ProjectRepositoryView.as_view(), name='project-repository'),
     path('projects/drafts/<uuid:draft_id>/repository/analysis/', ProjectRepositoryAnalysisView.as_view(), name='project-repository-analysis'),

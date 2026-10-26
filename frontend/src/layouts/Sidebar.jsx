@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Code2, Flame, FolderOpen, Gauge, LogOut,
+  BookOpen, Code2, FolderOpen, Gauge, LogOut,
   Megaphone, Rocket, Sparkles, UserRound, Users, X
 } from 'lucide-react'
 import { NavLink, Link } from 'react-router-dom'
@@ -14,10 +14,9 @@ const navigation = [
   { label: 'My Projects', icon: FolderOpen, to: '/projects' },
   { label: 'Flight Plan', icon: Rocket, to: '/flight-plan' },
   { label: 'Repository', icon: Code2, to: '/repository' },
-  { label: 'TestPilot', icon: Flame, to: '/testpilot' },
   { label: 'Team Workspace', icon: Users, to: '/team' },
+  { label: 'Docs', icon: BookOpen, to: '/docs' },
   { label: 'Marketing Studio', icon: Megaphone, to: '/marketing-studio' },
-  { label: 'Glimpse', icon: Sparkles, to: '/glimpse' },
 ]
 
 export default function Sidebar({ open = false, onClose = () => {} }) {

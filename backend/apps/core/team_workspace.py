@@ -3,12 +3,14 @@ import json
 import re
 import secrets
 import hashlib
+from uuid import uuid4
 from datetime import date, timedelta
 from decimal import Decimal
 
 from django.conf import settings
 from django.core.mail import send_mail
 from django.db import models, transaction
+from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
@@ -22,7 +24,7 @@ from rest_framework.views import APIView
 
 from apps.projects.models import ProjectDraft
 from apps.roadmaps.models import ProjectTask
-from apps.teams.models import TeamInvitation, TeamMember
+from apps.teams.models import TeamInvitation, TeamMember, TeamMcpCredential
 from apps.users.models import DeveloperProfile, TaskAllocationProposal
 from apps.core.gemini_service import GeminiConfigurationError, GeminiRequestError, generate_task_allocation
 
@@ -59,7 +61,9 @@ def ensure_member_slots(project, target_size=None, current_user=None):
 
 def task_payload(task):
     return {'id': task.pk, 'source_key': task.source_key, 'source_position': task.source_position, 'milestone': task.milestone, 'title': task.title,
-        'description': task.description, 'assigned_to': task.assigned_to_id, 'priority': task.priority,
+        'description': task.description, 'assigned_to': task.assigned_to_id,
+        'assigned_to_name': task.assigned_to.display_name if task.assigned_to_id else '',
+        'priority': task.priority,
         'effort_hours': float(task.effort_hours), 'dependencies': task.dependencies, 'deadline': task.deadline,
         'deliverable': task.deliverable, 'status': task.status, 'required_skills': task.required_skills, 'active': task.active}
 
@@ -279,6 +283,7 @@ class TaskInput(serializers.Serializer):
     title = serializers.CharField(max_length=240, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
     assigned_to = serializers.IntegerField(required=False, allow_null=True)
+    milestone = serializers.CharField(max_length=240, required=False, allow_blank=True)
     priority = serializers.ChoiceField(choices=['high', 'medium', 'low'], required=False)
     effort_hours = serializers.DecimalField(max_digits=8, decimal_places=1, min_value=Decimal('0.1'), required=False)
     dependencies = serializers.ListField(child=serializers.CharField(max_length=240), required=False)
@@ -353,6 +358,46 @@ class TeamWorkspaceView(APIView):
 
 
 class TeamMemberView(APIView):
+    def post(self, request, draft_id):
+        project = get_object_or_404(accessible_drafts(request), pk=draft_id)
+        is_owner = (project.owner_id == request.user.pk) if request.user.is_authenticated else (project.owner_id is None)
+        if not is_owner:
+            return Response({'error': 'Only the project owner can add team members.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = MemberInput(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        member_data = serializer.validated_data
+        name = member_data.get('name', '').strip()
+        email = member_data.get('email', '').strip().lower()
+        if not name and not email:
+            return Response({'error': 'Enter a member name or email address.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            project = ProjectDraft.objects.select_for_update().get(pk=project.pk)
+            if email and TeamMember.objects.filter(project=project, email__iexact=email).exists():
+                return Response({'error': 'This email already belongs to a joined member.'}, status=status.HTTP_409_CONFLICT)
+            if email and TeamInvitation.objects.filter(project=project, email__iexact=email, status='pending').exists():
+                return Response({'error': 'This email already has a pending team invitation.'}, status=status.HTTP_409_CONFLICT)
+            members = ensure_member_slots(project)
+            pending_invitations = list(project.team_invitations.all())
+            for invitation in pending_invitations:
+                invitation.refresh_expiry_status()
+            pending_count = sum(invitation.status == 'pending' for invitation in pending_invitations)
+            if len(members) + pending_count >= (project.team_size or 1):
+                return Response({'error': 'The team has reached its capacity. Increase team capacity or cancel a pending invitation.'}, status=status.HTTP_409_CONFLICT)
+
+            used_slots = {member.slot for member in members}
+            slot = next(candidate for candidate in range(2, (project.team_size or 1) + 1) if candidate not in used_slots)
+            member = TeamMember.objects.create(
+                project=project,
+                slot=slot,
+                name=name,
+                email=email,
+                role=member_data.get('role', '').strip(),
+                skills=[skill.strip() for skill in member_data.get('skills', []) if skill.strip()],
+            )
+        return Response(member_payload(member), status=status.HTTP_201_CREATED)
+
     def patch(self, request, draft_id, member_id):
         project = get_object_or_404(accessible_drafts(request), pk=draft_id)
         member = get_object_or_404(TeamMember, project=project, pk=member_id)
@@ -391,6 +436,159 @@ class TeamMemberView(APIView):
         return Response(status=204)
 
 
+class TeamMcpCredentialView(APIView):
+    def post(self, request, draft_id):
+        project = get_object_or_404(accessible_drafts(request), pk=draft_id)
+        is_owner = (project.owner_id == request.user.pk) if request.user.is_authenticated else project.owner_id is None
+        if not is_owner:
+            return Response({'error': 'Only the project owner can create an MCP connection token.'}, status=status.HTTP_403_FORBIDDEN)
+
+        token = f'udmcp_{secrets.token_urlsafe(32)}'
+        TeamMcpCredential.objects.update_or_create(
+            project=project,
+            defaults={'token_hash': hashlib.sha256(token.encode()).hexdigest()},
+        )
+        return Response({'token': token, 'mcp_url': request.build_absolute_uri('/api/mcp/')}, status=status.HTTP_201_CREATED)
+
+
+class TeamMcpView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    protocol_versions = {'2024-11-05', '2025-03-26', '2025-06-18'}
+    task_statuses = {'not_started', 'in_progress', 'blocked', 'completed'}
+
+    def post(self, request):
+        if request.content_type != 'application/json':
+            return JsonResponse({'error': 'MCP requests must use application/json.'}, status=415)
+        accepted = {value.split(';', 1)[0].strip() for value in request.headers.get('Accept', '').split(',')}
+        if not accepted.intersection({'application/json', 'text/event-stream', '*/*'}):
+            return JsonResponse({'error': 'Accept application/json or text/event-stream.'}, status=406)
+
+        authorization = request.headers.get('Authorization', '')
+        scheme, _, token = authorization.partition(' ')
+        if scheme.lower() != 'bearer' or not token.startswith('udmcp_'):
+            response = JsonResponse({'error': 'A valid project MCP bearer token is required.'}, status=401)
+            response['WWW-Authenticate'] = 'Bearer'
+            return response
+        credential = TeamMcpCredential.objects.select_related('project').filter(
+            token_hash=hashlib.sha256(token.encode()).hexdigest(),
+        ).first()
+        if not credential:
+            response = JsonResponse({'error': 'The MCP token is invalid or has been rotated.'}, status=401)
+            response['WWW-Authenticate'] = 'Bearer'
+            return response
+
+        payload = request.data
+        if not isinstance(payload, dict) or payload.get('jsonrpc') != '2.0' or not isinstance(payload.get('method'), str):
+            return self.rpc_error(payload.get('id') if isinstance(payload, dict) else None, -32600, 'Invalid JSON-RPC request.')
+
+        method = payload['method']
+        request_id = payload.get('id')
+        if method.startswith('notifications/'):
+            return HttpResponse(status=202)
+        if request_id is None:
+            return self.rpc_error(None, -32600, 'JSON-RPC requests must include an id.')
+
+        params = payload.get('params') or {}
+        if not isinstance(params, dict):
+            return self.rpc_error(request_id, -32602, 'Request params must be an object.')
+
+        if method == 'initialize':
+            requested_version = params.get('protocolVersion')
+            if requested_version not in self.protocol_versions:
+                return self.rpc_error(request_id, -32602, 'Unsupported MCP protocol version.')
+            return self.rpc_result(request_id, {
+                'protocolVersion': requested_version,
+                'capabilities': {'tools': {}},
+                'serverInfo': {'name': 'udaan-team-workspace', 'version': '1.0.0'},
+                'instructions': 'Use this project-scoped server to list team tasks, assign tasks to members, and update task status. Completing a task marks it done in UDAAN.',
+            })
+        if method == 'ping':
+            return self.rpc_result(request_id, {})
+        if method == 'tools/list':
+            return self.rpc_result(request_id, {'tools': self.tools})
+        if method == 'tools/call':
+            return self.call_tool(request_id, params, credential.project)
+        return self.rpc_error(request_id, -32601, f'Method not found: {method}')
+
+    @staticmethod
+    def rpc_result(request_id, result):
+        return JsonResponse({'jsonrpc': '2.0', 'id': request_id, 'result': result})
+
+    @staticmethod
+    def rpc_error(request_id, code, message):
+        return JsonResponse({'jsonrpc': '2.0', 'id': request_id, 'error': {'code': code, 'message': message}}, status=400)
+
+    @staticmethod
+    def tool_result(request_id, value, is_error=False):
+        return JsonResponse({'jsonrpc': '2.0', 'id': request_id, 'result': {
+            'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False, default=str)}],
+            'isError': is_error,
+        }})
+
+    @property
+    def tools(self):
+        return [
+            {'name': 'list_team_tasks', 'description': 'List active tasks in this project, including their status and current assignee.',
+             'inputSchema': {'type': 'object', 'properties': {'status': {'type': 'string', 'enum': ['all', *sorted(self.task_statuses)], 'description': 'Optional task status filter.'}}, 'additionalProperties': False}},
+            {'name': 'list_team_members', 'description': 'List project team members and their IDs for task assignment.',
+             'inputSchema': {'type': 'object', 'properties': {}, 'additionalProperties': False}},
+            {'name': 'assign_task', 'description': 'Assign an active project task to a team member by their IDs.',
+             'inputSchema': {'type': 'object', 'properties': {'task_id': {'type': 'integer'}, 'member_id': {'type': 'integer'}}, 'required': ['task_id', 'member_id'], 'additionalProperties': False}},
+            {'name': 'update_task_status', 'description': 'Update an active task status. Use completed to mark it done in Team Workspace and Flight Plan.',
+             'inputSchema': {'type': 'object', 'properties': {'task_id': {'type': 'integer'}, 'status': {'type': 'string', 'enum': sorted(self.task_statuses)}}, 'required': ['task_id', 'status'], 'additionalProperties': False}},
+            {'name': 'complete_task', 'description': 'Mark an active team task completed (tick it done in UDAAN).',
+             'inputSchema': {'type': 'object', 'properties': {'task_id': {'type': 'integer'}}, 'required': ['task_id'], 'additionalProperties': False}},
+        ]
+
+    def call_tool(self, request_id, params, project):
+        name = params.get('name')
+        arguments = params.get('arguments') or {}
+        if not isinstance(arguments, dict):
+            return self.rpc_error(request_id, -32602, 'Tool arguments must be an object.')
+        allowed_tools = {tool['name'] for tool in self.tools}
+        if name not in allowed_tools:
+            return self.rpc_error(request_id, -32602, f'Unknown tool: {name}')
+        if name == 'list_team_tasks':
+            task_filter = arguments.get('status', 'all')
+            if task_filter not in {'all', *self.task_statuses}:
+                return self.tool_result(request_id, {'error': 'Invalid task status filter.'}, True)
+            tasks = ProjectTask.objects.filter(project=project, active=True).select_related('assigned_to').order_by('id')
+            if task_filter != 'all':
+                tasks = tasks.filter(status=task_filter)
+            return self.tool_result(request_id, {'tasks': [task_payload(task) for task in tasks]})
+        if name == 'list_team_members':
+            members = TeamMember.objects.filter(project=project).order_by('slot')
+            return self.tool_result(request_id, {'members': [
+                {'id': member.pk, 'name': member.display_name, 'email': member.email, 'role': member.role, 'skills': member.skills}
+                for member in members
+            ]})
+
+        task_id = arguments.get('task_id')
+        if not isinstance(task_id, int) or isinstance(task_id, bool):
+            return self.tool_result(request_id, {'error': 'task_id must be an integer.'}, True)
+        task = ProjectTask.objects.filter(project=project, pk=task_id, active=True).select_related('assigned_to').first()
+        if not task:
+            return self.tool_result(request_id, {'error': 'Active task not found in this project.'}, True)
+
+        if name == 'assign_task':
+            member_id = arguments.get('member_id')
+            if not isinstance(member_id, int) or isinstance(member_id, bool):
+                return self.tool_result(request_id, {'error': 'member_id must be an integer.'}, True)
+            member = TeamMember.objects.filter(project=project, pk=member_id).first()
+            if not member:
+                return self.tool_result(request_id, {'error': 'Team member not found in this project.'}, True)
+            task.assigned_to = member
+        else:
+            new_status = 'completed' if name == 'complete_task' else arguments.get('status')
+            if new_status not in self.task_statuses:
+                return self.tool_result(request_id, {'error': 'Invalid task status.'}, True)
+            task.status = new_status
+        task.save()
+        return self.tool_result(request_id, {'task': task_payload(task)})
+
+
 class RoadmapTaskSyncView(APIView):
     def post(self, request, draft_id):
         project = get_object_or_404(accessible_drafts(request), pk=draft_id)
@@ -402,7 +600,8 @@ class RoadmapTaskSyncView(APIView):
             old = existing.get(row['source_key'])
             if not old: changes['new'].append({'title': row['title'], 'milestone': row['milestone']})
             elif old.source_hash != row['source_hash'] and old.active: changes['modified'].append({'title': row['title'], 'milestone': row['milestone']})
-        incoming = {r['source_key'] for r in records}
+        manual_keys = {key for key in existing if key.startswith('manual:')}
+        incoming = {r['source_key'] for r in records} | manual_keys
         changes['removed'] = [{'title': t.title, 'milestone': t.milestone} for key,t in existing.items() if t.active and key not in incoming]
         if request.data.get('preview') is True or request.data.get('confirm') is not True:
             return Response({'changes': changes, 'requires_confirmation': bool(existing and any(changes.values()))})
@@ -426,6 +625,32 @@ class RoadmapTaskSyncView(APIView):
 
 
 class TeamTaskView(APIView):
+    def post(self, request, draft_id):
+        project = get_object_or_404(accessible_drafts(request), pk=draft_id)
+        is_owner = (project.owner_id == request.user.pk) if request.user.is_authenticated else (project.owner_id is None)
+        if not is_owner:
+            return Response({'error': 'Only the project owner can create team tasks.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = TaskInput(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        values = serializer.validated_data
+        title = values.pop('title', '').strip()
+        if not title:
+            return Response({'error': 'Enter a task title.'}, status=status.HTTP_400_BAD_REQUEST)
+        assigned_to_id = values.pop('assigned_to', None)
+        assigned_to = None
+        if assigned_to_id:
+            assigned_to = get_object_or_404(TeamMember, project=project, pk=assigned_to_id)
+        task = ProjectTask.objects.create(
+            project=project,
+            source_key=f'manual:{uuid4().hex}',
+            source_position='manual',
+            title=title,
+            assigned_to=assigned_to,
+            **values,
+        )
+        return Response(task_payload(task), status=status.HTTP_201_CREATED)
+
     def patch(self, request, draft_id, task_id):
         project = get_object_or_404(accessible_drafts(request), pk=draft_id)
         task = get_object_or_404(ProjectTask, project=project, pk=task_id, active=True)

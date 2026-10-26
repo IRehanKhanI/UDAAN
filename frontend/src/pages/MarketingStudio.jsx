@@ -5,7 +5,6 @@ import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { getLearningProject, listLearningProjects } from '../services/learningService.js'
-import { getTeamWorkspace } from '../services/teamService.js'
 import { deleteMarketingContent, generateMarketingContent, listMarketingContent, saveMarketingContent, updateMarketingContent } from '../services/marketingService.js'
 import './MarketingStudio.css'
 
@@ -48,21 +47,11 @@ function dateLabel(value) {
   const date = new Date(value)
   return Number.isNaN(date.valueOf()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
-function projectSummary(project, teamWorkspace) {
-  const milestones = project?.workflow?.flight_plan?.milestones || []
-  const planned = milestones.flatMap(item => item.tasks || []).length
-  const features = project?.latest_assessment?.task_assessments || {}
-  const verified = Object.values(features).filter(item => item.status === 'verified').length
-  const completed = teamWorkspace?.tasks?.filter(task => task.status === 'completed').length ?? project?.workspace_completed_tasks ?? 0
-  return { milestones, planned, verified, completed }
-}
-
 export default function MarketingStudio() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [menuOpen, setMenuOpen] = useState(false)
   const [projects, setProjects] = useState(() => readSavedProjects().map(normalizeProject))
   const [selectedId, setSelectedId] = useState(() => searchParams.get('project') || localStorage.getItem('udaan:selected-project') || 'custom')
-  const [teamWorkspace, setTeamWorkspace] = useState(null)
   const [activeTab, setActiveTab] = useState('create')
   const [mode, setMode] = useState('social')
   const [inputs, setInputs] = useState({ topic: '', objective: 'awareness', audience: '', tone: 'Professional', length: 'Medium', keywords: '', cta: '', extra_instructions: '', platform: 'LinkedIn', showcase_type: showcaseTypes[0], formats: [formats[0], formats[2], formats[3]], campaign_days: 7, campaign_platform: 'LinkedIn', template: toolTypes[0], source_content: '', context_override: '' })
@@ -80,7 +69,6 @@ export default function MarketingStudio() {
   const [copying, setCopying] = useState('')
 
   const selectedProject = projects.find(item => String(item.id) === String(selectedId)) || null
-  const summary = useMemo(() => projectSummary(selectedProject, teamWorkspace), [selectedProject, teamWorkspace])
   const savedProjects = projects
 
   const loadProjects = useCallback(async () => {
@@ -127,12 +115,6 @@ export default function MarketingStudio() {
       if (searchParams.get('project') !== String(selectedProject.id)) setSearchParams(previous => { const next = new URLSearchParams(previous); next.set('project', String(selectedProject.id)); return next }, { replace: true })
     } else if (selectedId === 'custom' && searchParams.has('project')) setSearchParams(previous => { const next = new URLSearchParams(previous); next.delete('project'); return next }, { replace: true })
   }, [selectedId, selectedProject?.id])
-  useEffect(() => {
-    if (!selectedProject?.id) { setTeamWorkspace(null); return }
-    let active = true
-    void getTeamWorkspace(selectedProject.id).then(value => { if (active) setTeamWorkspace(value) }).catch(() => { if (active) setTeamWorkspace(null) })
-    return () => { active = false }
-  }, [selectedProject?.id])
   useEffect(() => {
     if (activeTab === 'saved') void loadLibrary({ q: libraryFilters.q, project: libraryFilters.project, type: libraryFilters.type, platform: libraryFilters.platform })
   }, [activeTab, libraryFilters.project, libraryFilters.type, libraryFilters.platform, loadLibrary])
@@ -246,8 +228,7 @@ export default function MarketingStudio() {
                   {activeTab === 'create' && <div className="ms-type-grid">{contentTypes.map(type => <ContentTypeCard key={type.mode} item={type} selected={mode === type.mode} onClick={() => setMode(type.mode)} />)}</div>}
                   {activeTab !== 'create' && <div className="ms-mode-notice"><span className="ms-type-icon"><WandSparkles size={17} /></span><div><b>{tabs.find(item => item.id === activeTab)?.label}</b><small>{activeTab === 'campaign' ? 'A proposed publishing plan—nothing gets scheduled.' : activeTab === 'repurpose' ? 'Preserve the source meaning while adapting its format.' : 'Use your project context to draft a shareable story.'}</small></div></div>}
                   {selectedProject && <section className="ms-context-card"><div className="ms-context-top"><span className="ms-context-mark">{selectedProject.name.slice(0, 1).toUpperCase()}</span><div><strong>{selectedProject.name}</strong><small>{selectedProject.project_type} · project context added automatically</small></div><button type="button" onClick={() => setEditContext(value => !value)}>{editContext ? 'Close context editor' : <><Pencil size={13} /> Edit context</>}</button></div>
-                    {!editContext ? <div className="ms-context-summary"><p>{selectedProject.description || selectedProject.idea || 'No project description has been added yet.'}</p><div>{(selectedProject.repository?.detected_technologies || []).slice(0, 5).map(item => <span key={item.name || item}>{item.name || item}</span>)}<small>{summary.milestones.length} planned milestones · {summary.completed} tasks marked complete · {summary.verified} independently verified</small></div></div> : <label className="ms-context-edit">Add, correct or remove details for this generation<textarea rows="5" maxLength="7000" value={inputs.context_override} onChange={event => setField('context_override', event.target.value)} placeholder="Correct the project summary or add confirmed details. Avoid adding claims you cannot support." /></label>}
-                    <p className="ms-context-footnote">Planned features remain plans. A task marked complete is user-recorded progress; verified claims require saved check evidence.</p>
+                    {!editContext ? <div className="ms-context-summary"><p>{selectedProject.description || selectedProject.idea || 'No project description has been added yet.'}</p><div>{(selectedProject.repository?.detected_technologies || []).slice(0, 5).map(item => <span key={item.name || item}>{item.name || item}</span>)}</div></div> : <label className="ms-context-edit">Add, correct or remove details for this generation<textarea rows="5" maxLength="7000" value={inputs.context_override} onChange={event => setField('context_override', event.target.value)} placeholder="Correct the project summary or add confirmed details. Avoid adding claims you cannot support." /></label>}
                   </section>}
                   <form className="ms-form" onSubmit={generate}>
                     <div className="ms-form-grid">

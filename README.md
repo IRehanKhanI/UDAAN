@@ -47,4 +47,10 @@ The four planning stages call the Django `/api/ideas/analyze/` and `/api/ideas/w
 
 Drafts are saved in browser storage and to the Django `ProjectDraft` table. The current frontend has no sign-in flow and sends draft requests anonymously, so the draft UUID acts as a bearer identifier for read/write access; anyone who obtains that identifier may access an unowned draft. The API associates a draft with a user when a request is authenticated, then restricts access to that user, but the React app does not currently provide or send user credentials. Do not store sensitive personal or confidential information in these drafts.
 
+## MCP team workspace
+
+Open **Docs → MCP Agent Access** and create a project-scoped MCP connection. Copy the generated client configuration immediately; the bearer token is stored as a hash and is shown only once. Rotating the token revokes the previous one. Keep the token private and do not commit it to source control.
+
+The Streamable HTTP MCP endpoint is `/api/mcp/`. It provides `list_team_tasks`, `list_team_members`, `assign_task`, `update_task_status`, and `complete_task` tools. Task status updates are persisted and reflected in Team Workspace and Flight Plan.
+
 Run backend checks from `backend/` with `python manage.py check`, `python manage.py makemigrations --check --dry-run`, and `python manage.py test apps.core.tests`. Run the production frontend build from `frontend/` with `npm run build`.

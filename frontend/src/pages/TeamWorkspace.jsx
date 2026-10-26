@@ -1,31 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AlertTriangle, Check, ChevronDown, Clock3, Copy, Filter, Github, Mail, Plus, RefreshCw, Save, Send, Sparkles, Users, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, Clock3, Copy, Filter, Mail, Plus, RefreshCw, Save, Send, Sparkles, Users, X, ClipboardPlus } from 'lucide-react'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
-import { applyRoadmapSync, approveAllocationProposal, createTeamInvitations, generateAllocationProposal, getTeamWorkspace, manageTeamInvitation, previewRoadmapSync, removeTeamMember, updateTeamMember, updateTeamSize, updateTeamTask } from '../services/teamService.js'
+import { applyRoadmapSync, approveAllocationProposal, createTeamInvitations, createTeamMember, createTeamTask, generateAllocationProposal, getTeamWorkspace, manageTeamInvitation, previewRoadmapSync, removeTeamMember, updateTeamMember, updateTeamSize, updateTeamTask } from '../services/teamService.js'
 
 const statusLabels = { not_started: 'Not Started', in_progress: 'In Progress', blocked: 'Blocked', completed: 'Completed' }
 const priorityLabels = { high: 'High', medium: 'Medium', low: 'Low' }
 
-function MemberCard({ member, onSave, onRemove }) {
+function MemberCard({ member, onSave, onRemove, onAddTask }) {
   const [form, setForm] = useState({ name: member.name || '', email: member.email || '', role: member.role || '', skills: (member.skills || []).join(', ') })
   useEffect(() => setForm({ name: member.name || '', email: member.email || '', role: member.role || '', skills: (member.skills || []).join(', ') }), [member])
   const save = () => onSave(member.id, { ...form, skills: form.skills.split(',').map(x => x.trim()).filter(Boolean) })
   return <article className="tw-live-member">
-    <div className="tw-live-member-heading"><span className="tw-slot-number">{String(member.slot).padStart(2, '0')}</span><div><b>{member.display_name}</b><small>{member.is_creator ? 'Project creator' : `Member slot ${member.slot}`}</small></div></div>
+    <div className="tw-live-member-heading"><span className="tw-member-avatar">{member.display_name.trim().split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()}</span><div><b>{member.display_name}</b><small>{member.role || (member.is_creator ? 'Project creator' : `Team member · slot ${member.slot}`)}</small>{member.email && <small>{member.email}</small>}</div></div>
+    {(member.skills || []).length > 0 && <div className="tw-member-skills">{member.skills.map(skill => <span key={skill}>{skill}</span>)}</div>}
     <div className="tw-member-fields">
       <label>Name<input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={member.is_creator ? 'Your name (optional)' : 'Unassigned'} /></label>
       <label>Email<input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email (optional)" /></label>
       <label>Role<input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="Role" /></label>
       <label>Skills<input value={form.skills} onChange={e => setForm({ ...form, skills: e.target.value })} placeholder="React, research, ..." /></label>
     </div>
-    <div className="tw-member-stats"><span><b>{member.task_count}</b> tasks</span><span><b>{member.workload_hours}h</b> estimated</span><span><b>{member.progress}%</b> complete</span></div>
-    <div className="tw-member-profile"><Github size={13} />{member.github_connected ? <span>GitHub profile @{member.github_login} · {member.profile_analysis_status} analysis</span> : <span>Using manually declared skills{member.user_id ? ' · GitHub profile not connected' : ''}</span>}</div>
-    {(member.profile_skills?.length || member.github_technologies?.length) > 0 && <div className="tw-member-evidence"><b>Profile skills</b> {[...new Set([...(member.profile_skills || []), ...(member.github_technologies || []).map(item => item.name)])].join(' · ')}</div>}
     <div className="tw-work-meter"><i style={{ width: `${Math.min(member.workload_hours / 40 * 100, 100)}%` }} /></div>
-    <div className="tw-member-actions"><button className="tw-live-save" onClick={save}><Save size={14} /> Save member</button>{!member.is_creator && <button className="tw-member-remove" onClick={() => onRemove(member)}>Remove</button>}</div>
+    <div className="tw-member-actions"><div><button className="tw-live-save" onClick={save}><Save size={14} /> Save profile</button><button className="tw-live-save" onClick={() => onAddTask(member)}><ClipboardPlus size={14} /> Add task</button></div>{!member.is_creator && <button className="tw-member-remove" onClick={() => onRemove(member)}>Remove</button>}</div>
   </article>
 }
 
@@ -68,6 +66,50 @@ function InviteMembersModal({ onClose, onSubmit, remaining, busy }) {
   </form></div>
 }
 
+function AddMemberModal({ onClose, onSubmit, busy }) {
+  const [form, setForm] = useState({ name: '', email: '', role: '', skills: '' })
+  const [error, setError] = useState('')
+  const submit = async event => {
+    event.preventDefault()
+    setError('')
+    try {
+      await onSubmit({ ...form, skills: form.skills.split(',').map(skill => skill.trim()).filter(Boolean) })
+    } catch (err) {
+      setError(err.message || 'Could not add this team member.')
+    }
+  }
+  return <div className="tw-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><form className="tw-invite-modal" onSubmit={submit}>
+    <div className="tw-modal-head"><div><span>TEAM WORKSPACE</span><h2>Add a team member</h2><p>The member will be saved to this project workspace immediately.</p></div><button type="button" onClick={onClose} aria-label="Close"><X size={18} /></button></div>
+    <label>Name *<input required maxLength={160} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} placeholder="Teammate name" /></label>
+    <div className="tw-modal-grid"><label>Email (optional)<input type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} placeholder="name@example.com" /></label><label>Role<input maxLength={120} value={form.role} onChange={event => setForm({ ...form, role: event.target.value })} placeholder="Designer, developer..." /></label></div>
+    <label>Skills (optional)<input value={form.skills} onChange={event => setForm({ ...form, skills: event.target.value })} placeholder="React, research, design" /></label>
+    {error && <p className="tw-invite-error" role="alert">{error}</p>}
+    <footer><button type="button" className="tw-modal-cancel" onClick={onClose}>Cancel</button><button type="submit" className="tw-modal-save" disabled={busy}>{busy ? 'Saving…' : <><Plus size={14} /> Add member</>}</button></footer>
+  </form></div>
+}
+
+function AddTaskModal({ onClose, onSubmit, members, initialMember, busy }) {
+  const [form, setForm] = useState({ title: '', description: '', assigned_to: initialMember ? String(initialMember.id) : '', milestone: '', priority: 'medium', effort_hours: 4, deadline: '' })
+  const [error, setError] = useState('')
+  const submit = async event => {
+    event.preventDefault()
+    setError('')
+    try {
+      await onSubmit({ ...form, assigned_to: form.assigned_to ? Number(form.assigned_to) : null, effort_hours: Number(form.effort_hours), deadline: form.deadline || null })
+    } catch (err) {
+      setError(err.message || 'Could not add this task.')
+    }
+  }
+  return <div className="tw-modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}><form className="tw-invite-modal" onSubmit={submit}>
+    <div className="tw-modal-head"><div><span>TEAM WORKSPACE</span><h2>Add a task</h2><p>Create a task and assign it to a team member.</p></div><button type="button" onClick={onClose} aria-label="Close"><X size={18} /></button></div>
+    <label>Task title *<input required maxLength={240} value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} placeholder="What needs to be done?" /></label>
+    <label>Description<textarea rows="3" value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} placeholder="Add task details" /></label>
+    <div className="tw-modal-grid"><label>Assign to<select value={form.assigned_to} onChange={event => setForm({ ...form, assigned_to: event.target.value })}><option value="">Unassigned</option>{members.map(member => <option key={member.id} value={member.id}>{member.display_name}</option>)}</select></label><label>Milestone<input maxLength={240} value={form.milestone} onChange={event => setForm({ ...form, milestone: event.target.value })} placeholder="Optional milestone" /></label><label>Priority<select value={form.priority} onChange={event => setForm({ ...form, priority: event.target.value })}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Effort (hours)<input required type="number" min="0.1" step="0.5" value={form.effort_hours} onChange={event => setForm({ ...form, effort_hours: event.target.value })} /></label><label>Deadline<input type="date" value={form.deadline} onChange={event => setForm({ ...form, deadline: event.target.value })} /></label></div>
+    {error && <p className="tw-invite-error" role="alert">{error}</p>}
+    <footer><button type="button" className="tw-modal-cancel" onClick={onClose}>Cancel</button><button type="submit" className="tw-modal-save" disabled={busy}>{busy ? 'Saving…' : <><Plus size={14} /> Add task</>}</button></footer>
+  </form></div>
+}
+
 export default function TeamWorkspace() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchParams] = useSearchParams()
@@ -81,6 +123,11 @@ export default function TeamWorkspace() {
   const [selectedTask, setSelectedTask] = useState(null)
   const [roadmapChanges, setRoadmapChanges] = useState(null)
   const [teamSize, setTeamSize] = useState(1)
+  const [memberOpen, setMemberOpen] = useState(false)
+  const [memberBusy, setMemberBusy] = useState(false)
+  const [taskOpen, setTaskOpen] = useState(false)
+  const [taskBusy, setTaskBusy] = useState(false)
+  const [taskMember, setTaskMember] = useState(null)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [inviteBusy, setInviteBusy] = useState(false)
   const [invitationLinks, setInvitationLinks] = useState({})
@@ -115,6 +162,30 @@ export default function TeamWorkspace() {
   useEffect(() => { void loadWorkspace() }, [loadWorkspace])
 
   const refresh = async (message = '') => { await loadWorkspace(); if (message) setNotice(message) }
+  const addMember = async data => {
+    setMemberBusy(true)
+    try {
+      await createTeamMember(projectId, data)
+      setMemberOpen(false)
+      await refresh('Member added and saved.')
+    } finally {
+      setMemberBusy(false)
+    }
+  }
+  const openTaskModal = member => {
+    setTaskMember(member || null)
+    setTaskOpen(true)
+  }
+  const addTask = async data => {
+    setTaskBusy(true)
+    try {
+      await createTeamTask(projectId, data)
+      setTaskOpen(false)
+      await refresh('Task added and assigned.')
+    } finally {
+      setTaskBusy(false)
+    }
+  }
   const saveMember = async (id, data) => { try { await updateTeamMember(projectId, id, data); await refresh('Member details saved.') } catch (err) { setError(err.message) } }
   const removeMember = async member => { if (!window.confirm(`Remove ${member.display_name} from this project?`)) return; try { await removeTeamMember(projectId, member.id); await refresh('Member removed.') } catch (err) { setError(err.assigned_tasks?.length ? `Reassign ${err.assigned_tasks.map(task => task.title).join(', ')} before removing this member.` : err.message) } }
   const saveTask = async data => { try { await updateTeamTask(projectId, selectedTask.id, data); setSelectedTask(null); await refresh('Task updated.') } catch (err) { setError(err.message) } }
@@ -223,10 +294,10 @@ export default function TeamWorkspace() {
                 {workspace.allocation_proposal?.status === 'pending' && <div className="tw-allocation-footer"><span>{workspace.project.is_owner ? 'Proposals never modify assignments until you approve.' : 'Only the project owner can approve proposed assignments.'}</span>{workspace.project.is_owner && <button onClick={() => void approveAllocation()} disabled={allocationBusy || workspace.allocation_proposal.stale}><Check size={14} />{allocationBusy ? 'Saving…' : 'Approve assignments'}</button>}</div>}
                 {workspace.allocation_proposal?.status === 'approved' && !workspace.allocation_proposal.stale && <div className="tw-allocation-footer"><span>Assignments were approved and saved to the Flight Plan tasks.</span></div>}
               </section>}
-              <section className="tw-members-panel"><div className="tw-live-section-head"><div><span className="tw-live-eyebrow">PEOPLE</span><h2>Team members</h2></div><div className="tw-team-actions"><span className="tw-capacity-copy">{members.length} of {workspace.project.team_size} members joined · {remainingCapacity} capacity remaining</span><div className="tw-size-control"><label>Capacity<input type="number" min="1" max="50" value={teamSize} disabled={!workspace.project.is_owner} onChange={e => setTeamSize(Math.max(1, Number(e.target.value) || 1))} /></label><button onClick={changeSize} disabled={!workspace.project.is_owner}>Update</button></div><button className="tw-invite-button" onClick={() => setInviteOpen(true)} disabled={!workspace.project.is_owner || remainingCapacity < 1}><Plus size={16} /> Invite members</button></div></div><p className="tw-panel-hint">Team size sets capacity. Members appear here after accepting a secure invitation.</p>{members.length ? <div className="tw-live-member-grid">{members.map(member => <MemberCard key={member.id} member={member} onSave={saveMember} onRemove={removeMember} />)}</div> : <div className="tw-member-empty"><Users size={18} /><div><b>No joined members yet</b><span>Invite teammates to add them to this workspace. The project creator remains a member.</span></div></div>}</section>
+              <section className="tw-members-panel"><div className="tw-live-section-head"><div><span className="tw-live-eyebrow">PEOPLE</span><h2>Team members</h2></div><div className="tw-team-actions"><span className="tw-capacity-copy">{members.length} of {workspace.project.team_size} members joined · {remainingCapacity} capacity remaining</span><div className="tw-size-control"><label>Capacity<input type="number" min="1" max="50" value={teamSize} disabled={!workspace.project.is_owner} onChange={e => setTeamSize(Math.max(1, Number(e.target.value) || 1))} /></label><button onClick={changeSize} disabled={!workspace.project.is_owner}>Update</button></div><button className="tw-invite-button" onClick={() => setMemberOpen(true)} disabled={!workspace.project.is_owner || remainingCapacity < 1}><Plus size={16} /> Add member</button><button className="tw-invite-button" onClick={() => setInviteOpen(true)} disabled={!workspace.project.is_owner || remainingCapacity < 1}><Mail size={15} /> Invite members</button></div></div><p className="tw-panel-hint">Add members directly or invite teammates to join securely. Saved members appear below.</p>{members.length ? <div className="tw-live-member-grid">{members.map(member => <MemberCard key={member.id} member={member} onSave={saveMember} onRemove={removeMember} onAddTask={openTaskModal} />)}</div> : <div className="tw-member-empty"><Users size={18} /><div><b>No joined members yet</b><span>Add a member or invite teammates to this workspace. The project creator remains a member.</span></div></div>}</section>
               {pendingInvitations.length > 0 && <section className="tw-pending-panel"><div className="tw-live-section-head"><div><span className="tw-live-eyebrow">INVITATIONS</span><h2>Pending invitations <span>{pendingInvitations.length}</span></h2></div></div><div className="tw-invitation-list">{pendingInvitations.map(invite => { const recent = invitationLinks[invite.id]; return <article className="tw-invitation-row" key={invite.id}><span className="tw-invitation-icon"><Mail size={15} /></span><div className="tw-invitation-person"><b>{invite.name || invite.email}</b><small>{invite.name ? invite.email : invite.role || 'Invitation pending'}{invite.role && invite.name ? ` · ${invite.role}` : ''}</small></div><span className="tw-invitation-status">Pending · expires {new Date(invite.expires_at).toLocaleDateString()}</span>{recent?.invite_link && <button className="tw-invitation-action" onClick={() => void copyInvitationLink(recent.invite_link)}><Copy size={13} /> Copy link</button>}<button className="tw-invitation-action" onClick={() => void invitationAction(invite, 'resend')}>Resend</button><button className="tw-invitation-cancel" onClick={() => void invitationAction(invite, 'cancel')}>Cancel</button></article> })}</div></section>}
               {invitations.some(invite => ['declined', 'expired'].includes(invite.status)) && <section className="tw-invite-history"><span>Invitation history</span>{invitations.filter(invite => ['declined', 'expired'].includes(invite.status)).map(invite => <small key={invite.id}>{invite.email} · {invite.status}</small>)}</section>}
-              <section className="tw-task-panel"><div className="tw-live-section-head"><div><span className="tw-live-eyebrow">FLIGHT PLAN</span><h2>Roadmap tasks <span>{tasks.length}</span></h2></div><span className="tw-task-count-icon"><Filter size={15} /> Filter tasks</span></div>
+              <section className="tw-task-panel"><div className="tw-live-section-head"><div><span className="tw-live-eyebrow">FLIGHT PLAN</span><h2>Roadmap tasks <span>{tasks.length}</span></h2></div><div className="tw-task-panel-actions"><span className="tw-task-count-icon"><Filter size={15} /> Filter tasks</span><button className="tw-invite-button" onClick={() => openTaskModal(null)} disabled={!workspace.project.is_owner}><Plus size={15} /> Add task</button></div></div>
                 <div className="tw-live-filters"><input placeholder="Search tasks" value={filters.query} onChange={e => setFilters({ ...filters, query: e.target.value })} /><select value={filters.member} onChange={e => setFilters({ ...filters, member: e.target.value })}><option value="">All members</option>{members.map(m => <option value={m.id} key={m.id}>{m.display_name}</option>)}</select><select value={filters.priority} onChange={e => setFilters({ ...filters, priority: e.target.value })}><option value="">All priorities</option>{Object.entries(priorityLabels).map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select><select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}><option value="">All statuses</option>{Object.entries(statusLabels).map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select><select value={filters.milestone} onChange={e => setFilters({ ...filters, milestone: e.target.value })}><option value="">All milestones</option>{milestones.map(m => <option key={m}>{m}</option>)}</select></div>
                 {tasks.length === 0 ? <div className="tw-task-empty"><Clock3 size={20} /><b>{workspace.project.has_roadmap ? 'No tasks have been allocated yet' : 'No Flight Plan yet'}</b><span>{workspace.project.has_roadmap ? 'Refresh to sync tasks from the current roadmap.' : 'Add a roadmap in Flight Plan, then return here to assign its tasks.'}</span></div> : <div className="tw-live-task-list">{visibleTasks.map(task => <button className="tw-live-task" key={task.id} onClick={() => setSelectedTask(task)}><span className={`tw-task-priority-dot ${task.priority}`} /><div className="tw-live-task-main"><b>{task.title}</b><small>{task.milestone || 'Roadmap task'} · {task.effort_hours}h{task.deadline ? ` · Due ${task.deadline}` : ''}</small></div><span className="tw-live-assignee">{members.find(m => m.id === task.assigned_to)?.display_name || 'Unassigned'}</span><span className={`tw-live-status ${task.status}`}>{statusLabels[task.status]}</span><span className="tw-task-open">Edit</span></button>)}</div>}
                 {tasks.some(t => !t.assigned_to) && <div className="tw-unassigned"><div><b>Unassigned tasks</b><span>{tasks.filter(t => !t.assigned_to).length} tasks need an owner</span></div><div className="tw-unassigned-list">{tasks.filter(t => !t.assigned_to).map(task => <button key={task.id} onClick={() => setSelectedTask(task)}>{task.title} <span>Assign</span></button>)}</div></div>}
@@ -236,6 +307,8 @@ export default function TeamWorkspace() {
           </div>
         </main>
         {selectedTask && <TaskEditor task={selectedTask} members={members} onClose={() => setSelectedTask(null)} onSave={saveTask} />}
+        {memberOpen && <AddMemberModal busy={memberBusy} onClose={() => setMemberOpen(false)} onSubmit={addMember} />}
+        {taskOpen && <AddTaskModal members={members} initialMember={taskMember} busy={taskBusy} onClose={() => setTaskOpen(false)} onSubmit={addTask} />}
         {inviteOpen && <InviteMembersModal remaining={remainingCapacity} busy={inviteBusy} onClose={() => setInviteOpen(false)} onSubmit={sendInvitations} />}
       </div>
     </div>

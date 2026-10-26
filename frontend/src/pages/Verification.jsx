@@ -10,7 +10,6 @@ import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { getHealthScore, refreshHealthScore, getPassport, statusLabel, statusClass } from '../services/healthService.js'
-import { listRuns } from '../services/testPilotService.js'
 import './Verification.css'
 
 // ─── Status icon ─────────────────────────────────────────────────────────────
@@ -72,7 +71,7 @@ function CheckItem({ item, expanded, onToggle }) {
 }
 
 // ─── Build checklist from API data ──────────────────────────────────────────
-function buildChecklist(health, passport, runs) {
+function buildChecklist(health, passport) {
   const signals = health?.signals?.signals ?? health?.signals ?? {}
   const score = health?.score ?? null
   const band = health?.signals?.status ?? health?.status ?? ''
@@ -168,23 +167,6 @@ function buildChecklist(health, passport, runs) {
     fixLink: '/repository',
   })
 
-  // TestPilot
-  const latestRun = runs?.[0]
-  const tpPassed = latestRun?.status === 'complete' && (latestRun?.passed_count ?? 0) > 0
-  const tpWarn = latestRun && latestRun.status !== 'complete'
-  checklist.code.items.push({
-    key: 'testpilot',
-    label: 'TestPilot automated run passed',
-    status: tpPassed ? 'pass' : latestRun ? 'warn' : 'fail',
-    badgeText: latestRun
-      ? `${latestRun.passed_count ?? 0} passed, ${latestRun.failed_count ?? 0} failed`
-      : 'No runs yet',
-    detail: latestRun
-      ? `Last run: ${latestRun.status}. ${latestRun.passed_count ?? 0} step(s) passed, ${latestRun.failed_count ?? 0} failed.`
-      : 'No TestPilot run found. Run automated browser tests to validate your app.',
-    fixLink: '/testpilot',
-  })
-
   // ── Team & Collaboration ──────────────────────────────────────────────────
   const ta = signals.team_alignment ?? {}
 
@@ -278,7 +260,6 @@ export default function Verification() {
   const [projects, setProjects] = useState([])
   const [health, setHealth] = useState(null)
   const [passport, setPassport] = useState(null)
-  const [runs, setRuns] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -295,14 +276,12 @@ export default function Verification() {
     setLoading(true)
     setError('')
     try {
-      const [h, pp, rr] = await Promise.all([
+      const [h, pp] = await Promise.all([
         getHealthScore(pid).catch(() => null),
         getPassport(pid).catch(() => null),
-        listRuns(pid).catch(() => ({ runs: [] })),
       ])
       setHealth(h)
       setPassport(pp)
-      setRuns(rr?.runs ?? [])
     } catch (e) {
       setError(e.message || 'Failed to load verification data.')
     } finally {
@@ -324,7 +303,7 @@ export default function Verification() {
 
   const toggleExpand = (key) => setExpanded(prev => ({ ...prev, [key]: !prev[key] }))
 
-  const { checklist, score, band, overallStatus } = buildChecklist(health, passport, runs)
+  const { checklist, score, band, overallStatus } = buildChecklist(health, passport)
 
   const allItems = Object.values(checklist).flatMap(c => c.items)
   const passCount = allItems.filter(i => i.status === 'pass').length

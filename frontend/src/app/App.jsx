@@ -10,9 +10,9 @@ import ProjectSetup from '../pages/ProjectSetup.jsx'
 import Learning from '../pages/Learning.jsx'
 import MarketingStudio from '../pages/MarketingStudio.jsx'
 import DeveloperProfile from '../pages/DeveloperProfile.jsx'
-import TestPilot from '../pages/TestPilot.jsx'
 import Verification from '../pages/Verification.jsx'
 import Glimpse from '../pages/Glimpse.jsx'
+import Docs from '../pages/Docs.jsx'
 
 export default function App() {
   return <Routes>
@@ -25,11 +25,11 @@ export default function App() {
     <Route path="/projects/new/analysis" element={<IdeaAnalysis />} />
     <Route path="/flight-plan" element={<FlightPlan />} />
     <Route path="/team" element={<TeamWorkspace />} />
+    <Route path="/docs" element={<Docs />} />
     <Route path="/learning" element={<Learning />} />
     <Route path="/marketing-studio" element={<MarketingStudio />} />
     <Route path="/glimpse" element={<Glimpse />} />
     <Route path="/issues" element={<Navigate to="/" replace />} />
-    <Route path="/testpilot" element={<TestPilot />} />
     <Route path="/verification" element={<Verification />} />
     <Route path="/reports" element={<Navigate to="/marketing-studio" replace />} />
     <Route path="/team/invite/:token" element={<TeamInvitationAccept />} />
