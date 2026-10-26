@@ -1,21 +1,22 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Bookmark, Check, ChevronDown, Copy, Download,
   FileText, Mail, Megaphone, MessageSquareText, Pencil, RefreshCw,
-  Search, Sparkles, WandSparkles, X, Zap, TrendingUp, Globe
+  Search, Sparkles, WandSparkles, X, Zap, TrendingUp, Globe, MapPin, Upload, AlertCircle
 } from 'lucide-react'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { getLearningProject, listLearningProjects } from '../services/learningService.js'
 import { getTeamWorkspace } from '../services/teamService.js'
-import { deleteMarketingCampaign, deleteMarketingContent, generateMarketingCampaign, generateMarketingContent, listMarketingCampaigns, listMarketingContent, regenerateMarketingCampaignAsset, saveMarketingContent, updateMarketingCampaign, updateMarketingContent } from '../services/marketingService.js'
+import { deleteMarketingCampaign, deleteMarketingContent, generateMarketingCampaign, generateMarketingContent, getMarketIntelligence, importMarketIntelligence, listMarketingCampaigns, listMarketingContent, regenerateMarketingCampaignAsset, saveMarketingContent, searchMarketPlaces, updateMarketingCampaign, updateMarketingContent } from '../services/marketingService.js'
 import './MarketingStudio.css'
 
 const tabs = [
   { id: 'create', label: 'Create Content', icon: Sparkles },
   { id: 'saved',  label: 'Saved Library', icon: Bookmark  },
+  { id: 'market', label: 'Market Intelligence', icon: MapPin },
 ]
 
 const contentTypes = [
@@ -105,6 +106,9 @@ export default function MarketingStudio() {
   const [error, setError]               = useState('')
   const [notice, setNotice]             = useState('')
   const [copying, setCopying]           = useState('')
+  const [marketData, setMarketData]     = useState({ locations: [], summary: null, data_status: 'empty' })
+  const [marketBusy, setMarketBusy]     = useState(false)
+  const [marketLocation, setMarketLocation] = useState(null)
 
   const selectedProject = projects.find(item => String(item.id) === String(selectedId)) || null
   const selectedBackendProjectId = selectedProject && backendProjectIds.has(String(selectedProject.id))
@@ -219,8 +223,50 @@ export default function MarketingStudio() {
   useEffect(() => {
     if (activeTab === 'saved') void loadLibrary({ q: libraryFilters.q, project: libraryFilters.project, type: libraryFilters.type, platform: libraryFilters.platform, status: libraryFilters.status })
   }, [activeTab, libraryFilters.project, libraryFilters.type, libraryFilters.platform, libraryFilters.status, loadLibrary])
+  useEffect(() => {
+    if (activeTab !== 'market' || !selectedBackendProjectId) return
+    setMarketBusy(true)
+    void getMarketIntelligence(selectedBackendProjectId)
+      .then(setMarketData)
+      .catch(err => setError(err.message || 'Market data could not be loaded.'))
+      .finally(() => setMarketBusy(false))
+  }, [activeTab, selectedBackendProjectId])
 
   const switchTab  = tab => { setActiveTab(tab); const nextMode = tabs.find(item => item.id === tab)?.mode; if (nextMode) setMode(nextMode); setError(''); setNotice('') }
+  const prepareLocationCampaign = location => {
+    setMarketLocation(location)
+    setInputs(current => ({
+      ...current,
+      topic: current.topic || `${selectedProject?.name || 'Product'} in ${location.name}`,
+      audience: current.audience || selectedProject?.target_users || '',
+      region_context: {
+        region_id: location.region_id || '',
+        name: location.name,
+        display_name: location.display_name || location.name,
+        country: location.country || '',
+        state: location.state || '',
+        district: location.district || '',
+        city: location.city || '',
+        boundary_status: location.boundary_status || 'unavailable',
+        observed_metrics: location.metrics || {},
+        observations: location.observations || 0,
+      },
+      extra_instructions: `${current.extra_instructions || ''}\nSelected market location: ${location.name}${location.state ? `, ${location.state}` : ''}${location.country ? `, ${location.country}` : ''}. Use only the observed market data shown; do not imply demand where no data exists.`.trim(),
+    }))
+    setActiveTab('create')
+    setWizardStep(1)
+    setNotice(`Campaign brief prepared for ${location.name}. Review it before generating.`)
+  }
+  const handleMarketImport = async file => {
+    if (!file) return
+    setMarketBusy(true); setError('')
+    try {
+      await importMarketIntelligence(file, selectedBackendProjectId)
+      setMarketData(await getMarketIntelligence(selectedBackendProjectId))
+      setNotice('Market data imported. Metrics are labelled as observed data.')
+    } catch (err) { setError(err.message || 'Market data import failed.') }
+    finally { setMarketBusy(false) }
+  }
   const setField   = (key, value) => setInputs(current => ({ ...current, [key]: value }))
   const selectProject = projectId => {
     setSelectedId(projectId)
@@ -448,7 +494,17 @@ export default function MarketingStudio() {
             {/* ════════════════════════════════════
                 SAVED LIBRARY TAB
             ════════════════════════════════════ */}
-            {activeTab === 'saved' ? (
+            {activeTab === 'market' ? (
+              <MarketIntelligencePanel
+                data={marketData}
+                busy={marketBusy}
+                project={selectedProject}
+                selectedLocation={marketLocation}
+                onSelectLocation={setMarketLocation}
+                onCreateCampaign={prepareLocationCampaign}
+                onImport={handleMarketImport}
+              />
+            ) : activeTab === 'saved' ? (
               <section className="ms-panel ms-library-panel">
                 <div className="ms-library-header">
                   <div>
@@ -908,6 +964,164 @@ function ContentTypeCard({ item, selected, onClick }) {
       <b>{item.title}</b>
       <small>{item.subtitle}</small>
     </button>
+  )
+}
+
+function MarketIntelligencePanel({ data, busy, project, selectedLocation, onSelectLocation, onCreateCampaign, onImport }) {
+  const mapRef = useRef(null)
+  const searchRef = useRef(null)
+  const mapInstance = useRef(null)
+  const boundaryLayer = useRef(null)
+  const [query, setQuery] = useState('')
+  const [mapError, setMapError] = useState('')
+  const [searchBusy, setSearchBusy] = useState(false)
+  const [searchError, setSearchError] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [metricLayer, setMetricLayer] = useState('boundaries')
+  const mapKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  const locations = data.locations || []
+  const summary = data.summary
+  const availableLayers = [...new Set(locations.flatMap(location => Object.keys(location.metrics || {})))]
+
+  useEffect(() => {
+    if (!mapKey || !mapRef.current) return undefined
+    const initialize = () => {
+      if (!window.google?.maps || mapInstance.current) return
+      mapInstance.current = new window.google.maps.Map(mapRef.current, {
+        center: { lat: 22.9734, lng: 78.6569 }, zoom: 5, mapTypeControl: false, streetViewControl: false,
+      })
+    }
+    if (window.google?.maps) { initialize(); return undefined }
+    const existing = document.querySelector('script[data-udaan-google-maps]')
+    if (existing) {
+      existing.addEventListener('load', initialize)
+      existing.addEventListener('error', () => setMapError('Google Maps could not be loaded. Check the browser key restrictions and enabled APIs.'))
+      return () => existing.removeEventListener('load', initialize)
+    }
+    const script = document.createElement('script')
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(mapKey)}&libraries=places`
+    script.async = true; script.defer = true; script.dataset.udaanGoogleMaps = 'true'
+    script.addEventListener('load', initialize)
+    script.addEventListener('error', () => setMapError('Google Maps could not be loaded. Check the browser key restrictions and enabled APIs.'))
+    document.head.appendChild(script)
+    return () => script.removeEventListener('load', initialize)
+  }, [mapKey, onSelectLocation])
+
+  useEffect(() => {
+    const value = query.trim()
+    if (value.length < 2) {
+      setSuggestions([])
+      setSearchError('')
+      return undefined
+    }
+    let active = true
+    const timer = setTimeout(() => {
+      setSearchBusy(true)
+      void searchMarketPlaces(value)
+        .then(response => { if (active) setSuggestions(response.results || []) })
+        .catch(error => { if (active) setSearchError(error.message || 'Place search is unavailable.') })
+        .finally(() => { if (active) setSearchBusy(false) })
+    }, 350)
+    return () => { active = false; clearTimeout(timer) }
+  }, [query])
+
+  const selectPlace = place => {
+    const observed = locations.find(item => [item.name, item.city, item.state, item.country].filter(Boolean).some(value => value.toLowerCase() === place.name.toLowerCase()))
+    setQuery(place.display_name || place.name)
+    setSuggestions([])
+    setSearchError('')
+    onSelectLocation({ ...place, ...(observed || {}), metrics: observed?.metrics || {}, observations: observed?.observations || 0, source: observed ? 'imported_observations' : 'geographic_boundary' })
+    if (!mapInstance.current || !window.google?.maps) return
+    if (boundaryLayer.current) boundaryLayer.current.setMap(null)
+    if (place.geometry) {
+      boundaryLayer.current = new window.google.maps.Data({ map: mapInstance.current })
+      boundaryLayer.current.addGeoJson({ type: 'Feature', properties: { name: place.name }, geometry: place.geometry })
+      boundaryLayer.current.setStyle({ fillColor: '#F16B61', fillOpacity: 0.18, strokeColor: '#8E4B49', strokeWeight: 2 })
+      const bounds = new window.google.maps.LatLngBounds()
+      boundaryLayer.current.forEach(feature => feature.getGeometry()?.forEachLatLng(point => bounds.extend(point)))
+      if (!bounds.isEmpty()) mapInstance.current.fitBounds(bounds)
+    } else if (place.latitude != null && place.longitude != null) {
+      mapInstance.current.setCenter({ lat: place.latitude, lng: place.longitude })
+      mapInstance.current.setZoom(10)
+    }
+  }
+
+  useEffect(() => {
+    if (!mapInstance.current || !window.google?.maps) return
+    const markers = locations.filter(item => item.latitude != null && item.longitude != null).map(item => {
+      const marker = new window.google.maps.Marker({
+        map: mapInstance.current, position: { lat: item.latitude, lng: item.longitude }, title: item.name,
+      })
+      marker.addListener('click', () => onSelectLocation(item))
+      return marker
+    })
+    return () => markers.forEach(marker => marker.setMap(null))
+  }, [locations, onSelectLocation])
+
+  return (
+    <section className="ms-market-panel">
+      <div className="ms-library-header">
+        <div>
+          <span className="ms-eyebrow"><MapPin size={12} /> Market Intelligence</span>
+          <h2>Explore where your marketing can focus</h2>
+          <p>Google Maps provides the geography. Metrics below only come from your connected or imported business data.</p>
+        </div>
+        <label className="ms-market-import">
+          <Upload size={14} /> Import CSV
+          <input type="file" accept=".csv,text/csv" onChange={event => { void onImport(event.target.files?.[0]); event.target.value = '' }} disabled={busy || !project} />
+        </label>
+      </div>
+      {!project && <div className="ms-market-empty"><AlertCircle size={18} /><div><b>Select a project first</b><span>Regional records are kept separate for each project and signed-in account.</span></div></div>}
+      {!mapKey && <div className="ms-market-empty"><AlertCircle size={18} /><div><b>Google Maps is not configured</b><span>Add VITE_GOOGLE_MAPS_API_KEY to the frontend environment and restrict it to Maps JavaScript API and Places API.</span></div></div>}
+      <div className="ms-market-search">
+        <Search size={15} />
+        <input ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search a city, state, district or address" />
+        {searchBusy && <span className="ms-market-search-status">Searching…</span>}
+        {suggestions.length > 0 && <div className="ms-market-suggestions">
+          {suggestions.map(place => (
+            <button type="button" key={place.region_id} onClick={() => selectPlace(place)}>
+              <b>{place.name}</b>
+              <small>{place.display_name} · {place.boundary_status === 'available' ? 'Boundary available' : 'Boundary unavailable'}</small>
+            </button>
+          ))}
+        </div>}
+      </div>
+      {searchError && <p className="ms-error">{searchError}</p>}
+      <div className="ms-market-layer-controls">
+        <label>Map layer
+          <select value={metricLayer} onChange={event => setMetricLayer(event.target.value)}>
+            <option value="boundaries">Administrative boundaries</option>
+            {['sales', 'enquiries', 'website_visits', 'conversions'].filter(layer => availableLayers.includes(layer)).map(layer => <option key={layer} value={layer}>{layer.replaceAll('_', ' ')}</option>)}
+          </select>
+        </label>
+        {metricLayer !== 'boundaries' && <span className="ms-market-legend">Observed {metricLayer.replaceAll('_', ' ')} · darker values indicate higher values within imported records</span>}
+      </div>
+      <div className="ms-market-grid">
+        <div className="ms-market-map" ref={mapRef}>{mapError || (mapKey ? 'Loading Google Maps…' : 'Map unavailable until a browser key is configured.')}</div>
+        <aside className="ms-market-details">
+          {selectedLocation ? (
+            <>
+              <span className="ms-eyebrow"><MapPin size={12} /> Selected location</span>
+              <h3>{selectedLocation.name}</h3>
+              <p>{[selectedLocation.city, selectedLocation.district, selectedLocation.state, selectedLocation.country].filter(Boolean).join(' → ') || 'Geographic selection'}</p>
+              <p>{selectedLocation.boundary_status === 'available' ? 'Administrative boundary available' : 'Boundary unavailable for this place'} · {selectedLocation.provider || 'Google Maps selection'}</p>
+              {selectedLocation.observations ? (
+                <div className="ms-market-metrics">
+                  {Object.entries(selectedLocation.metrics || {}).filter(([, value]) => value != null).map(([key, value]) => <span key={key}><b>{Number(value).toLocaleString()}</b>{key.replaceAll('_', ' ')}</span>)}
+                </div>
+              ) : <div className="ms-market-empty compact"><AlertCircle size={16} /><span>No connected observations for this location. Do not treat the map selection as demand evidence.</span></div>}
+              <button className="ms-primary" type="button" onClick={() => onCreateCampaign(selectedLocation)}>Create Campaign for This Location <ArrowRight size={14} /></button>
+            </>
+          ) : <div className="ms-market-empty compact"><MapPin size={18} /><span>Search or select a marker to review location context.</span></div>}
+          <div className="ms-market-summary">
+            <b>Data status</b>
+            {summary?.status === 'observed'
+              ? <><span>{summary.observations} imported observation(s)</span>{summary.score != null && <span>Explainable signal score: {summary.score}/100</span>}<span>{summary.reliability}</span></>
+              : <span>No sales, enquiry or analytics dataset is connected yet. Import approved CSV data to calculate observed metrics.</span>}
+          </div>
+        </aside>
+      </div>
+    </section>
   )
 }
 

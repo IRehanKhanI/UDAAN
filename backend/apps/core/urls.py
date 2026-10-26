@@ -38,6 +38,7 @@ from .marketing_views import (
     MarketingCampaignGenerateView, MarketingCampaignCollectionView, MarketingCampaignDetailView,
     MarketingCampaignAssetRegenerateView,
 )
+from .market_intelligence_views import MarketIntelligenceView, MarketPlaceSearchView
 from apps.users.views import (
     GitHubLoginStartView, GitHubLoginCallbackView, AuthStatusView, DeveloperProfileView,
     LogoutView, CsrfTokenView, QuickLoginView, GitHubUsernameConnectView,
@@ -99,6 +100,8 @@ urlpatterns = [
     path('marketing/campaigns/', MarketingCampaignCollectionView.as_view(), name='marketing-campaign-list'),
     path('marketing/campaigns/<int:campaign_id>/', MarketingCampaignDetailView.as_view(), name='marketing-campaign-detail'),
     path('marketing/campaigns/<int:campaign_id>/assets/<int:asset_index>/regenerate/', MarketingCampaignAssetRegenerateView.as_view(), name='marketing-campaign-asset-regenerate'),
+    path('marketing/market-intelligence/', MarketIntelligenceView.as_view(), name='marketing-market-intelligence'),
+    path('marketing/market-intelligence/places/', MarketPlaceSearchView.as_view(), name='marketing-market-place-search'),
     path('marketing/content/', MarketingContentCollectionView.as_view(), name='marketing-content-list-create'),
     path('marketing/content/<int:item_id>/', MarketingContentDetailView.as_view(), name='marketing-content-detail'),
 ]

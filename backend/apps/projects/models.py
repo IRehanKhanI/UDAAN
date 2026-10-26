@@ -210,6 +210,29 @@ class MarketingCampaign(models.Model):
         indexes = [models.Index(fields=['owner', 'updated_at'], name='mktcamp_owner_updated_idx')]
 
 
+class MarketIntelligenceRecord(models.Model):
+    """User-owned regional observations imported from an approved business dataset."""
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='market_intelligence_records')
+    project = models.ForeignKey(ProjectDraft, null=True, blank=True, on_delete=models.CASCADE, related_name='market_intelligence_records')
+    location_name = models.CharField(max_length=180)
+    country = models.CharField(max_length=100, blank=True, default='')
+    state = models.CharField(max_length=100, blank=True, default='')
+    city = models.CharField(max_length=100, blank=True, default='')
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
+    metrics = models.JSONField(default=dict, blank=True)
+    source_label = models.CharField(max_length=180, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['location_name', '-period_end']
+        indexes = [
+            models.Index(fields=['owner', 'project', 'location_name'], name='mktintel_owner_location_idx'),
+        ]
+
+
 class MarketRadarReport(models.Model):
     """Source-linked market research report containing competitors, pricing, customer complaints, and experiments."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

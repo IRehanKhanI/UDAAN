@@ -56,3 +56,14 @@ export const deleteMarketingCampaign = id => request(`/api/marketing/campaigns/$
 export const regenerateMarketingCampaignAsset = (campaignId, assetIndex) => request(`/api/marketing/campaigns/${encodeURIComponent(campaignId)}/assets/${assetIndex}/regenerate/`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
 })
+
+export const getMarketIntelligence = (projectId = '') => request(`/api/marketing/market-intelligence/${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`)
+
+export const importMarketIntelligence = (file, projectId = '') => {
+  const body = new FormData()
+  body.append('file', file)
+  if (projectId) body.append('project_id', projectId)
+  return request('/api/marketing/market-intelligence/', { method: 'POST', body })
+}
+
+export const searchMarketPlaces = query => request(`/api/marketing/market-intelligence/places/?q=${encodeURIComponent(query)}`)
