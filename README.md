@@ -40,6 +40,41 @@ py manage.py runserver 0.0.0.0:8000
 
 > **Backend Health Check**: Open `http://127.0.0.1:8000/api/health/` in your browser to verify it responds with `{"status": "healthy"}`.
 
+### Market Intelligence setup
+
+Market Intelligence is the third tab inside Marketing Studio. Google Maps supplies only
+the geographic search and map layer; UDAAN does not treat Google Maps as a source of
+sales, demand, or customer data.
+
+Create `frontend/.env` from `frontend/.env.example` and set:
+
+```env
+VITE_GOOGLE_MAPS_API_KEY=your-browser-restricted-key
+```
+
+In Google Cloud Console, enable **Maps JavaScript API** and **Places API**, enable
+billing as required by Google Maps Platform, and restrict the browser key to your
+development/production referrers and only those APIs. Never put a server-side key in
+the Vite environment.
+
+To supply observed regional metrics, select a project in Market Intelligence and import
+a UTF-8 CSV (maximum 5 MB / 5,000 rows). Supported columns are:
+
+```text
+location_name,country,state,city,latitude,longitude,period_start,period_end,enquiries,sales,website_visits,conversions,campaign_engagement,source_label
+```
+
+Imported values are labelled as observed business data. Without imported records, the
+tab shows an honest insufficient-data state and does not calculate an opportunity
+score. A selected map location can still be used to prefill a campaign brief, but its
+geography is not treated as demand evidence.
+
+Place search and administrative boundaries use OpenStreetMap Nominatim through the
+Django backend. Results are cached for one hour and requests identify UDAAN with a
+User-Agent. The map uses Google Maps only for rendering and viewport interaction;
+Nominatim is not used as a source of sales or demand statistics. Review the
+Nominatim usage policy and configure a suitable proxy/provider for production volume.
+
 ---
 
 ### Step 2: Start the Frontend (Vite)
@@ -138,9 +173,14 @@ Both directories include fully documented [`example.env`](file:///c:/Users/User/
 | `CORS_ALLOW_ALL_ORIGINS` | Enables mobile access from any device on WiFi | `True` in dev |
 | `GEMINI_API_KEY` | Google Gemini API key for roadmap & mind map synthesis | Get from Google AI Studio |
 | `GEMINI_MODEL` | Primary Gemini model | `gemini-2.5-flash` |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID for marketing image generation | Required for campaign creatives |
+| `CLOUDFLARE_API_TOKEN` | Server-only Cloudflare API token with Workers AI access | Required for campaign creatives |
+| `CLOUDFLARE_AI_IMAGE_MODEL` | Workers AI image model | `@cf/black-forest-labs/flux-1-schnell` |
 | `BRAVE_API_KEY` | Real web discovery for competitor pricing & complaints | Optional (Brave Search API) |
 | `TAVILY_API_KEY` | Deep competitor content extraction | Optional (Tavily AI) |
 | `DB_ENGINE` | Database engine (`sqlite` or `postgresql`) | `sqlite` |
+
+Marketing captions continue to use the configured Gemini/Groq text provider. Marketing campaign images use Cloudflare Workers AI through Django; the Cloudflare token is never sent to the frontend. Add the Cloudflare values to `backend/.env`, restart Django, and grant the token permission to run Workers AI models. The campaign workflow accepts one to three image concepts, stores successful JPEGs in Django media storage, preserves partial failures, and supports per-image retry.
 
 ### Frontend (`frontend/.env`):
 | Variable | Description | Recommended Setting |

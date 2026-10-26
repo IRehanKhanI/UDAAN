@@ -33,7 +33,12 @@ from .views import health
 from .team_workspace import (TeamWorkspaceView, TeamMemberView, TeamTaskView, RoadmapTaskSyncView,
     TeamInvitationCollectionView, TeamInvitationManageView, PublicTeamInvitationView,
     TeamAllocationProposalView, TeamAllocationApprovalView)
-from .marketing_views import MarketingGenerateView, MarketingContentCollectionView, MarketingContentDetailView
+from .marketing_views import (
+    MarketingGenerateView, MarketingContentCollectionView, MarketingContentDetailView,
+    MarketingCampaignGenerateView, MarketingCampaignCollectionView, MarketingCampaignDetailView,
+    MarketingCampaignAssetRegenerateView,
+)
+from .market_intelligence_views import MarketIntelligenceView, MarketPlaceSearchView
 from apps.users.views import (
     GitHubLoginStartView, GitHubLoginCallbackView, AuthStatusView, DeveloperProfileView,
     LogoutView, CsrfTokenView, QuickLoginView, GitHubUsernameConnectView,
@@ -91,6 +96,12 @@ urlpatterns = [
     path('repository/explain-finding/', RepositoryFindingExplanationView.as_view(), name='repository-finding-explanation'),
     path('repository/explain-task-assessment/', RoadmapTaskExplanationView.as_view(), name='repository-explain-task-assessment'),
     path('marketing/generate/', MarketingGenerateView.as_view(), name='marketing-generate'),
+    path('marketing/campaigns/generate/', MarketingCampaignGenerateView.as_view(), name='marketing-campaign-generate'),
+    path('marketing/campaigns/', MarketingCampaignCollectionView.as_view(), name='marketing-campaign-list'),
+    path('marketing/campaigns/<int:campaign_id>/', MarketingCampaignDetailView.as_view(), name='marketing-campaign-detail'),
+    path('marketing/campaigns/<int:campaign_id>/assets/<int:asset_index>/regenerate/', MarketingCampaignAssetRegenerateView.as_view(), name='marketing-campaign-asset-regenerate'),
+    path('marketing/market-intelligence/', MarketIntelligenceView.as_view(), name='marketing-market-intelligence'),
+    path('marketing/market-intelligence/places/', MarketPlaceSearchView.as_view(), name='marketing-market-place-search'),
     path('marketing/content/', MarketingContentCollectionView.as_view(), name='marketing-content-list-create'),
     path('marketing/content/<int:item_id>/', MarketingContentDetailView.as_view(), name='marketing-content-detail'),
 ]

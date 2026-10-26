@@ -37,3 +37,33 @@ export const updateMarketingContent = (id, payload) => request(`/api/marketing/c
 })
 
 export const deleteMarketingContent = id => request(`/api/marketing/content/${encodeURIComponent(id)}/`, { method: 'DELETE' })
+
+export const generateMarketingCampaign = payload => request('/api/marketing/campaigns/generate/', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+})
+
+export const listMarketingCampaigns = (filters = {}) => {
+  const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== '' && value != null))
+  return request(`/api/marketing/campaigns/${query.size ? `?${query}` : ''}`)
+}
+
+export const updateMarketingCampaign = (id, payload) => request(`/api/marketing/campaigns/${encodeURIComponent(id)}/`, {
+  method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+})
+
+export const deleteMarketingCampaign = id => request(`/api/marketing/campaigns/${encodeURIComponent(id)}/`, { method: 'DELETE' })
+
+export const regenerateMarketingCampaignAsset = (campaignId, assetIndex) => request(`/api/marketing/campaigns/${encodeURIComponent(campaignId)}/assets/${assetIndex}/regenerate/`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+})
+
+export const getMarketIntelligence = (projectId = '') => request(`/api/marketing/market-intelligence/${projectId ? `?project=${encodeURIComponent(projectId)}` : ''}`)
+
+export const importMarketIntelligence = (file, projectId = '') => {
+  const body = new FormData()
+  body.append('file', file)
+  if (projectId) body.append('project_id', projectId)
+  return request('/api/marketing/market-intelligence/', { method: 'POST', body })
+}
+
+export const searchMarketPlaces = query => request(`/api/marketing/market-intelligence/places/?q=${encodeURIComponent(query)}`)

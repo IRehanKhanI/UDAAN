@@ -1,10 +1,12 @@
 import json
 import os
+import io
+from xml.etree import ElementTree
 from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
-from apps.projects.models import ProjectDraft, ProjectRepository, RoadmapAssessment, ProjectLearningState, MarketingContentItem
+from apps.projects.models import ProjectDraft, ProjectRepository, RoadmapAssessment, ProjectLearningState, MarketingContentItem, MarketIntelligenceRecord
 from apps.teams.models import TeamMember
 from apps.roadmaps.models import ProjectTask
 
@@ -12,6 +14,129 @@ from .gemini_service import (
     GeminiConfigurationError, GeminiRequestError, _parse_json_candidate,
     generate_idea_stage, _validate_stage_result,
 )
+from .cloudflare_ai_service import CloudflareConfigurationError, generate_cloudflare_image
+from .marketing_views import compose_marketing_creative
+
+
+class CloudflareImageServiceTests(SimpleTestCase):
+    @patch.dict(os.environ, {'CLOUDFLARE_ACCOUNT_ID': '', 'CLOUDFLARE_API_TOKEN': ''})
+    def test_missing_cloudflare_credentials_are_actionable(self):
+        with self.assertRaisesRegex(CloudflareConfigurationError, 'CLOUDFLARE_ACCOUNT_ID'):
+            generate_cloudflare_image(prompt='A clean product photo')
+
+    @patch.dict(os.environ, {
+        'CLOUDFLARE_ACCOUNT_ID': 'account',
+        'CLOUDFLARE_API_TOKEN': 'token',
+        'CLOUDFLARE_AI_IMAGE_MODEL': '@cf/black-forest-labs/flux-1-schnell',
+    })
+    @patch('apps.core.cloudflare_ai_service.urlopen')
+    def test_decodes_cloudflare_base64_jpeg_response(self, urlopen_mock):
+        response = urlopen_mock.return_value.__enter__.return_value
+        response.headers = {'Content-Type': 'application/json'}
+        response.read.return_value = json.dumps({
+            'success': True,
+            'result': {'image': 'aGVsbG8='},
+        }).encode()
+
+        image, mime_type = generate_cloudflare_image(prompt='A clean product photo')
+
+        self.assertEqual(image, b'hello')
+        self.assertEqual(mime_type, 'image/jpeg')
+        request = urlopen_mock.call_args.args[0]
+        self.assertIn('/accounts/account/ai/run/@cf/black-forest-labs/flux-1-schnell', request.full_url)
+        self.assertEqual(request.headers['Authorization'], 'Bearer token')
+        self.assertEqual(json.loads(request.data.decode()), {'prompt': 'A clean product photo'})
+
+    def test_composed_creative_contains_exact_copy_and_embedded_background(self):
+        rendered, mime_type = compose_marketing_creative(
+            b'background-bytes',
+            'image/jpeg',
+            copy_item={'title': 'SolarFlow', 'hook': 'Power your future', 'body': 'Save time with verified tools.', 'cta': 'Explore the project'},
+            inputs={'platform': 'LinkedIn', 'creative_format': 'LinkedIn post'},
+            style_index=1,
+        )
+        text = rendered.decode('utf-8')
+        self.assertEqual(mime_type, 'image/svg+xml')
+        self.assertIn('Power your future', text)
+        self.assertIn('Save time with verified tools.', text)
+        self.assertIn('Explore the project', text)
+        self.assertIn('data:image/jpeg;base64,YmFja2dyb3VuZC1ieXRlcw==', text)
+
+    def test_all_creative_styles_produce_valid_svg_for_long_copy(self):
+        for style_index in range(3):
+            rendered, mime_type = compose_marketing_creative(
+                b'background-bytes',
+                'image/jpeg',
+                copy_item={
+                    'title': 'A long campaign title that must wrap safely',
+                    'hook': 'A long headline that remains readable without overlapping the supporting copy',
+                    'body': 'Supporting copy stays in its own bounded region with clear spacing before the CTA.',
+                    'cta': 'Start your free pilot today',
+                },
+                inputs={'platform': 'Instagram', 'creative_format': 'Instagram post'},
+                style_index=style_index,
+            )
+            ElementTree.fromstring(rendered)
+            self.assertEqual(mime_type, 'image/svg+xml')
+
+
+class MarketIntelligenceApiTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        self.user = get_user_model().objects.create_user(username='market-user', password='test-password')
+        self.other = get_user_model().objects.create_user(username='other-market-user', password='test-password')
+        self.project = ProjectDraft.objects.create(owner=self.user, idea='Regional product', project_type='startup')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_empty_market_data_is_explicit_and_does_not_score(self):
+        response = self.client.get('/api/marketing/market-intelligence/', {'project': self.project.id})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['data_status'], 'empty')
+        self.assertIsNone(response.json()['summary']['score'])
+
+    def test_csv_import_persists_observed_metrics_and_summary(self):
+        csv_body = (
+        'location_name,country,state,city,latitude,longitude,enquiries,sales,conversions,source_label\n'
+        'Panaji,India,Goa,Panaji,15.4909,73.8278,20,5,3,CRM export\n'
+        )
+        response = self.client.post(
+        '/api/marketing/market-intelligence/',
+        {'project_id': str(self.project.id), 'file': (io.BytesIO(csv_body.encode()), 'market.csv')},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.json()['imported'], 1)
+        record = MarketIntelligenceRecord.objects.get()
+        self.assertEqual(record.owner_id, self.user.id)
+        result = self.client.get('/api/marketing/market-intelligence/', {'project': self.project.id}).json()
+        self.assertEqual(result['summary']['status'], 'observed')
+        self.assertEqual(result['locations'][0]['name'], 'Panaji')
+
+    def test_records_are_isolated_between_users(self):
+        MarketIntelligenceRecord.objects.create(owner=self.other, location_name='Private location', metrics={'sales': 9})
+        response = self.client.get('/api/marketing/market-intelligence/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['locations'], [])
+
+    @patch('apps.core.market_intelligence_views.urllib.request.urlopen')
+    def test_place_search_returns_provider_boundary_and_hierarchy(self, urlopen_mock):
+        response = urlopen_mock.return_value.__enter__.return_value
+        response.read.return_value = json.dumps([{
+            'osm_type': 'relation',
+            'osm_id': 123,
+            'name': 'Panaji',
+            'display_name': 'Panaji, Goa, India',
+            'type': 'administrative',
+            'lat': '15.4909',
+            'lon': '73.8278',
+            'address': {'city': 'Panaji', 'state': 'Goa', 'country': 'India'},
+            'geojson': {'type': 'Polygon', 'coordinates': [[[73.8, 15.4], [73.9, 15.4], [73.9, 15.5], [73.8, 15.4]]]},
+        }]).encode()
+        self.client.get('/api/marketing/market-intelligence/places/', {'q': 'Panaji unique'})
+        result = self.client.get('/api/marketing/market-intelligence/places/', {'q': 'Panaji unique'}).json()
+        self.assertEqual(result['results'][0]['region_id'], 'relation:123')
+        self.assertEqual(result['results'][0]['state'], 'Goa')
+        self.assertEqual(result['results'][0]['boundary_status'], 'available')
 
 
 def valid_result(stage):
@@ -2047,4 +2172,3 @@ class FlightPlanMarketRadarTests(TestCase):
         self.assertEqual(res_dup.status_code, 200)
         self.assertEqual(res_dup.json()['xp_awarded'], 0)
         self.assertEqual(res_dup.json()['total_xp'], 350)
-

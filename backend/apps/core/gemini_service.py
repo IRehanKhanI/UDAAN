@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -643,7 +644,7 @@ def generate_marketing_content(*, mode, inputs, project_context=None):
     """Generate editable, evidence-grounded marketing drafts with structured output."""
     count = 1 if mode == 'refine' else 3
     if mode == 'campaign':
-        count = 30 if inputs.get('campaign_days') == 30 else 7
+        count = {7: 7, 14: 14, 30: 30}.get(inputs.get('campaign_days'), 7)
     elif mode == 'repurpose':
         count = max(1, min(8, len(inputs.get('formats') or [])))
     item_schema = {
@@ -675,6 +676,25 @@ Trust rules:
 - Return exactly {count} items. For social mode, make three genuinely different variations with hook, body, useful CTA and platform-appropriate tags. For campaign mode, make exactly {count} distinct entries, day values 1 through {count}, coherent progression, and varied formats. For repurpose mode, match the requested formats in order. For refine mode, honor the requested refinement_action and preserve the source content's supported facts and user intent. For other modes, give distinct usable alternatives.
 - Keep each body complete, factual and ready for the user to edit. Put CTA in cta and hashtags in hashtags; omit hashtags with an empty array if unsuitable. For non-campaign items use day 0.
 - Rationale briefly describes the writing choice, not predicted performance."""
+    prompt += """
+
+Brief requirements:
+- Use the full marketing brief, especially audience, customer problem, value proposition, objective, CTA, brand voice, language, budget, channels, duration, goals and references when present.
+- For launch mode, treat launch_status as a gate: if it is not explicitly ready/launched, write a pre-launch or readiness draft and do not announce availability.
+- For campaign mode, include measurable goals as planned targets only; never report them as achieved metrics.
+- For email mode, use recipient_type and desired_next_action to shape every message.
+- For repurpose mode, use source_content or source_url only as source material; do not claim the URL was fetched unless source text was actually supplied by an integration.
+- Make unsupported assumptions visible in rationale or objective and ask the user to confirm them rather than filling gaps with invented facts."""
+    if mode == 'email':
+        prompt += '\nFor email mode, make each item a distinct email in a sequence with a subject-line-style title, clear body, purpose in objective, and a specific CTA.'
+    elif mode == 'launch':
+        prompt += '\nFor launch mode, write an announcement grounded in verified project work, with a concise launch hook, what is available now, and a low-pressure CTA. Never imply publishing or traction.'
+    elif mode == 'showcase':
+        prompt += '\nFor showcase mode, explicitly separate the problem, implemented solution, verified capabilities, technology evidence, and CTA in the body.'
+    elif mode == 'tool':
+        prompt += '\nFor toolkit mode, make the alternatives useful as distinct assets such as a tagline, elevator pitch, value proposition, or FAQ answer based on the requested template.'
+    elif mode == 'landing':
+        prompt += '\nFor landing mode, structure each alternative around headline, subheadline, benefits, evidence, CTA and FAQs. Only include evidence present in the supplied context or brief.'
     payload = {
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
         'generationConfig': {'temperature': 0.55, 'maxOutputTokens': min(12000, 700 + 340 * count), 'thinkingConfig': {'thinkingLevel': 'low'}, 'responseMimeType': 'application/json', 'responseSchema': schema},

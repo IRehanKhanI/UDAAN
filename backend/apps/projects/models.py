@@ -164,7 +164,13 @@ class ProjectLearningState(models.Model):
 
 class MarketingContentItem(models.Model):
     """Saved user-authored marketing drafts, optionally attached to a project."""
-    STATUSES = [('saved', 'Saved'), ('draft', 'Draft')]
+    STATUSES = [
+        ('draft', 'Draft'),
+        ('saved', 'Saved'),
+        ('ready_for_review', 'Ready for review'),
+        ('approved', 'Approved'),
+        ('published', 'Published'),
+    ]
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name='marketing_content')
     project = models.ForeignKey(ProjectDraft, null=True, blank=True, on_delete=models.CASCADE, related_name='marketing_content')
     browser_key = models.CharField(max_length=64, blank=True, default='', db_index=True)
@@ -173,13 +179,58 @@ class MarketingContentItem(models.Model):
     content_type = models.CharField(max_length=40)
     platform = models.CharField(max_length=80, blank=True, default='')
     generation_inputs = models.JSONField(default=dict, blank=True)
-    status = models.CharField(max_length=12, choices=STATUSES, default='saved')
+    version_history = models.JSONField(default=list, blank=True)
+    status = models.CharField(max_length=20, choices=STATUSES, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-updated_at']
         indexes = [models.Index(fields=['owner', 'updated_at'], name='mkt_owner_updated_idx')]
+
+
+class MarketingCampaign(models.Model):
+    """Persisted campaign package containing editable copy and generated creative assets."""
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE, related_name='marketing_campaigns')
+    project = models.ForeignKey(ProjectDraft, null=True, blank=True, on_delete=models.CASCADE, related_name='marketing_campaigns')
+    browser_key = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    title = models.CharField(max_length=240)
+    content_type = models.CharField(max_length=80)
+    platform = models.CharField(max_length=80, blank=True, default='')
+    brief = models.JSONField(default=dict, blank=True)
+    copy = models.JSONField(default=dict, blank=True)
+    assets = models.JSONField(default=list, blank=True)
+    selected_asset = models.PositiveSmallIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, default='draft')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        indexes = [models.Index(fields=['owner', 'updated_at'], name='mktcamp_owner_updated_idx')]
+
+
+class MarketIntelligenceRecord(models.Model):
+    """User-owned regional observations imported from an approved business dataset."""
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='market_intelligence_records')
+    project = models.ForeignKey(ProjectDraft, null=True, blank=True, on_delete=models.CASCADE, related_name='market_intelligence_records')
+    location_name = models.CharField(max_length=180)
+    country = models.CharField(max_length=100, blank=True, default='')
+    state = models.CharField(max_length=100, blank=True, default='')
+    city = models.CharField(max_length=100, blank=True, default='')
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
+    metrics = models.JSONField(default=dict, blank=True)
+    source_label = models.CharField(max_length=180, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['location_name', '-period_end']
+        indexes = [
+            models.Index(fields=['owner', 'project', 'location_name'], name='mktintel_owner_location_idx'),
+        ]
 
 
 class MarketRadarReport(models.Model):
@@ -247,4 +298,3 @@ class BusinessModelRevision(models.Model):
 
     def __str__(self):
         return f'{self.project_id} revision at {self.created_at}'
-
