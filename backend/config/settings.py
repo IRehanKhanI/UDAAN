@@ -94,5 +94,5 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', '')
 FRONTEND_BASE_URL = os.getenv('FRONTEND_BASE_URL', 'http://127.0.0.1:5173')
 REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': ['rest_framework.renderers.JSONRenderer'],
-    'DEFAULT_THROTTLE_RATES': {'repository_ai': '5/hour', 'marketing_ai': '20/hour', 'allocation_ai': '10/hour', 'glimpse_ai': '60/hour'},
+    'DEFAULT_THROTTLE_RATES': {'repository_ai': '5/hour', 'marketing_ai': '20/hour', 'business_model_ai': '10/hour', 'allocation_ai': '10/hour', 'glimpse_ai': '60/hour'},
 }

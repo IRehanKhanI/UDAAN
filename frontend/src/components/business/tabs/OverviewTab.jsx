@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   HelpCircle, Sparkles, CheckCircle2, AlertCircle, ArrowRight,
-  DollarSign, Users, Briefcase, FileText, Check
+  DollarSign, Users, Briefcase, FileText, Check, ExternalLink, RefreshCw
 } from 'lucide-react'
 import ConfidenceTag from '../ConfidenceTag.jsx'
 import { formatCurrency } from '../FormatCurrency.js'
@@ -11,6 +11,11 @@ export default function OverviewTab({
   onChange = () => {},
   currency = 'INR',
   project = {},
+  market = 'India',
+  onMarketChange = () => {},
+  onResearch = () => {},
+  researching = false,
+  researchError = '',
 }) {
   const overview = data.overview || {}
   const [clarityTested, setClarityTested] = useState(false)
@@ -20,7 +25,7 @@ export default function OverviewTab({
   }
 
   // 15-word purpose validation
-  const purpose = overview.one_line_purpose || project.description || ''
+  const purpose = overview.one_line_purpose || project?.description || ''
   const words = useMemo(() => purpose.trim().split(/\s+/).filter(Boolean), [purpose])
   const wordCount = words.length
   const isWordCountValid = wordCount > 0 && wordCount <= 15
@@ -106,16 +111,97 @@ export default function OverviewTab({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setClarityTested(true)}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shrink-0 cursor-pointer"
-          >
-            <Sparkles size={13} />
-            <span>AI Clarity Check</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2 shrink-0">
+            <label className="grid gap-1 text-[10px] font-bold text-[#7C766F]">
+              Research market
+              <input
+                type="text"
+                value={market}
+                onChange={event => onMarketChange(event.target.value)}
+                maxLength={120}
+                placeholder="e.g. India"
+                className="w-full sm:w-36 px-2.5 py-2 rounded-lg border border-[#EFEAE4] bg-white text-xs font-semibold text-[#1D1B18] outline-none focus:ring-1 focus:ring-[#FF6B6B]"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={async () => {
+                setClarityTested(true)
+                await onResearch()
+              }}
+              disabled={researching || !market.trim()}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shrink-0 cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+            >
+              {researching ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
+              <span>{researching ? 'Researching market…' : 'AI Clarity & Market Research'}</span>
+            </button>
+          </div>
         </div>
+        {researchError && <p className="text-xs font-semibold text-[#B42318]" role="alert">{researchError}</p>}
+        {clarityTested && !researching && !researchError && (
+          <p className="text-[10px] text-[#7C766F]" role="status">
+            AI suggestions are estimates. Review the research and sources below before relying on them.
+          </p>
+        )}
       </div>
+
+      {data.market_research && (
+        <section className="bg-white rounded-2xl p-6 border border-[#EFEAE4] shadow-xs space-y-4" aria-live="polite">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <span className="text-[10px] font-bold tracking-wider text-[#8C847E] uppercase">AI-assisted market research · {data.market_research.market || market}</span>
+              <h3 className="text-base font-bold text-[#1D1B18] mt-0.5">Customer and pricing hypotheses</h3>
+              <p className="text-xs text-[#7C766F] mt-1">{data.market_research.summary}</p>
+            </div>
+            <span className="rounded-full bg-[#FAF5FF] px-2.5 py-1 text-[10px] font-bold text-[#7E22CE]">Unverified estimates</span>
+          </div>
+          {data.market_research.key_findings?.length > 0 && (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {data.market_research.key_findings.map((finding, index) => (
+                <li key={`${index}-${finding}`} className="rounded-xl bg-[#FAF8F5] p-3 text-xs leading-relaxed text-[#534342]">{finding}</li>
+              ))}
+            </ul>
+          )}
+          {data.market_research.assumptions?.length > 0 && (
+            <div>
+              <h4 className="text-[11px] font-bold text-[#534342]">Assumptions to verify</h4>
+              <ul className="mt-1 list-disc pl-5 text-[11px] leading-relaxed text-[#7C766F]">
+                {data.market_research.assumptions.map((assumption, index) => <li key={`${index}-${assumption}`}>{assumption}</li>)}
+              </ul>
+            </div>
+          )}
+          {data.market_research.validation_questions?.length > 0 && (
+            <div>
+              <h4 className="text-[11px] font-bold text-[#534342]">Questions for customer interviews</h4>
+              <ul className="mt-1 list-disc pl-5 text-[11px] leading-relaxed text-[#7C766F]">
+                {data.market_research.validation_questions.map((question, index) => <li key={`${index}-${question}`}>{question}</li>)}
+              </ul>
+            </div>
+          )}
+          {data.market_research.sources?.length > 0 ? (
+            <div>
+              <h4 className="text-[11px] font-bold text-[#534342]">Research sources</h4>
+              <ul className="mt-1 grid gap-1.5 sm:grid-cols-2">
+                {data.market_research.sources.map(source => (
+                  <li key={source.url}>
+                    <a href={source.url} target="_blank" rel="noreferrer" className="inline-flex items-start gap-1.5 text-[11px] font-semibold text-[#2563EB] hover:underline">
+                      <ExternalLink size={12} className="mt-0.5 shrink-0" />
+                      <span>{source.title}{source.snippet && <span className="mt-0.5 block font-normal text-[#7C766F]">{source.snippet}</span>}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="rounded-lg bg-[#FFFBEB] p-3 text-[11px] leading-relaxed text-[#92400E]">
+              {data.market_research.evidence_note || 'Live sources were unavailable; treat these as unverified estimates.'}
+            </p>
+          )}
+          {data.market_research.sources?.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-[#7C766F]">{data.market_research.evidence_note}</p>
+          )}
+        </section>
+      )}
 
       {/* ── Card 2: Who Pays, How Much, To Whom (Transaction Architecture) ── */}
       <div className="bg-white rounded-2xl p-6 border border-[#EFEAE4] shadow-xs space-y-5">
