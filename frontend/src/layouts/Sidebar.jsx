@@ -63,9 +63,11 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
               onClick={onClose}
               className="flex items-center gap-2.5 text-left group no-underline focus:outline-none"
             >
-              <div className="w-8 h-8 rounded-full bg-[#FFAAA6] flex items-center justify-center shadow-xs shrink-0 transition-transform group-hover:rotate-12">
-                <Sparkles className="w-4 h-4 text-[#8E4B49]" />
-              </div>
+              <img
+                src="/logo.jpeg"
+                alt="Udaan Logo"
+                className="w-8 h-8 rounded-xl object-contain shadow-xs shrink-0 transition-transform group-hover:scale-105 border border-[#EFEAE4]/80"
+              />
               <div className="flex flex-col">
                 <span className="text-xl font-bold tracking-tight text-[#1D1B18] leading-none font-['Plus_Jakarta_Sans']">
                   Udaan

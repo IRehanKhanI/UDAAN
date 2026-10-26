@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Bell, Check, ChevronsUpDown, Menu, Plus, UserPlus } from 'lucide-react'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { getTeamWorkspace } from '../services/teamService.js'
 import { useAuth } from '../app/AuthContext.jsx'
@@ -97,7 +98,6 @@ export default function Header({
     { id: 2, text: 'Automated test suite probe verified 200 OK', time: '1h ago', unread: false },
     { id: 3, text: 'Collaborator invitation link active', time: 'Yesterday', unread: false },
   ]
-
   return (
     <header className="fixed top-4 left-4 lg:left-80 right-4 h-16 bg-[#FFF8F3]/90 backdrop-blur-xl rounded-2xl z-40 flex items-center justify-between px-4 sm:px-6 shadow-[0_1px_8px_rgba(0,0,0,0.04)] border border-[#EFEAE4]">
       {/* Left items: Mobile menu trigger + sprint pill + project dropdown */}
@@ -107,8 +107,12 @@ export default function Header({
           className="lg:hidden p-1.5 text-[#534342] hover:text-[#1D1B18] rounded-xl hover:bg-[#F3EDE7]"
           aria-label="Open navigation menu"
         >
-          <span className="material-symbols-outlined text-[22px]">menu</span>
+          <Menu size={20} />
         </button>
+
+        <Link to="/" className="lg:hidden flex items-center shrink-0" aria-label="Go to Udaan home">
+          <img src="/logo.jpeg" alt="Udaan Logo" className="w-8 h-8 rounded-xl object-contain border border-[#EFEAE4] shadow-xs" />
+        </Link>
 
         <div className="hidden sm:flex items-center gap-1.5 bg-[#F9F2ED] px-3 py-1.5 rounded-full border border-[#EFEAE4]">
           <span className="w-2 h-2 rounded-full bg-[#FFAAA6] animate-pulse"></span>
@@ -129,9 +133,7 @@ export default function Header({
             <span className="text-xs font-bold text-[#1D1B18] max-w-[140px] sm:max-w-[200px] truncate">
               {currentProject.name}
             </span>
-            <span className="material-symbols-outlined text-[#2E6BFF] text-[16px]">
-              unfold_more
-            </span>
+            <ChevronsUpDown size={15} className="text-[#2E6BFF] shrink-0" />
           </button>
 
           {projectDropdownOpen && (
@@ -154,9 +156,7 @@ export default function Header({
                     <span className="text-[10px] text-[#7C766F] font-normal">{p.category || 'Project'}</span>
                   </div>
                   {p.id === currentProject.id && (
-                    <span className="material-symbols-outlined text-[16px] text-[#8E4B49]">
-                      check
-                    </span>
+                    <Check size={15} className="text-[#8E4B49] shrink-0" />
                   )}
                 </button>
               ))}
@@ -168,7 +168,7 @@ export default function Header({
                 }}
                 className="w-full text-left px-3 py-2 text-xs font-bold text-[#8E4B49] hover:bg-[#F9F2ED] flex items-center gap-1.5"
               >
-                <span className="material-symbols-outlined text-[16px]">add</span>
+                <Plus size={15} className="shrink-0" />
                 <span>+ Launch New Project</span>
               </button>
             </div>
@@ -238,10 +238,10 @@ export default function Header({
               if (onInviteClick) onInviteClick()
               else setInternalInviteOpen(true)
             }}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F9F2ED] hover:bg-[#EDE7E2] text-[#8E4B49] text-[11px] font-bold border border-[#EFEAE4] transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F9F2ED] hover:bg-[#EDE7E2] text-[#8E4B49] text-xs font-bold border border-[#EFEAE4] transition-colors cursor-pointer"
             title="Invite new collaborator to this project"
           >
-            <span className="material-symbols-outlined text-[13px]">person_add</span>
+            <UserPlus size={13} />
             <span>Invite</span>
           </button>
         </div>
@@ -251,10 +251,10 @@ export default function Header({
           <button
             type="button"
             onClick={() => setNotificationsOpen(!notificationsOpen)}
-            className="relative p-2 text-[#534342] hover:text-[#1D1B18] hover:bg-[#F9F2ED] rounded-full transition-colors"
+            className="relative p-2 text-[#534342] hover:text-[#1D1B18] hover:bg-[#F9F2ED] rounded-full transition-colors flex items-center justify-center cursor-pointer"
             aria-label="Notifications"
           >
-            <span className="material-symbols-outlined text-[20px]">notifications</span>
+            <Bell size={18} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#8E4B49] ring-2 ring-[#FFF8F3]"></span>
           </button>
 
@@ -287,9 +287,9 @@ export default function Header({
         {/* New Idea Button */}
         <Link
           to="/projects/new/setup"
-          className="flex items-center gap-1.5 bg-[#FFAAA6] text-[#7A3C3A] hover:bg-[#FFDAD8] px-3.5 sm:px-4 py-2 rounded-full text-xs font-bold transition-all shadow-[0_2px_8px_-2px_rgba(142,75,73,0.18)] hover:scale-105 active:scale-95 no-underline"
+          className="flex items-center gap-1.5 bg-[#FFAAA6] text-[#7A3C3A] hover:bg-[#FFDAD8] px-3.5 sm:px-4 py-2 rounded-full text-xs font-bold transition-all shadow-[0_2px_8px_-2px_rgba(142,75,73,0.18)] hover:scale-105 active:scale-95 no-underline shrink-0"
         >
-          <span className="material-symbols-outlined text-[18px]">add</span>
+          <Plus size={15} />
           <span>New Idea</span>
         </Link>
       </div>

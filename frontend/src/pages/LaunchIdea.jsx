@@ -168,9 +168,11 @@ export default function LaunchIdea() {
           <span>Dashboard</span>
         </button>
         <span className="flex items-center gap-2 text-xs sm:text-sm font-black text-[#1D1B18]">
-          <span className="w-7 h-7 rounded-xl bg-[#FFAAA6] flex items-center justify-center shadow-xs">
-            <Sparkles size={14} className="text-[#7A3C3A]" />
-          </span>
+          <img
+            src="/logo.jpeg"
+            alt="Udaan Logo"
+            className="w-7 h-7 rounded-lg object-contain shadow-xs border border-[#EFEAE4]"
+          />
           Launch New Idea
         </span>
         <div className="flex items-center gap-2">
@@ -188,6 +190,12 @@ export default function LaunchIdea() {
           {/* Subtle Background Glows */}
           <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-80 h-72 sm:h-80 bg-[#FFAAA6]/20 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute bottom-10 left-10 w-44 sm:w-48 h-44 sm:h-48 bg-[#FDE68A]/25 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Top Brand Pill */}
+          <div className="absolute top-4 left-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/85 backdrop-blur-sm border border-[#EFEAE4] shadow-xs">
+            <img src="/logo.jpeg" alt="Udaan" className="w-5 h-5 rounded-md object-contain" />
+            <span className="text-xs font-bold text-[#1D1B18] tracking-tight">Udaan Launchpad</span>
+          </div>
 
           {/* Big Interactive Mascot */}
           <div className="relative z-10 flex flex-col items-center justify-center transform scale-95 sm:scale-110 lg:scale-135 py-2 sm:py-4 transition-transform duration-300">

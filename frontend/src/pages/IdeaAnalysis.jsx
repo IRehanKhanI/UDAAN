@@ -296,9 +296,25 @@ function getBestTechStackRecommendation(idea = '', understanding = {}, knownSkil
 function readDraft() {
   try {
     const d = JSON.parse(sessionStorage.getItem(draftKey) || localStorage.getItem(draftKey) || 'null')
-    if (d && !d.projectId) { d.projectId = newUuid(); sessionStorage.setItem(draftKey, JSON.stringify(d)); localStorage.setItem(draftKey, JSON.stringify(d)) }
-    return d
-  } catch { return null }
+    if (d) {
+      if (!d.projectId) {
+        d.projectId = newUuid()
+        sessionStorage.setItem(draftKey, JSON.stringify(d))
+        localStorage.setItem(draftKey, JSON.stringify(d))
+      }
+      return d
+    }
+  } catch { }
+  return {
+    projectId: newUuid(),
+    domains: ['digital'],
+    domain: 'software',
+    aiPickDomains: ['digital'],
+    aiPickDomain: 'software',
+    understanding: { project_name: '', problem_statement: '', target_users: '', expected_outcome: '' },
+    projectType: 'Startup',
+    currentStage: 0,
+  }
 }
 function hasStageContent(r) {
   if (!r) return false
@@ -855,8 +871,10 @@ export default function IdeaAnalysis() {
 
       {/* Top bar */}
       <header className="sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-[#EFEAE4] flex items-center justify-between px-4 sm:px-6 py-3 shrink-0">
-        <Link to="/" className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-[#534342] hover:text-[#1D1B18] transition-colors no-underline">
-          <ArrowLeft size={15} /> <span>Back</span>
+        <Link to="/" className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#534342] hover:text-[#1D1B18] transition-colors no-underline">
+          <ArrowLeft size={15} />
+          <img src="/logo.jpeg" alt="Udaan Logo" className="w-6 h-6 rounded-md object-contain border border-[#EFEAE4]" />
+          <span>Dashboard</span>
         </Link>
 
         {draft && (
