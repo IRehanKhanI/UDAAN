@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft, BriefcaseBusiness, GraduationCap, Lightbulb,
   Paperclip, Rocket, Sparkles, X, Compass, ChevronRight, CheckCircle2,
-  Cpu, Code2, Zap, Loader2,
+  Cpu, Code2, Zap, Loader2, Check,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import InteractiveMascot from '../components/mascot/InteractiveMascot.jsx'
@@ -24,6 +24,27 @@ const CATEGORIES = [
   { label: 'Personal Project', Icon: Lightbulb },
 ]
 
+const PROJECT_DOMAINS = [
+  {
+    id: 'digital',
+    label: 'Digital Products',
+    icon: '💻',
+    shortDesc: 'Websites, mobile apps, SaaS, AI tools, APIs, and online platforms.',
+  },
+  {
+    id: 'physical',
+    label: 'Physical Products',
+    icon: '📦',
+    shortDesc: 'Electronics, hardware, robotics, IoT, clothing brands, manufacturing, and custom-made products.',
+  },
+  {
+    id: 'services',
+    label: 'Businesses & Services',
+    icon: '💼',
+    shortDesc: 'Retail shops, clothing stores, e-commerce, agencies, consulting, freelancing, and other service businesses.',
+  },
+]
+
 const FLOW_STEPS = [
   { emoji: '💡', title: 'Idea & Purpose' },
   { emoji: '🔍', title: 'Competitor Intelligence' },
@@ -43,6 +64,7 @@ export default function LaunchIdea() {
   const [attachmentNotice, setAttachmentNotice] = useState('')
   const [error, setError] = useState('')
   const [domain, setDomain] = useState('software')
+  const [domains, setDomains] = useState(['digital'])
   const [domainClassifying, setDomainClassifying] = useState(false)
   const [domainReasoning, setDomainReasoning] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -58,6 +80,9 @@ export default function LaunchIdea() {
         const result = await classifyProjectDomain(idea.trim(), intent)
         if (result?.domain) {
           setDomain(result.domain)
+          if (Array.isArray(result?.domains) && result.domains.length > 0) {
+            setDomains(result.domains)
+          }
           setDomainReasoning(result.reasoning || '')
         }
       } catch { /* use current domain */ }
@@ -91,6 +116,7 @@ export default function LaunchIdea() {
     setIsSubmitting(true)
 
     let finalDomain = domain
+    let finalDomains = domains
     let finalReasoning = domainReasoning
 
     // Always calculate domain directly if not yet classified or currently classifying
@@ -99,6 +125,9 @@ export default function LaunchIdea() {
         const result = await classifyProjectDomain(cleanIdea, intent)
         if (result?.domain) {
           finalDomain = result.domain
+          if (Array.isArray(result?.domains) && result.domains.length > 0) {
+            finalDomains = result.domains
+          }
           finalReasoning = result.reasoning || ''
         }
       } catch (err) {
@@ -111,7 +140,9 @@ export default function LaunchIdea() {
       idea: cleanIdea,
       projectType: intent,
       domain: finalDomain,
+      domains: finalDomains,
       aiPickDomain: finalDomain,
+      aiPickDomains: finalDomains,
       aiPickReasoning: finalReasoning,
       attachment: attachment ?? null,
       currentStage: 0,
@@ -207,7 +238,7 @@ export default function LaunchIdea() {
 
               {/* Category Pills */}
               <div className="space-y-1.5">
-                <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">Project Type</span>
+                <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">Category</span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {CATEGORIES.map(({ label, Icon }) => (
                     <button
@@ -223,6 +254,70 @@ export default function LaunchIdea() {
                       <span>{label}</span>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              {/* Project Type Multi-Select (Digital Products, Physical Products, Businesses & Services) */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">
+                    Project Type (Multi-Select · AI Pick)
+                  </span>
+                  {domainClassifying && (
+                    <span className="flex items-center gap-1 text-[10px] text-[#8E4B49] font-bold animate-pulse">
+                      <Loader2 size={10} className="animate-spin" />
+                      AI detecting…
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {PROJECT_DOMAINS.map(item => {
+                    const isSelected = domains.includes(item.id)
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          let next
+                          if (domains.includes(item.id)) {
+                            if (domains.length === 1) return
+                            next = domains.filter(d => d !== item.id)
+                          } else {
+                            next = [...domains, item.id]
+                          }
+                          setDomains(next)
+                          let leg = 'software'
+                          if (next.includes('physical') && (next.includes('digital') || next.includes('services'))) leg = 'hybrid'
+                          else if (next.includes('physical')) leg = 'hardware'
+                          setDomain(leg)
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-white border-[#1D1B18] shadow-xs ring-2 ring-[#1D1B18]/10'
+                            : 'bg-[#FAF8F5]/60 hover:bg-white border-[#EFEAE4]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-base">{item.icon}</span>
+                            <span className={`text-xs font-bold ${isSelected ? 'text-[#1D1B18]' : 'text-[#534342]'}`}>
+                              {item.label}
+                            </span>
+                          </div>
+                          <div
+                            className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
+                              isSelected ? 'bg-[#1D1B18] border-[#1D1B18] text-white' : 'border-[#D1D5DB] bg-white'
+                            }`}
+                          >
+                            {isSelected && <Check size={10} strokeWidth={3} />}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-[#7C766F] leading-tight line-clamp-2">
+                          {item.shortDesc}
+                        </p>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
 

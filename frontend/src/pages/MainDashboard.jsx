@@ -380,22 +380,7 @@ export default function MainDashboard() {
               </p>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsTracking(!isTracking)}
-                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${isTracking
-                    ? 'bg-[#10B981] text-white hover:bg-[#059669]'
-                    : 'bg-[#1D1B18] text-white hover:bg-black'
-                    }`}
-                >
-                  {isTracking ? <IconPause size={13} /> : <IconPlay size={13} />}
-                  <span>{isTracking ? 'Pause tracking' : 'Start tracking'}</span>
-                  {isTracking && (
-                    <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 font-mono text-[11px]">
-                      {formatTimer(trackedSeconds)}
-                    </span>
-                  )}
-                </button>
+
 
                 <Link
                   to="/flight-plan"

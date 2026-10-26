@@ -587,7 +587,7 @@ export default function TeamWorkspace() {
           }}
         />
 
-        <main className="flex-1 p-5 md:p-8 max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 pt-24 pb-16 px-4 sm:px-6 md:px-8 max-w-7xl w-full mx-auto space-y-6">
           {/* ── Top Bar Alerts & Project Switcher ── */}
           {notice && (
             <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-[#EBF7EE] border border-[#CDEBD4] text-[#1F7A3F] text-xs font-semibold animate-fadeIn">

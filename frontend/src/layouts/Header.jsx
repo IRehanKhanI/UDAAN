@@ -7,7 +7,7 @@ import InviteMakerModal from '../components/modals/InviteMakerModal.jsx'
 
 export default function Header({
   currentProject: propCurrentProject,
-  onToggleMobileMenu = () => {},
+  onToggleMobileMenu = () => { },
   onProjectSelect = null,
   onInviteClick = null,
 }) {
@@ -124,12 +124,12 @@ export default function Header({
           <button
             type="button"
             onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FFFFFF] rounded-full shadow-[0_1px_4px_rgba(31,29,26,0.02)] border border-[#EFEAE4] cursor-pointer hover:bg-[#F9F2ED] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#53dbae] hover:bg-[#DDF2E3] rounded-full shadow-[0_1px_4px_rgba(31,29,26,0.02)] border border-[#CDEBD4] cursor-pointer transition-colors"
           >
             <span className="text-xs font-bold text-[#1D1B18] max-w-[140px] sm:max-w-[200px] truncate">
               {currentProject.name}
             </span>
-            <span className="material-symbols-outlined text-[#534342] text-[16px]">
+            <span className="material-symbols-outlined text-[#2E6BFF] text-[16px]">
               unfold_more
             </span>
           </button>
@@ -146,9 +146,8 @@ export default function Header({
                 <button
                   key={p.id}
                   onClick={() => handleSelectProject(p)}
-                  className={`w-full text-left px-3 py-2 text-xs font-semibold flex items-center justify-between hover:bg-[#F9F2ED] transition-colors ${
-                    p.id === currentProject.id ? 'bg-[#FFAAA6]/20 text-[#8E4B49]' : 'text-[#1D1B18]'
-                  }`}
+                  className={`w-full text-left px-3 py-2 text-xs font-semibold flex items-center justify-between hover:bg-[#F9F2ED] transition-colors ${p.id === currentProject.id ? 'bg-[#FFAAA6]/20 text-[#8E4B49]' : 'text-[#1D1B18]'
+                    }`}
                 >
                   <div className="flex flex-col truncate pr-2">
                     <span className="truncate">{p.name}</span>
@@ -206,9 +205,8 @@ export default function Header({
                 return (
                   <div
                     key={member.id || idx}
-                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-[#FFF8F3] overflow-hidden ${
-                      colors[idx % colors.length]
-                    }`}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-[#FFF8F3] overflow-hidden ${colors[idx % colors.length]
+                      }`}
                     title={`${member.name || member.display_name || 'Member'} (${member.role || 'Contributor'})`}
                   >
                     {member.avatar_url ? (
@@ -304,7 +302,7 @@ export default function Header({
           if (currentProject?.id && currentProject.id !== 'starter') {
             getTeamWorkspace(currentProject.id).then(d => {
               if (d?.members) setTeamMembers(d.members)
-            }).catch(() => {})
+            }).catch(() => { })
           }
         }}
       />

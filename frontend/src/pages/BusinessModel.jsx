@@ -285,7 +285,7 @@ export default function BusinessModel() {
           }}
         />
 
-        <main className="flex-1 p-5 md:p-8 max-w-7xl w-full mx-auto space-y-6">
+        <main className="flex-1 pt-24 pb-16 px-4 sm:px-6 md:px-8 max-w-7xl w-full mx-auto space-y-6">
           {/* ── Top Bar Alerts ── */}
           {notice && (
             <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-[#EBF7EE] border border-[#CDEBD4] text-[#1F7A3F] text-xs font-semibold animate-fadeIn">
@@ -372,9 +372,9 @@ export default function BusinessModel() {
             </div>
           </div>
 
-          {/* ── Tab Navigation Strip ── */}
-          <div className="overflow-x-auto pb-1 scrollbar-none">
-            <div className="flex items-center gap-2 border-b border-[#EFEAE4] min-w-max pb-2">
+          {/* ── Tab Navigation Strip (No horizontal scroll, clean wrap) ── */}
+          <div className="border-b border-[#EFEAE4] pb-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               {TABS.map((tab) => {
                 const isActive = activeTab === tab.id
                 const Icon = tab.icon
@@ -384,14 +384,14 @@ export default function BusinessModel() {
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveTab(tab.id)}
-                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-white text-[#1D1B18] shadow-xs border border-[#EFEAE4]'
-                        : 'text-[#7C766F] hover:text-[#1D1B18] hover:bg-white/60'
+                        ? 'bg-white text-[#1D1B18] shadow-xs border border-[#EFEAE4] ring-1 ring-[#1D1B18]/5'
+                        : 'text-[#7C766F] hover:text-[#1D1B18] hover:bg-white/60 border border-transparent'
                     }`}
                   >
-                    <Icon size={14} className={isActive ? 'text-[#FF6B6B]' : 'text-[#8C847E]'} />
-                    <span>{tab.label}</span>
+                    <Icon size={13} className={isActive ? 'text-[#FF6B6B]' : 'text-[#8C847E]'} />
+                    <span className="whitespace-nowrap">{tab.label}</span>
                     {tab.badge && (
                       <span
                         className={`w-4 h-4 rounded-full text-white text-[9px] font-bold flex items-center justify-center ${tab.badgeColor}`}

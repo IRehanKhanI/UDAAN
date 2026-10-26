@@ -19,27 +19,51 @@ import { INDIAN_VENDORS, generateBillOfMaterials, searchHardwareProducts, predic
 import InteractiveMascot from '../components/mascot/InteractiveMascot.jsx'
 import Interactive3DCharacter from '../components/mascot/Interactive3DCharacter.jsx'
 
-const DOMAIN_DETAILS = {
-  software: {
-    label: 'Software',
+export const PROJECT_DOMAINS = {
+  digital: {
+    id: 'digital',
+    label: 'Digital Products',
     icon: '💻',
-    shortDesc: 'Web, mobile, SaaS, APIs',
+    shortDesc: 'Websites, mobile apps, SaaS, AI tools, APIs, and online platforms.',
     color: '#2563EB',
     bg: '#EFF6FF',
     border: '#BFDBFE',
+    activeBg: '#F0F7FF',
+    activeBorder: '#3B82F6',
   },
-  hardware: {
-    label: 'Hardware',
-    icon: '📟',
-    shortDesc: 'Circuits, Arduino, IoT, robotics',
-    color: '#059669',
-    bg: '#ECFDF5',
-    border: '#A7F3D0',
+  physical: {
+    id: 'physical',
+    label: 'Physical Products',
+    icon: '📦',
+    shortDesc: 'Electronics, hardware, robotics, IoT, clothing brands, manufacturing, and custom-made products.',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+    activeBg: '#FFFDF5',
+    activeBorder: '#F59E0B',
   },
+  services: {
+    id: 'services',
+    label: 'Businesses & Services',
+    icon: '💼',
+    shortDesc: 'Retail shops, clothing stores, e-commerce, agencies, consulting, freelancing, and other service businesses.',
+    color: '#0D9488',
+    bg: '#F0FDFA',
+    border: '#99F6E4',
+    activeBg: '#F2FDFB',
+    activeBorder: '#14B8A6',
+  },
+}
+
+const DOMAIN_DETAILS = {
+  ...PROJECT_DOMAINS,
+  software: PROJECT_DOMAINS.digital,
+  hardware: PROJECT_DOMAINS.physical,
   hybrid: {
-    label: 'Software + Hardware',
+    id: 'hybrid',
+    label: 'Digital + Physical',
     icon: '⚡',
-    shortDesc: 'Hardware device + companion app',
+    shortDesc: 'Hardware device + companion software',
     color: '#D97706',
     bg: '#FFFBEB',
     border: '#FDE68A',
@@ -63,15 +87,19 @@ function newUuid() {
   })
 }
 
-export function getStagesForDomain(domain = 'software') {
+export function getStagesForDomain(domain = 'software', domains = []) {
+  const isPhysical = (Array.isArray(domains) && domains.includes('physical')) || domain === 'hardware' || domain === 'hybrid'
+  const isDigital = (Array.isArray(domains) && domains.includes('digital')) || domain === 'software' || domain === 'hybrid'
+  const isServices = Array.isArray(domains) && domains.includes('services')
+
   return [
     { key: 'understanding', title: 'Pillars', icon: Target },
     { key: 'research', title: 'Research', icon: Search },
-    domain === 'hardware'
+    isPhysical && !isDigital && !isServices
       ? { key: 'components', title: 'Components & BOM', icon: Cpu }
-      : domain === 'hybrid'
-      ? { key: 'feasibility', title: 'Tech + Hardware', icon: Code2 }
-      : { key: 'feasibility', title: 'Architecture', icon: Code2 },
+      : isPhysical
+        ? { key: 'feasibility', title: 'Tech + Hardware', icon: Code2 }
+        : { key: 'feasibility', title: 'Architecture', icon: Code2 },
     { key: 'launch_timing', title: 'Team', icon: Users },
     { key: 'flight_plan', title: 'Roadmap', icon: Rocket },
     { key: 'business_model', title: 'Business Model', icon: CircleDollarSign },
@@ -79,11 +107,12 @@ export function getStagesForDomain(domain = 'software') {
 }
 
 const REVENUE_MODELS = [
-  { id: 'subscription', icon: '📅', name: 'Subscription (SaaS)', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', desc: 'Predictable monthly or annual fees per seat or tier. Best for software & dashboards.', bestFor: ['software', 'hybrid'] },
-  { id: 'one_time', icon: '🏷️', name: 'One-Time Hardware Sale', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', desc: 'Immediate cash flow per unit sold. Ideal for physical hardware kits & IoT devices.', bestFor: ['hardware', 'hybrid'] },
-  { id: 'freemium', icon: '🚀', name: 'Freemium + Upgrade', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', desc: 'Free access for rapid viral growth, convert power users to paid plans.', bestFor: ['software', 'hybrid'] },
-  { id: 'marketplace', icon: '%', name: 'Platform Commission', color: '#BE185D', bg: '#FDF2F8', border: '#FBCFE8', desc: 'Take a cut of transactions between buyers and service providers.', bestFor: ['software'] },
-  { id: 'grant', icon: '🏆', name: 'Grant & Prize Funded', color: '#059669', bg: '#F0FDF4', border: '#A7F3D0', desc: 'Non-dilutive capital from student competitions, SIH, SSIP, or university funds.', bestFor: ['software', 'hardware', 'hybrid'] },
+  { id: 'subscription', icon: '📅', name: 'Subscription (SaaS)', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', desc: 'Predictable monthly or annual fees per seat or tier. Best for software, SaaS & platforms.', bestFor: ['software', 'hybrid', 'digital'] },
+  { id: 'one_time', icon: '🏷️', name: 'Product / Hardware Sale', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', desc: 'Immediate cash flow per unit sold. Ideal for physical products, hardware kits & custom goods.', bestFor: ['hardware', 'hybrid', 'physical'] },
+  { id: 'freemium', icon: '🚀', name: 'Freemium + Upgrade', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', desc: 'Free access for rapid viral growth, convert power users to paid plans.', bestFor: ['software', 'hybrid', 'digital'] },
+  { id: 'marketplace', icon: '%', name: 'Platform Commission (%)', color: '#BE185D', bg: '#FDF2F8', border: '#FBCFE8', desc: 'Take a cut of transactions between buyers and service providers.', bestFor: ['software', 'services', 'digital'] },
+  { id: 'service_fee', icon: '💼', name: 'Service Retainer / Hourly', color: '#0D9488', bg: '#F0FDFA', border: '#99F6E4', desc: 'Client billing for professional services, agencies, consulting, and custom client work.', bestFor: ['services'] },
+  { id: 'grant', icon: '🏆', name: 'Grant Funded', color: '#059669', bg: '#F0FDF4', border: '#A7F3D0', desc: 'Non-dilutive capital from student competitions, SIH, SSIP, or university funds.', bestFor: ['software', 'hardware', 'hybrid', 'digital', 'physical', 'services'] },
 ]
 
 const FUNDING_SOURCES = {
@@ -107,20 +136,31 @@ const FUNDING_SOURCES = {
   ],
 }
 
-function getBudgetCategoriesForDomain(domain = 'software') {
-  if (domain === 'hardware') return [
+function getBudgetCategoriesForDomain(domain = 'software', domains = []) {
+  const isPhysical = (Array.isArray(domains) && domains.includes('physical')) || domain === 'hardware' || domain === 'hybrid'
+  const isDigital = (Array.isArray(domains) && domains.includes('digital')) || domain === 'software' || domain === 'hybrid'
+  const isServices = Array.isArray(domains) && domains.includes('services')
+
+  if (isPhysical && (isDigital || isServices)) return [
+    { label: 'Hardware Components & BOM', pct: 30, color: '#D97706', icon: '🔧' },
+    { label: 'Cloud Infrastructure & DB', pct: 25, color: '#2563EB', icon: '☁️' },
+    { label: 'Tools & Subscriptions', pct: 15, color: '#7C3AED', icon: '🛠️' },
+    { label: 'Marketing & User Acquisition', pct: 15, color: '#BE185D', icon: '📣' },
+    { label: 'Contingency', pct: 15, color: '#9CA3AF', icon: '🛡️' },
+  ]
+  if (isPhysical) return [
     { label: 'Components & BOM', pct: 40, color: '#D97706', icon: '🔧' },
     { label: 'Tools & Prototyping', pct: 20, color: '#F59E0B', icon: '🛠️' },
     { label: 'PCB & Fabrication', pct: 15, color: '#0891B2', icon: '⚡' },
     { label: 'Testing & Enclosure', pct: 15, color: '#7C3AED', icon: '🧪' },
     { label: 'Contingency', pct: 10, color: '#9CA3AF', icon: '🛡️' },
   ]
-  if (domain === 'hybrid') return [
-    { label: 'Hardware Components & BOM', pct: 30, color: '#D97706', icon: '🔧' },
-    { label: 'Cloud Infrastructure & DB', pct: 25, color: '#2563EB', icon: '☁️' },
-    { label: 'Tools & Subscriptions', pct: 15, color: '#7C3AED', icon: '🛠️' },
-    { label: 'Marketing & User Acquisition', pct: 15, color: '#BE185D', icon: '📣' },
-    { label: 'Contingency', pct: 15, color: '#9CA3AF', icon: '🛡️' },
+  if (isServices && !isDigital) return [
+    { label: 'Client Operations & Delivery', pct: 35, color: '#0D9488', icon: '💼' },
+    { label: 'Marketing & Client Acquisition', pct: 30, color: '#BE185D', icon: '📣' },
+    { label: 'Software Tools & Subscriptions', pct: 15, color: '#7C3AED', icon: '🛠️' },
+    { label: 'Legal & Accounting', pct: 10, color: '#16A34A', icon: '📜' },
+    { label: 'Contingency', pct: 10, color: '#9CA3AF', icon: '🛡️' },
   ]
   return [
     { label: 'Cloud Infrastructure & DB', pct: 30, color: '#2563EB', icon: '☁️' },
@@ -323,58 +363,90 @@ export default function IdeaAnalysis() {
   const [error, setError] = useState('')
   const [mascotMode, setMascotMode] = useState('3d') // '3d' | '2d'
 
-  // Domain & Stages
+  // Domain & Multi-Select Categories
+  const initialDomains = useMemo(() => {
+    if (Array.isArray(draft?.domains) && draft.domains.length > 0) {
+      return draft.domains
+    }
+    if (draft?.domain === 'hardware') return ['physical']
+    if (draft?.domain === 'hybrid') return ['digital', 'physical']
+    if (draft?.domain === 'services') return ['services']
+    return ['digital']
+  }, [draft?.domains, draft?.domain])
+
+  const [domains, setDomains] = useState(initialDomains)
+  const [aiPickDomains, setAiPickDomains] = useState(
+    Array.isArray(draft?.aiPickDomains) && draft.aiPickDomains.length > 0
+      ? draft.aiPickDomains
+      : (draft?.aiPickDomain === 'hardware' ? ['physical'] : draft?.aiPickDomain === 'hybrid' ? ['digital', 'physical'] : ['digital'])
+  )
+
   const [domain, setDomain] = useState(draft?.domain || 'software')
   const [aiPickDomain, setAiPickDomain] = useState(draft?.aiPickDomain || draft?.domain || 'software')
-  const [domainDropdownOpen, setDomainDropdownOpen] = useState(false)
-  const domainDropdownRef = useRef(null)
-  const stages = useMemo(() => getStagesForDomain(domain), [domain])
+  const stages = useMemo(() => getStagesForDomain(domain, domains), [domain, domains])
 
-  // Close domain dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (domainDropdownRef.current && !domainDropdownRef.current.contains(e.target)) {
-        setDomainDropdownOpen(false)
-      }
+  function computeLegacyDomain(activeDomains) {
+    if (activeDomains.includes('physical') && (activeDomains.includes('digital') || activeDomains.includes('services'))) {
+      return 'hybrid'
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    if (activeDomains.includes('physical')) {
+      return 'hardware'
+    }
+    return 'software'
+  }
+
+  function toggleDomain(key) {
+    let next
+    if (domains.includes(key)) {
+      if (domains.length === 1) return // Keep at least one selected
+      next = domains.filter(d => d !== key)
+    } else {
+      next = [...domains, key]
+    }
+    setDomains(next)
+    const legDomain = computeLegacyDomain(next)
+    setDomain(legDomain)
+    const updated = {
+      ...(draft || {}),
+      domains: next,
+      domain: legDomain,
+    }
+    setDraft(updated)
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(updated))
+      sessionStorage.setItem(draftKey, JSON.stringify(updated))
+    } catch { }
+    persist({ domains: next, domain: legDomain })
+  }
 
   // Auto-calculate domain if missing or unclassified
   useEffect(() => {
-    if (draft?.idea && (!draft?.aiPickDomain || !draft?.domain)) {
+    if (draft?.idea && (!draft?.aiPickDomains || draft.aiPickDomains.length === 0 || !draft?.domains || draft.domains.length === 0)) {
       classifyProjectDomain(draft.idea, draft.projectType || 'Startup').then(res => {
-        if (res?.domain) {
-          setDomain(res.domain)
-          setAiPickDomain(res.domain)
+        if (res?.domains && res.domains.length > 0) {
+          setDomains(res.domains)
+          setAiPickDomains(res.domains)
+          const leg = res.domain || computeLegacyDomain(res.domains)
+          setDomain(leg)
+          setAiPickDomain(leg)
           const updated = {
             ...(draft || {}),
-            domain: res.domain,
-            aiPickDomain: res.domain,
+            domains: res.domains,
+            aiPickDomains: res.domains,
+            domain: leg,
+            aiPickDomain: leg,
             aiPickReasoning: res.reasoning,
           }
           setDraft(updated)
           try {
             localStorage.setItem(draftKey, JSON.stringify(updated))
             sessionStorage.setItem(draftKey, JSON.stringify(updated))
-          } catch {}
+          } catch { }
+          persist({ domains: res.domains, domain: leg })
         }
       })
     }
   }, [draft?.idea])
-
-  function handleDomainChange(newDomain) {
-    setDomain(newDomain)
-    setDomainDropdownOpen(false)
-    const updated = { ...(draft || {}), domain: newDomain }
-    setDraft(updated)
-    try {
-      localStorage.setItem(draftKey, JSON.stringify(updated))
-      sessionStorage.setItem(draftKey, JSON.stringify(updated))
-    } catch {}
-    persist({ domain: newDomain })
-  }
 
   // Step 0: Understanding
   const [understanding, setUnderstanding] = useState(
@@ -407,10 +479,11 @@ export default function IdeaAnalysis() {
       problem: understanding?.problem_statement || '',
       outcome: understanding?.expected_outcome || '',
       domain: domain || 'software',
+      domains,
       category: projectType || 'Startup',
       targetUsers: understanding?.target_users || '',
     })
-  }, [draft?.idea, understanding, domain, projectType])
+  }, [draft?.idea, understanding, domain, domains, projectType])
 
   useEffect(() => {
     if (!draft?.business_model?.revenue_model && aiRevenueRecommendation?.modelId) {
@@ -468,6 +541,7 @@ export default function IdeaAnalysis() {
       const next = {
         ...cur,
         domain,
+        domains,
         understanding,
         workflow,
         startDate,
@@ -683,13 +757,13 @@ export default function IdeaAnalysis() {
     }
     const updated = [...customStacks, newStack]
     setCustomStacks(updated)
-    try { localStorage.setItem('udaan:custom-stacks', JSON.stringify(updated)) } catch {}
+    try { localStorage.setItem('udaan:custom-stacks', JSON.stringify(updated)) } catch { }
     setSelectedStack(id)
     persist({ selectedStack: id })
     setShowCustomModal(false)
     setCustomForm({ name: '', frontend: '', backend: '', database: '', cloud: '' })
     if (skills.length) {
-      saveTechHistory({ learning_stacks: skills.map(n => ({ name: n, project_context: understanding.project_name || 'custom project' })) }).catch(() => {})
+      saveTechHistory({ learning_stacks: skills.map(n => ({ name: n, project_context: understanding.project_name || 'custom project' })) }).catch(() => { })
     }
     setNotice(`Custom stack "${newStack.name}" added & selected! ✓`)
     setTimeout(() => setNotice(''), 4000)
@@ -726,6 +800,7 @@ export default function IdeaAnalysis() {
           projectId: draft.projectId,
           idea: draft.idea,
           domain,
+          domains,
           hardware_bom: hardwareBom,
           business_model: {
             revenue_model: selectedRevenueModel,
@@ -743,7 +818,7 @@ export default function IdeaAnalysis() {
         understanding,
         workflow,
       })
-      try { await saveProjectDraft({ ...draft, domain, hardware_bom: hardwareBom, business_model: { revenue_model: selectedRevenueModel, budget: projectBudget } }, understanding, workflow, 'flight_plan') } catch { }
+      try { await saveProjectDraft({ ...draft, domain, domains, hardware_bom: hardwareBom, business_model: { revenue_model: selectedRevenueModel, budget: projectBudget } }, understanding, workflow, 'flight_plan') } catch { }
       if (connectedRepo) {
         try { await associateProjectRepository(project.id, { repo_owner: connectedRepo.owner, repo_name: connectedRepo.name, repo_url: connectedRepo.url, selected_branch: connectedRepo.branch, connection_status: connectedRepo.isEmpty ? 'empty' : 'connected', is_empty: connectedRepo.isEmpty }) } catch { }
       }
@@ -791,13 +866,12 @@ export default function IdeaAnalysis() {
               const done = i < step; const active = i === step
               return (
                 <button key={s.key} type="button" onClick={() => goToStage(i)}
-                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                    active
+                  className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all shrink-0 cursor-pointer ${active
                       ? 'bg-[#FFAAA6]/30 text-[#7A3C3A] border border-[#FFAAA6]'
                       : done
-                      ? 'bg-[#F0FAF8] text-[#2A9D8F] border border-[#9FD8CB]'
-                      : 'text-[#7C766F] hover:text-[#1D1B18] border border-transparent'
-                  }`}
+                        ? 'bg-[#F0FAF8] text-[#2A9D8F] border border-[#9FD8CB]'
+                        : 'text-[#7C766F] hover:text-[#1D1B18] border border-transparent'
+                    }`}
                 >
                   {done ? <CheckCircle2 size={13} className="text-[#2A9D8F]" /> : <Icon size={13} />}
                   <span className="hidden sm:inline">{s.title}</span>
@@ -845,22 +919,20 @@ export default function IdeaAnalysis() {
               <button
                 type="button"
                 onClick={() => setMascotMode('3d')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                  mascotMode === '3d'
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${mascotMode === '3d'
                     ? 'bg-[#1D1B18] text-white shadow-xs'
                     : 'text-[#7C766F] hover:text-[#1D1B18]'
-                }`}
+                  }`}
               >
                 3D Character
               </button>
               <button
                 type="button"
                 onClick={() => setMascotMode('2d')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
-                  mascotMode === '2d'
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${mascotMode === '2d'
                     ? 'bg-[#1D1B18] text-white shadow-xs'
                     : 'text-[#7C766F] hover:text-[#1D1B18]'
-                }`}
+                  }`}
               >
                 2D Bird
               </button>
@@ -890,1445 +962,1472 @@ export default function IdeaAnalysis() {
           <main className="flex-1 overflow-y-auto px-4 sm:px-8 lg:px-10 xl:px-12 py-6 space-y-6 flex flex-col justify-between">
             <div className="space-y-6">
 
-          {/* Progress bar */}
-          <div className="h-1.5 bg-[#EFEAE4] rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-[#FF6B6B] to-[#E76F51] rounded-full transition-all duration-500" style={{ width: `${((step + 1) / stages.length) * 100}%` }} />
-          </div>
-
-          {/* Page title */}
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[11px] font-black text-[#7A3C3A] uppercase tracking-widest px-2 py-0.5 rounded-lg bg-[#FFAAA6]/30">
-                  Step {step + 1} of {stages.length}
-                </span>
-              </div>
-              <h1 className="text-2xl font-black text-[#1D1B18] leading-tight">
-                {['Your Project Vision', 'Market Research', 'Tech Stack & Repo', 'Team & Timeline', 'Launch Roadmap'][step]}
-              </h1>
-              <p className="text-sm text-[#7C766F] mt-0.5">
-                {['AI fills this in from your idea — just review & tweak.', 'Real competitor data from the live web.', 'Pick your tech stack and set up your repo.', 'Who builds it and when does it ship?', 'Your milestone roadmap, ready to execute.'][step]}
-              </p>
-            </div>
-            {/* Top Right: AI Domain Pick Dropdown & Idea chip */}
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="relative" ref={domainDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setDomainDropdownOpen(prev => !prev)}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] hover:border-[#D1D5DB] text-xs font-bold shadow-xs transition-all cursor-pointer select-none"
-                  style={{
-                    color: DOMAIN_DETAILS[domain]?.color || '#2563EB',
-                  }}
-                  title="Project Type (AI Pick) · Click to change domain"
-                >
-                  <span className="text-sm">{DOMAIN_DETAILS[domain]?.icon || '💻'}</span>
-                  <span>{DOMAIN_DETAILS[domain]?.label || 'Software'}</span>
-                  {domain === aiPickDomain ? (
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-[#FFF1ED] text-[#8E4B49] border border-[#FFAAA6]">
-                      AI Pick
-                    </span>
-                  ) : (
-                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[#F3EDE7] text-[#7C766F]">
-                      Manual
-                    </span>
-                  )}
-                  <ChevronDown
-                    size={13}
-                    className={`text-[#7C766F] transition-transform duration-150 ${domainDropdownOpen ? 'rotate-180' : ''}`}
-                  />
-                </button>
-
-                {domainDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 w-64 rounded-2xl bg-white border border-[#EFEAE4] shadow-xl z-50 p-1.5 space-y-1 animate-fadeIn">
-                    <div className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#7C766F] border-b border-[#F3EDE7]">
-                      Select Project Type
-                    </div>
-                    {Object.entries(DOMAIN_DETAILS).map(([key, item]) => {
-                      const isCurrent = domain === key
-                      const isAiPick = aiPickDomain === key
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => handleDomainChange(key)}
-                          className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer ${
-                            isCurrent
-                              ? 'bg-[#FFF8F3] border border-[#FFCDB8]'
-                              : 'hover:bg-[#FAF8F5] border border-transparent'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">{item.icon}</span>
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-[#1D1B18]">{item.label}</span>
-                                {isAiPick && (
-                                  <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full bg-[#FFAAA6] text-[#7A3C3A]">
-                                    AI Pick
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[10px] text-[#7C766F] block leading-tight">{item.shortDesc}</span>
-                            </div>
-                          </div>
-                          {isCurrent && <Check size={14} className="text-[#8E4B49] shrink-0" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
+              {/* Progress bar */}
+              <div className="h-1.5 bg-[#EFEAE4] rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-[#FF6B6B] to-[#E76F51] rounded-full transition-all duration-500" style={{ width: `${((step + 1) / stages.length) * 100}%` }} />
               </div>
 
-              {/* Idea chip */}
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] max-w-[200px] shrink-0">
-                <Lightbulb size={13} className="text-[#8E4B49] shrink-0" />
-                <span className="text-[11px] font-semibold text-[#534342] truncate">{draft.idea?.slice(0, 50)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ─── STEP 0: PROJECT VISION ─────────────────────────────────────── */}
-          {step === 0 && (
-            <div className="space-y-4">
-              {loading ? (
-                <div className="bg-white rounded-3xl border border-[#EFEAE4] p-8 sm:p-12 shadow-xs flex flex-col items-center justify-center text-center space-y-5 animate-fadeIn">
-                  <div className="relative">
-                    <div className="w-16 h-16 rounded-2xl bg-[#FFF1ED] border border-[#FFAAA6] flex items-center justify-center shadow-inner">
-                      <Sparkles size={28} className="text-[#8E4B49] animate-pulse" />
-                    </div>
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E76F51] animate-ping" />
-                  </div>
-
-                  <div className="space-y-1.5 max-w-md">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#8E4B49] px-2.5 py-1 rounded-full bg-[#FFF1ED] border border-[#FFAAA6]/50 inline-block">
-                      AI Studio Synthesis
+              {/* Page title */}
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[11px] font-black text-[#7A3C3A] uppercase tracking-widest px-2 py-0.5 rounded-lg bg-[#FFAAA6]/30">
+                      Step {step + 1} of {stages.length}
                     </span>
-                    <h2 className="text-xl sm:text-2xl font-black text-[#1D1B18] tracking-tight">
-                      AI is generating your project vision…
-                    </h2>
-                    <p className="text-xs text-[#534342] leading-relaxed">
-                      Deconstructing your raw idea into clear pillars: identifying target user personas, core pain points, and measurable outcomes.
-                    </p>
                   </div>
-
-                  {/* Step status indicators */}
-                  <div className="w-full max-w-sm pt-1 space-y-2 text-left">
-                    <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
-                      <span className="w-2 h-2 rounded-full bg-[#2A9D8F] animate-pulse" />
-                      <span>Synthesizing project name & concept</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
-                      <span className="w-2 h-2 rounded-full bg-[#E76F51] animate-pulse" />
-                      <span>Mapping primary user persona & friction</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
-                      <span className="w-2 h-2 rounded-full bg-[#F4A261] animate-pulse" />
-                      <span>Defining verifiable success metrics</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-xs font-bold text-[#8E4B49] pt-1">
-                    <MiniLoader color="#8E4B49" />
-                    <span>Synthesizing live with Gemini…</span>
-                  </div>
+                  <h1 className="text-2xl font-black text-[#1D1B18] leading-tight">
+                    {['Your Project Vision', 'Market Research', 'Tech Stack & Repo', 'Team & Timeline', 'Launch Roadmap'][step]}
+                  </h1>
+                  <p className="text-sm text-[#7C766F] mt-0.5">
+                    {['AI fills this in from your idea — just review & tweak.', 'Real competitor data from the live web.', 'Pick your tech stack and set up your repo.', 'Who builds it and when does it ship?', 'Your milestone roadmap, ready to execute.'][step]}
+                  </p>
                 </div>
-              ) : (
-                <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">Project Details</span>
-                    <button type="button" onClick={analyzeUnderstanding} disabled={loading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF1ED] border border-[#FFAAA6] text-[#8E4B49] text-xs font-bold hover:bg-[#FFAAA6]/20 transition-colors">
-                      {loading ? <MiniLoader color="#8E4B49" /> : <RefreshCw size={12} />}
-                      {loading ? 'Thinking…' : 'Re-generate'}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      { key: 'project_name', label: '🏷 Project Name', placeholder: 'e.g. WorkCraft Marketplace', rows: 1 },
-                      { key: 'target_users', label: '👥 Who is it for?', placeholder: 'Who feels this pain most?', rows: 2 },
-                      { key: 'problem_statement', label: '🎯 What problem does it solve?', placeholder: 'The exact friction users face today…', rows: 3 },
-                      { key: 'expected_outcome', label: '✅ What does success look like?', placeholder: 'What can users do after you build it?', rows: 2 },
-                    ].map(f => (
-                      <div key={f.key} className={`space-y-1 ${f.key === 'problem_statement' || f.key === 'expected_outcome' ? 'sm:col-span-1' : ''}`}>
-                        <label className="text-xs font-bold text-[#534342] block">{f.label}</label>
-                        <AutoResizeTextarea value={understanding[f.key] || ''} onChange={val => { setUnderstanding(prev => ({ ...prev, [f.key]: val })); persist({ understanding: { ...understanding, [f.key]: val } }) }} placeholder={f.placeholder} minRows={f.rows} />
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Category pills */}
-                  <div className="flex items-center gap-2 flex-wrap pt-1">
-                    <span className="text-xs font-bold text-[#534342]">Category:</span>
-                    {['Startup', 'Hackathon', 'College Project', 'Personal Project'].map(cat => (
-                      <button key={cat} type="button" onClick={() => { setProjectType(cat); persist({ projectType: cat }) }}
-                        className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${projectType === cat ? 'bg-[#1D1B18] text-white' : 'bg-[#FFF8F3] border border-[#EFEAE4] text-[#534342] hover:bg-[#EDE7E2]'}`}>
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ─── STEP 1: MARKET RESEARCH ─────────────────────────────────────── */}
-          {step === 1 && (
-            <div className="space-y-4">
-              {stageLoading === 'research' ? (
-                <div className="bg-white rounded-2xl border border-[#EFEAE4] p-8 flex flex-col items-center">
-                  <UdaanLoader character="researcher" size="md"
-                    message={['Scanning the web…', 'Finding competitors…', 'Checking pricing models…', 'Mapping market gaps…']}
-                    sub="" />
-                </div>
-              ) : !hasStageContent(research) ? (
-                <div className="bg-white rounded-2xl border border-[#EFEAE4] p-10 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-2xl bg-[#FFF1ED] flex items-center justify-center mx-auto"><Globe size={22} className="text-[#8E4B49]" /></div>
-                  <p className="text-sm font-bold">Ready to scan the web</p>
-                  <p className="text-xs text-[#7C766F]">UDAAN will find real competitors, pricing & pain points for your idea.</p>
-                  <button type="button" onClick={() => generateStageDirectly('research')} className="px-5 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors">
-                    Start Live Research
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-xs text-[#7C766F]">
-                      <ShieldCheck size={14} className="text-[#2A9D8F]" />
-                      <span>Verified from live web sources via Tavily</span>
-                    </div>
-                    <button type="button" onClick={() => generateStageDirectly('research')} disabled={Boolean(stageLoading)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#EFEAE4] text-[#534342] text-xs font-bold hover:bg-[#F7F4F0] transition-colors">
-                      {stageLoading === 'research' ? <MiniLoader color="#534342" /> : <RefreshCw size={12} />}
-                      Refresh
-                    </button>
-                  </div>
-
-                  {/* Competitor overview — simplified */}
-                  <InsightCard number="1" label="What exists today" color="#7A3C3A" bg="#FFF1ED" border="#FFAAA6">
-                    <p className="text-sm text-[#1D1B18] leading-relaxed">
-                      {research.existing_solutions_competitors || 'No competitor data found.'}
-                    </p>
-                  </InsightCard>
-
-                  {/* Gaps */}
-                  <InsightCard number="2" label="Gaps in the market — your opportunity" color="#766320" bg="#FFFBEB" border="#FDE68A">
-                    <ul className="space-y-2">
-                      {(research.gaps_opportunities || []).map((g, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-[#1D1B18]">
-                          <span className="w-5 h-5 rounded-full bg-[#FDE68A] text-[#766320] text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                          {g}
-                        </li>
-                      ))}
-                    </ul>
-                  </InsightCard>
-
-                  {/* Startup Graveyard / Failed Predecessors */}
-                  <InsightCard number="3" label="Startup Graveyard: Predecessors That Failed & Why" color="#991B1B" bg="#FEF2F2" border="#FCA5A5">
-                    <p className="text-xs text-[#534342] mb-2 font-medium">
-                      Companies that previously tackled similar problem statements and their post-mortem failure causes:
-                    </p>
-                    <div className="space-y-2">
-                      {[
-                        {
-                          company: 'Early Point-Solutions & Clones',
-                          cause: '💸 High Marketing Burn / Cash Flow Exhaustion',
-                          desc: 'Spent heavily on customer acquisition before retention was sticky, running out of runway.',
-                        },
-                        {
-                          company: 'Legacy Standalone Tools',
-                          cause: '🏢 Copied or Bundled by Big Tech (Google / Apple / Microsoft)',
-                          desc: 'Tech giants integrated similar base utilities into OS updates for free, crushing standalone paid models.',
-                        },
-                        {
-                          company: 'Niche First-Movers',
-                          cause: '🔒 Monetization Friction & Lack of Direct Proof',
-                          desc: 'Enforced steep monthly paywalls before users experienced tangible value or solved their core friction.',
-                        },
-                      ].map((item, i) => (
-                        <div key={i} className="p-3 rounded-xl bg-white border border-[#FECDD3] text-xs space-y-1">
-                          <div className="flex items-center justify-between font-bold flex-wrap gap-1">
-                            <span className="text-[#991B1B]">{item.company}</span>
-                            <span className="text-[10px] text-[#B91C1C] px-2 py-0.5 rounded-full bg-[#FEE2E2] font-bold">{item.cause}</span>
-                          </div>
-                          <p className="text-[#534342] text-[11px] leading-relaxed m-0">{item.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-xs space-y-1 mt-2">
-                      <strong className="text-[#92400E] block font-bold">
-                        💡 Key Strategic Lesson for Your Build:
-                      </strong>
-                      <p className="text-[#78350F] text-[11.5px] leading-relaxed m-0">
-                        Focus on deep niche workflows and verified proof of work that Big Tech algorithms cannot bundle. Keep infrastructure costs low and validate early with real users!
-                      </p>
-                    </div>
-                  </InsightCard>
-
-                  {/* Features grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <InsightCard number="4" label="Standard features expected" color="#2A5D54" bg="#F0FAF8" border="#9FD8CB">
-                      <PillList items={research.commonly_available_features || []} color="#2A5D54" bg="#E0F5F1" />
-                    </InsightCard>
-
-                    <InsightCard number="5" label="Your first experiments to validate" color="#4B3B8C" bg="#F5F3FF" border="#C4B5FD">
-                      <ul className="space-y-1.5">
-                        {(research.recommended_validation_actions || []).slice(0, 3).map((a, i) => (
-                          <li key={i} className="flex items-start gap-1.5 text-xs text-[#1D1B18]">
-                            <Check size={12} className="text-[#4B3B8C] shrink-0 mt-0.5" /> {a}
-                          </li>
-                        ))}
-                      </ul>
-                    </InsightCard>
-                  </div>
-
-                  {/* Sources */}
-                  {Boolean(research.sources?.length) && (
-                    <div className="bg-white rounded-2xl border border-[#EFEAE4] p-4 space-y-2">
-                      <span className="text-xs font-bold text-[#534342]">Sources ({research.sources.length})</span>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {research.sources.map((src, i) => (
-                          <a key={i} href={src.url} target="_blank" rel="noreferrer"
-                            className="flex items-start gap-2 p-2.5 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#8E4B49] transition-colors no-underline">
-                            <ExternalLink size={12} className="text-[#8E4B49] shrink-0 mt-0.5" />
-                            <div>
-                              <div className="text-xs font-bold text-[#8E4B49] truncate">{src.title || 'Source'}</div>
-                              <div className="text-[11px] text-[#7C766F] truncate">{src.explanation || src.url}</div>
-                            </div>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* ─── STEP 2: TECH STACK & HARDWARE BOM ─────────────────────────── */}
-          {step === 2 && (
-            <div className="space-y-5">
-
-              {/* Hardware & BOM Sourcer for Hardware and Hybrid projects */}
-              {(domain === 'hardware' || domain === 'hybrid') && (
-                <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-5 shadow-xs">
-                  <div className="flex items-start justify-between gap-3 flex-wrap">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-lg bg-[#FFFBEB] border border-[#FDE68A] flex items-center justify-center text-xs">🔧</span>
-                        <h2 className="text-sm font-bold text-[#1D1B18]">Bill of Materials (BOM) & Components</h2>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A]">
-                          {domain === 'hardware' ? 'Hardware Project' : 'IoT Hybrid Project'}
+                {/* Top Right: Active Project Types pill & Idea chip */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (step !== 0) setStep(0)
+                      setTimeout(() => {
+                        document.getElementById('project-type-selector')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      }, 50)
+                    }}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] hover:border-[#D1D5DB] text-xs font-bold shadow-xs transition-all cursor-pointer select-none"
+                    title="Click to view or edit Project Types in Vision step"
+                  >
+                    <div className="flex items-center gap-1">
+                      {domains.map(d => (
+                        <span key={d} className="text-sm">
+                          {PROJECT_DOMAINS[d]?.icon || '💻'}
                         </span>
-                      </div>
-                      <p className="text-xs text-[#7C766F] mt-1">
-                        Sourced with verified Indian vendor pricing (INR), wiring diagrams, and direct product search for MakerBazar, Robocraze, Roboin & IndiaHobbyStore.
-                      </p>
+                      ))}
                     </div>
+                    <span className="text-[#1D1B18] text-xs font-bold">
+                      {domains.map(d => PROJECT_DOMAINS[d]?.label?.replace(' Products', '').replace('Businesses & ', '')).join(' + ')}
+                    </span>
+                    {domains.length === aiPickDomains.length && domains.every(d => aiPickDomains.includes(d)) ? (
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-[#FFF1ED] text-[#8E4B49] border border-[#FFAAA6]">
+                        AI Pick
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-[#F3EDE7] text-[#7C766F]">
+                        Custom
+                      </span>
+                    )}
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={fetchHardwareBom}
-                      disabled={bomLoading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFFBEB] border border-[#FDE68A] text-[#B45309] text-xs font-bold hover:bg-[#FDE68A]/30 transition-colors cursor-pointer"
-                    >
-                      {bomLoading ? <MiniLoader color="#B45309" /> : <RefreshCw size={12} />}
-                      <span>{bomLoading ? 'Generating BOM…' : 'Regenerate BOM'}</span>
-                    </button>
+                  {/* Idea chip */}
+                  <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-white border border-[#EFEAE4] max-w-[200px] shrink-0">
+                    <Lightbulb size={13} className="text-[#8E4B49] shrink-0" />
+                    <span className="text-[11px] font-semibold text-[#534342] truncate">{draft.idea?.slice(0, 50)}</span>
                   </div>
+                </div>
+              </div>
 
-                  {/* Live Component Search Bar */}
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C766F]" />
-                        <input
-                          type="text"
-                          value={bomSearchQuery}
-                          onChange={e => setBomSearchQuery(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') handleSearchComponents(bomSearchQuery) }}
-                          placeholder="Search live components (e.g. ESP32, SG90 servo, HC-SR04, OLED display, Arduino)..."
-                          className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs focus:bg-white focus:border-[#D97706] focus:outline-none transition-all"
-                        />
+              {/* ─── STEP 0: PROJECT VISION ─────────────────────────────────────── */}
+              {step === 0 && (
+                <div className="space-y-4">
+                  {loading ? (
+                    <div className="bg-white rounded-3xl border border-[#EFEAE4] p-8 sm:p-12 shadow-xs flex flex-col items-center justify-center text-center space-y-5 animate-fadeIn">
+                      <div className="relative">
+                        <div className="w-16 h-16 rounded-2xl bg-[#FFF1ED] border border-[#FFAAA6] flex items-center justify-center shadow-inner">
+                          <Sparkles size={28} className="text-[#8E4B49] animate-pulse" />
+                        </div>
+                        <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E76F51] animate-ping" />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleSearchComponents(bomSearchQuery)}
-                        disabled={bomSearching}
-                        className="px-4 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
-                      >
-                        {bomSearching ? <MiniLoader color="#fff" /> : <Search size={13} />}
-                        <span>Search Stores</span>
+
+                      <div className="space-y-1.5 max-w-md">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#8E4B49] px-2.5 py-1 rounded-full bg-[#FFF1ED] border border-[#FFAAA6]/50 inline-block">
+                          AI Studio Synthesis
+                        </span>
+                        <h2 className="text-xl sm:text-2xl font-black text-[#1D1B18] tracking-tight">
+                          AI is generating your project vision…
+                        </h2>
+                        <p className="text-xs text-[#534342] leading-relaxed">
+                          Deconstructing your raw idea into clear pillars: identifying target user personas, core pain points, and measurable outcomes.
+                        </p>
+                      </div>
+
+                      {/* Step status indicators */}
+                      <div className="w-full max-w-sm pt-1 space-y-2 text-left">
+                        <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
+                          <span className="w-2 h-2 rounded-full bg-[#2A9D8F] animate-pulse" />
+                          <span>Synthesizing project name & concept</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
+                          <span className="w-2 h-2 rounded-full bg-[#E76F51] animate-pulse" />
+                          <span>Mapping primary user persona & friction</span>
+                        </div>
+                        <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs font-semibold text-[#1D1B18]">
+                          <span className="w-2 h-2 rounded-full bg-[#F4A261] animate-pulse" />
+                          <span>Defining verifiable success metrics</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs font-bold text-[#8E4B49] pt-1">
+                        <MiniLoader color="#8E4B49" />
+                        <span>Synthesizing live with Gemini…</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">Project Details</span>
+                        <button type="button" onClick={analyzeUnderstanding} disabled={loading}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF1ED] border border-[#FFAAA6] text-[#8E4B49] text-xs font-bold hover:bg-[#FFAAA6]/20 transition-colors">
+                          {loading ? <MiniLoader color="#8E4B49" /> : <RefreshCw size={12} />}
+                          {loading ? 'Thinking…' : 'Re-generate'}
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { key: 'project_name', label: '🏷 Project Name', placeholder: 'e.g. WorkCraft Marketplace', rows: 1 },
+                          { key: 'target_users', label: '👥 Who is it for?', placeholder: 'Who feels this pain most?', rows: 2 },
+                          { key: 'problem_statement', label: '🎯 What problem does it solve?', placeholder: 'The exact friction users face today…', rows: 3 },
+                          { key: 'expected_outcome', label: '✅ What does success look like?', placeholder: 'What can users do after you build it?', rows: 2 },
+                        ].map(f => (
+                          <div key={f.key} className={`space-y-1 ${f.key === 'problem_statement' || f.key === 'expected_outcome' ? 'sm:col-span-1' : ''}`}>
+                            <label className="text-xs font-bold text-[#534342] block">{f.label}</label>
+                            <AutoResizeTextarea value={understanding[f.key] || ''} onChange={val => { setUnderstanding(prev => ({ ...prev, [f.key]: val })); persist({ understanding: { ...understanding, [f.key]: val } }) }} placeholder={f.placeholder} minRows={f.rows} />
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Category pills */}
+                      <div className="flex items-center gap-2 flex-wrap pt-1">
+                        <span className="text-xs font-bold text-[#534342]">Category:</span>
+                        {['Startup', 'Hackathon', 'College Project', 'Personal Project'].map(cat => (
+                          <button key={cat} type="button" onClick={() => { setProjectType(cat); persist({ projectType: cat }) }}
+                            className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${projectType === cat ? 'bg-[#1D1B18] text-white' : 'bg-[#FFF8F3] border border-[#EFEAE4] text-[#534342] hover:bg-[#EDE7E2]'}`}>
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Project Type Multi-Select (Digital Products, Physical Products, Businesses & Services) */}
+                      <div id="project-type-selector" className="pt-3 border-t border-[#F3EDE7] space-y-2.5">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-[#534342]">Project Type:</span>
+                            <span className="text-[11px] text-[#7C766F] font-medium">(Select one or more · AI picks combinations)</span>
+                          </div>
+                          {aiPickDomains.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-[#8E4B49] bg-[#FFF1ED] border border-[#FFAAA6] px-2.5 py-0.5 rounded-full">
+                              <Sparkles size={11} className="text-[#8E4B49]" />
+                              <span>AI Picked: {aiPickDomains.map(d => PROJECT_DOMAINS[d]?.label || d).join(' + ')}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                          {Object.entries(PROJECT_DOMAINS).map(([key, item]) => {
+                            const isSelected = domains.includes(key)
+                            const isAiPick = aiPickDomains.includes(key)
+                            return (
+                              <button
+                                key={key}
+                                type="button"
+                                onClick={() => toggleDomain(key)}
+                                className={`group relative p-3.5 rounded-2xl border text-left transition-all duration-200 cursor-pointer flex flex-col justify-between ${
+                                  isSelected
+                                    ? 'bg-white border-[#1D1B18] shadow-sm ring-2 ring-[#1D1B18]/10'
+                                    : 'bg-[#FAF8F5]/70 hover:bg-white border-[#EFEAE4] hover:border-[#D1D5DB]'
+                                }`}
+                              >
+                                <div className="space-y-1.5 w-full">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg">{item.icon}</span>
+                                      <span className={`text-xs font-black ${isSelected ? 'text-[#1D1B18]' : 'text-[#534342]'}`}>
+                                        {item.label}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      {isAiPick && (
+                                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-[#FFF1ED] text-[#8E4B49] border border-[#FFAAA6]">
+                                          AI Pick
+                                        </span>
+                                      )}
+                                      <div
+                                        className={`w-4 h-4 rounded-md border flex items-center justify-center transition-colors ${
+                                          isSelected
+                                            ? 'bg-[#1D1B18] border-[#1D1B18] text-white'
+                                            : 'border-[#D1D5DB] bg-white group-hover:border-[#9CA3AF]'
+                                        }`}
+                                      >
+                                        {isSelected && <Check size={11} strokeWidth={3} />}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <p className="text-[11px] text-[#7C766F] leading-snug group-hover:text-[#534342] transition-colors">
+                                    {item.shortDesc}
+                                  </p>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ─── STEP 1: MARKET RESEARCH ─────────────────────────────────────── */}
+              {step === 1 && (
+                <div className="space-y-4">
+                  {stageLoading === 'research' ? (
+                    <div className="bg-white rounded-2xl border border-[#EFEAE4] p-8 flex flex-col items-center">
+                      <UdaanLoader character="researcher" size="md"
+                        message={['Scanning the web…', 'Finding competitors…', 'Checking pricing models…', 'Mapping market gaps…']}
+                        sub="" />
+                    </div>
+                  ) : !hasStageContent(research) ? (
+                    <div className="bg-white rounded-2xl border border-[#EFEAE4] p-10 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-[#FFF1ED] flex items-center justify-center mx-auto"><Globe size={22} className="text-[#8E4B49]" /></div>
+                      <p className="text-sm font-bold">Ready to scan the web</p>
+                      <p className="text-xs text-[#7C766F]">UDAAN will find real competitors, pricing & pain points for your idea.</p>
+                      <button type="button" onClick={() => generateStageDirectly('research')} className="px-5 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors">
+                        Start Live Research
                       </button>
                     </div>
-
-                    {/* Live Search Results */}
-                    {bomSearchResults.length > 0 && (
-                      <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-bold text-[#534342]">Store Search Results ({bomSearchResults.length})</span>
-                          <button type="button" onClick={() => setBomSearchResults([])} className="text-[10px] text-[#7C766F] hover:text-[#1D1B18] cursor-pointer">Close ✕</button>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs text-[#7C766F]">
+                          <ShieldCheck size={14} className="text-[#2A9D8F]" />
+                          <span>Verified from live web sources via Tavily</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {bomSearchResults.map((item, idx) => (
-                            <div key={idx} className="p-2.5 rounded-xl bg-white border border-[#EFEAE4] flex gap-2.5 items-start">
-                              {item.image && (
-                                <img src={item.image} alt={item.name} className="w-12 h-12 rounded-lg object-cover border border-[#EFEAE4] shrink-0" />
+                        <button type="button" onClick={() => generateStageDirectly('research')} disabled={Boolean(stageLoading)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#EFEAE4] text-[#534342] text-xs font-bold hover:bg-[#F7F4F0] transition-colors">
+                          {stageLoading === 'research' ? <MiniLoader color="#534342" /> : <RefreshCw size={12} />}
+                          Refresh
+                        </button>
+                      </div>
+
+                      {/* Competitor overview — simplified */}
+                      <InsightCard number="1" label="What exists today" color="#7A3C3A" bg="#FFF1ED" border="#FFAAA6">
+                        <p className="text-sm text-[#1D1B18] leading-relaxed">
+                          {research.existing_solutions_competitors || 'No competitor data found.'}
+                        </p>
+                      </InsightCard>
+
+                      {/* Gaps */}
+                      <InsightCard number="2" label="Gaps in the market — your opportunity" color="#766320" bg="#FFFBEB" border="#FDE68A">
+                        <ul className="space-y-2">
+                          {(research.gaps_opportunities || []).map((g, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm text-[#1D1B18]">
+                              <span className="w-5 h-5 rounded-full bg-[#FDE68A] text-[#766320] text-[10px] font-black flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                              {g}
+                            </li>
+                          ))}
+                        </ul>
+                      </InsightCard>
+
+                      {/* Startup Graveyard / Failed Predecessors */}
+                      <InsightCard number="3" label="Startup Graveyard: Predecessors That Failed & Why" color="#991B1B" bg="#FEF2F2" border="#FCA5A5">
+                        <p className="text-xs text-[#534342] mb-2 font-medium">
+                          Companies that previously tackled similar problem statements and their post-mortem failure causes:
+                        </p>
+                        <div className="space-y-2">
+                          {[
+                            {
+                              company: 'Early Point-Solutions & Clones',
+                              cause: '💸 High Marketing Burn / Cash Flow Exhaustion',
+                              desc: 'Spent heavily on customer acquisition before retention was sticky, running out of runway.',
+                            },
+                            {
+                              company: 'Legacy Standalone Tools',
+                              cause: '🏢 Copied or Bundled by Big Tech (Google / Apple / Microsoft)',
+                              desc: 'Tech giants integrated similar base utilities into OS updates for free, crushing standalone paid models.',
+                            },
+                            {
+                              company: 'Niche First-Movers',
+                              cause: '🔒 Monetization Friction & Lack of Direct Proof',
+                              desc: 'Enforced steep monthly paywalls before users experienced tangible value or solved their core friction.',
+                            },
+                          ].map((item, i) => (
+                            <div key={i} className="p-3 rounded-xl bg-white border border-[#FECDD3] text-xs space-y-1">
+                              <div className="flex items-center justify-between font-bold flex-wrap gap-1">
+                                <span className="text-[#991B1B]">{item.company}</span>
+                                <span className="text-[10px] text-[#B91C1C] px-2 py-0.5 rounded-full bg-[#FEE2E2] font-bold">{item.cause}</span>
+                              </div>
+                              <p className="text-[#534342] text-[11px] leading-relaxed m-0">{item.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-[#FFFBEB] border border-[#FDE68A] text-xs space-y-1 mt-2">
+                          <strong className="text-[#92400E] block font-bold">
+                            💡 Key Strategic Lesson for Your Build:
+                          </strong>
+                          <p className="text-[#78350F] text-[11.5px] leading-relaxed m-0">
+                            Focus on deep niche workflows and verified proof of work that Big Tech algorithms cannot bundle. Keep infrastructure costs low and validate early with real users!
+                          </p>
+                        </div>
+                      </InsightCard>
+
+                      {/* Features grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <InsightCard number="4" label="Standard features expected" color="#2A5D54" bg="#F0FAF8" border="#9FD8CB">
+                          <PillList items={research.commonly_available_features || []} color="#2A5D54" bg="#E0F5F1" />
+                        </InsightCard>
+
+                        <InsightCard number="5" label="Your first experiments to validate" color="#4B3B8C" bg="#F5F3FF" border="#C4B5FD">
+                          <ul className="space-y-1.5">
+                            {(research.recommended_validation_actions || []).slice(0, 3).map((a, i) => (
+                              <li key={i} className="flex items-start gap-1.5 text-xs text-[#1D1B18]">
+                                <Check size={12} className="text-[#4B3B8C] shrink-0 mt-0.5" /> {a}
+                              </li>
+                            ))}
+                          </ul>
+                        </InsightCard>
+                      </div>
+
+                      {/* Sources */}
+                      {Boolean(research.sources?.length) && (
+                        <div className="bg-white rounded-2xl border border-[#EFEAE4] p-4 space-y-2">
+                          <span className="text-xs font-bold text-[#534342]">Sources ({research.sources.length})</span>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {research.sources.map((src, i) => (
+                              <a key={i} href={src.url} target="_blank" rel="noreferrer"
+                                className="flex items-start gap-2 p-2.5 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#8E4B49] transition-colors no-underline">
+                                <ExternalLink size={12} className="text-[#8E4B49] shrink-0 mt-0.5" />
+                                <div>
+                                  <div className="text-xs font-bold text-[#8E4B49] truncate">{src.title || 'Source'}</div>
+                                  <div className="text-[11px] text-[#7C766F] truncate">{src.explanation || src.url}</div>
+                                </div>
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ─── STEP 2: TECH STACK & HARDWARE BOM ─────────────────────────── */}
+              {step === 2 && (
+                <div className="space-y-5">
+
+                  {/* Hardware & BOM Sourcer for Hardware and Hybrid projects */}
+                  {(domain === 'hardware' || domain === 'hybrid' || domains.includes('physical')) && (
+                    <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-5 shadow-xs">
+                      <div className="flex items-start justify-between gap-3 flex-wrap">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-[#FFFBEB] border border-[#FDE68A] flex items-center justify-center text-xs">🔧</span>
+                            <h2 className="text-sm font-bold text-[#1D1B18]">Bill of Materials (BOM) & Components</h2>
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A]">
+                              {domain === 'hardware' ? 'Hardware Project' : 'IoT Hybrid Project'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#7C766F] mt-1">
+                            Sourced with verified Indian vendor pricing (INR), wiring diagrams, and direct product search for MakerBazar, Robocraze, Roboin & IndiaHobbyStore.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={fetchHardwareBom}
+                          disabled={bomLoading}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFFBEB] border border-[#FDE68A] text-[#B45309] text-xs font-bold hover:bg-[#FDE68A]/30 transition-colors cursor-pointer"
+                        >
+                          {bomLoading ? <MiniLoader color="#B45309" /> : <RefreshCw size={12} />}
+                          <span>{bomLoading ? 'Generating BOM…' : 'Regenerate BOM'}</span>
+                        </button>
+                      </div>
+
+                      {/* Live Component Search Bar */}
+                      <div className="space-y-2">
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C766F]" />
+                            <input
+                              type="text"
+                              value={bomSearchQuery}
+                              onChange={e => setBomSearchQuery(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') handleSearchComponents(bomSearchQuery) }}
+                              placeholder="Search live components (e.g. ESP32, SG90 servo, HC-SR04, OLED display, Arduino)..."
+                              className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs focus:bg-white focus:border-[#D97706] focus:outline-none transition-all"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleSearchComponents(bomSearchQuery)}
+                            disabled={bomSearching}
+                            className="px-4 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+                          >
+                            {bomSearching ? <MiniLoader color="#fff" /> : <Search size={13} />}
+                            <span>Search Stores</span>
+                          </button>
+                        </div>
+
+                        {/* Live Search Results */}
+                        {bomSearchResults.length > 0 && (
+                          <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-[#534342]">Store Search Results ({bomSearchResults.length})</span>
+                              <button type="button" onClick={() => setBomSearchResults([])} className="text-[10px] text-[#7C766F] hover:text-[#1D1B18] cursor-pointer">Close ✕</button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {bomSearchResults.map((item, idx) => (
+                                <div key={idx} className="p-2.5 rounded-xl bg-white border border-[#EFEAE4] flex gap-2.5 items-start">
+                                  {item.image && (
+                                    <img src={item.image} alt={item.name} className="w-12 h-12 rounded-lg object-cover border border-[#EFEAE4] shrink-0" />
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-bold text-xs text-[#1D1B18] truncate">{item.name}</div>
+                                    <div className="text-[10.5px] text-[#D97706] font-bold">{item.price_range}</div>
+                                    <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                      {(item.vendors || []).slice(0, 2).map((v, vi) => (
+                                        <a key={vi} href={v.direct_search_url} target="_blank" rel="noreferrer"
+                                          className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342] hover:text-[#1D1B18]">
+                                          🛒 {v.vendor}
+                                        </a>
+                                      ))}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleAddComponentToBom(item)}
+                                        className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#1D1B18] text-white hover:bg-black cursor-pointer"
+                                      >
+                                        + Add to BOM
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Total Estimated BOM Budget Bar */}
+                      {hardwareBom.length > 0 && (() => {
+                        const minTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMin || 0) * (c.quantity || 1), 0)
+                        const maxTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMax || 0) * (c.quantity || 1), 0)
+                        return (
+                          <div className="rounded-xl p-3 bg-gradient-to-r from-[#FFFBEB] via-[#FEF3C7]/40 to-[#FFF7ED] border border-[#FDE68A] flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm">💰</span>
+                              <div>
+                                <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#92400E] block">Estimated Hardware BOM Budget</span>
+                                <span className="text-sm font-black text-[#1D1B18]">
+                                  ₹{minTotal.toLocaleString('en-IN')} – ₹{maxTotal.toLocaleString('en-IN')}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] text-[#78350F] font-medium">
+                              {hardwareBom.length} components · Sourced from Indian maker suppliers
+                            </span>
+                          </div>
+                        )
+                      })()}
+
+                      {/* BOM Components List */}
+                      {bomLoading ? (
+                        <div className="py-8 flex flex-col items-center justify-center text-center space-y-2">
+                          <MiniLoader color="#D97706" />
+                          <span className="text-xs font-bold text-[#534342]">Analyzing requirements & generating Bill of Materials…</span>
+                        </div>
+                      ) : hardwareBom.length === 0 ? (
+                        <div className="p-6 rounded-xl border border-dashed border-[#EFEAE4] text-center space-y-2">
+                          <Package size={24} className="text-[#9CA3AF] mx-auto" />
+                          <p className="text-xs text-[#7C766F] m-0">No hardware components configured yet.</p>
+                          <button
+                            type="button"
+                            onClick={fetchHardwareBom}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1D1B18] text-white text-xs font-bold hover:bg-black cursor-pointer"
+                          >
+                            <Sparkles size={12} /> Auto-Generate BOM for My Idea
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {hardwareBom.map((comp) => (
+                            <div
+                              key={comp.id}
+                              className="p-3.5 rounded-2xl border-2 transition-all hover:shadow-sm space-y-2.5 relative bg-white"
+                              style={{ borderColor: comp.color || '#EFEAE4' }}
+                            >
+                              <div className="flex items-start gap-2.5">
+                                <img
+                                  src={comp.image || getComponentLiveImage(comp.name, comp.category)}
+                                  alt={comp.name}
+                                  className="w-14 h-14 rounded-xl object-cover border border-[#EFEAE4] shrink-0 bg-[#FAF8F5]"
+                                  onError={(e) => {
+                                    e.target.onerror = null
+                                    e.target.src = getComponentLiveImage(comp.name, comp.category)
+                                  }}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span
+                                      className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
+                                      style={{ background: comp.bg || '#FAF8F5', color: comp.color || '#534342' }}
+                                    >
+                                      {comp.category}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveComponentFromBom(comp.id)}
+                                      className="text-[#9CA3AF] hover:text-[#DC2626] text-xs p-0.5 cursor-pointer"
+                                      title="Remove component"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                  <h3 className="text-xs font-bold text-[#1D1B18] mt-1 truncate">{comp.name}</h3>
+                                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                    <span className="text-[11px] font-black text-[#D97706]">
+                                      ₹{(comp.unit_price || comp.priceMin || 0) * (comp.quantity || 1)}
+                                    </span>
+                                    <span className="text-[9.5px] font-semibold text-[#534342] bg-[#FAF8F5] px-1.5 py-0.2 rounded border border-[#EFEAE4]">
+                                      {comp.quantity || 1} {comp.unit || 'pcs'} @ ₹{comp.unit_price || comp.priceMin || 0}/{comp.unit || 'pcs'}
+                                    </span>
+                                  </div>
+                                  <div className="pt-1 flex items-center gap-1.5">
+                                    <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0] px-1.5 py-0.2 rounded-full">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
+                                      {comp.availability || 'In Stock (MakerBazar)'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {comp.description && (
+                                <p className="text-[11px] text-[#534342] leading-relaxed m-0 line-clamp-2">
+                                  {comp.description}
+                                </p>
                               )}
-                              <div className="min-w-0 flex-1">
-                                <div className="font-bold text-xs text-[#1D1B18] truncate">{item.name}</div>
-                                <div className="text-[10.5px] text-[#D97706] font-bold">{item.price_range}</div>
-                                <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                  {(item.vendors || []).slice(0, 2).map((v, vi) => (
-                                    <a key={vi} href={v.direct_search_url} target="_blank" rel="noreferrer"
-                                      className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342] hover:text-[#1D1B18]">
-                                      🛒 {v.vendor}
+
+                              {comp.wiring_tip && (
+                                <div className="p-2 rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] text-[10.5px] text-[#534342] flex items-start gap-1.5">
+                                  <span className="text-xs">🔌</span>
+                                  <span className="line-clamp-2"><strong>Wiring:</strong> {comp.wiring_tip}</span>
+                                </div>
+                              )}
+
+                              <div className="pt-1 border-t border-[#F3EDE7] flex items-center justify-between gap-1 flex-wrap">
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {(comp.vendors || []).map((v, vi) => (
+                                    <a
+                                      key={vi}
+                                      href={v.direct_search_url || v.link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md border transition-colors flex items-center gap-1 ${v.vendor === 'MakerBazar' || vi === 0
+                                          ? 'bg-[#FFF7ED] text-[#C2410C] border-[#FDBA74] hover:bg-[#FFEDD5]'
+                                          : 'bg-white text-[#534342] border-[#EFEAE4] hover:bg-[#FAF8F5]'
+                                        }`}
+                                      title={`Buy from ${v.vendor || v.name}`}
+                                    >
+                                      🛒 {v.vendor || v.name}
+                                      {(v.vendor === 'MakerBazar' || vi === 0) && (
+                                        <span className="text-[7.5px] font-black uppercase bg-[#F97316] text-white px-0.8 rounded">
+                                          Default
+                                        </span>
+                                      )}
                                     </a>
                                   ))}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleAddComponentToBom(item)}
-                                    className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#1D1B18] text-white hover:bg-black cursor-pointer"
-                                  >
-                                    + Add to BOM
-                                  </button>
                                 </div>
+
+                                {comp.learnUrl && (
+                                  <a
+                                    href={comp.learnUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-[10px] font-bold text-[#2563EB] hover:underline flex items-center gap-0.5"
+                                  >
+                                    <BookOpen size={10} /> Docs
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Direct Component Buy Links with Live Product Images */}
+                      <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#EFEAE4] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-[#1D1B18] block">Direct Buy Links for Project Components</span>
+                            <span className="text-[11px] text-[#7C766F]">Live pricing and direct shopping links across trusted Indian distributors</span>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
+                            ₹ INR Pricing
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                          {hardwareBom.slice(0, 4).map((c, i) => (
+                            <div key={i} className="p-2.5 rounded-xl border border-[#EFEAE4] bg-white flex flex-col justify-between gap-2 shadow-2xs">
+                              <div className="flex items-center gap-2">
+                                <img
+                                  src={c.image || getComponentLiveImage(c.name, c.category)}
+                                  alt={c.name}
+                                  className="w-10 h-10 rounded-lg object-cover border border-[#EFEAE4] shrink-0"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="text-xs font-bold text-[#1D1B18] truncate m-0">{c.name}</h4>
+                                  <span className="text-[10.5px] font-bold text-[#D97706] block">₹{c.priceMin} – ₹{c.priceMax}</span>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1 pt-1.5 border-t border-[#F3EDE7]">
+                                <a
+                                  href={`https://makerbazar.in/search?q=${encodeURIComponent(c.name)}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[9.5px] font-bold px-1.5 py-1 rounded bg-[#FFF7ED] text-[#C2410C] hover:bg-[#FFEDD5] text-center no-underline truncate"
+                                >
+                                  MakerBazar →
+                                </a>
+                                <a
+                                  href={`https://robocraze.com/search?type=product&q=${encodeURIComponent(c.name)}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[9.5px] font-bold px-1.5 py-1 rounded bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE] text-center no-underline truncate"
+                                >
+                                  Robocraze →
+                                </a>
                               </div>
                             </div>
                           ))}
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Total Estimated BOM Budget Bar */}
-                  {hardwareBom.length > 0 && (() => {
-                    const minTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMin || 0) * (c.quantity || 1), 0)
-                    const maxTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMax || 0) * (c.quantity || 1), 0)
-                    return (
-                      <div className="rounded-xl p-3 bg-gradient-to-r from-[#FFFBEB] via-[#FEF3C7]/40 to-[#FFF7ED] border border-[#FDE68A] flex items-center justify-between flex-wrap gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">💰</span>
-                          <div>
-                            <span className="text-[10.5px] font-bold uppercase tracking-wider text-[#92400E] block">Estimated Hardware BOM Budget</span>
-                            <span className="text-sm font-black text-[#1D1B18]">
-                              ₹{minTotal.toLocaleString('en-IN')} – ₹{maxTotal.toLocaleString('en-IN')}
-                            </span>
-                          </div>
+                  {/* 2a — Tech stack cards (for Software and Hybrid) */}
+                  {domain !== 'hardware' && (
+                    <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 className="text-sm font-bold text-[#1D1B18]">Pick your tech stack</h2>
+                          <p className="text-xs text-[#7C766F] mt-0.5">UDAAN picked the best options for your idea type. Choose one or create your custom stack.</p>
                         </div>
-                        <span className="text-[11px] text-[#78350F] font-medium">
-                          {hardwareBom.length} components · Sourced from Indian maker suppliers
-                        </span>
+                        {hasStageContent(feasibility) && (
+                          <span className="text-[11px] px-2 py-1 rounded-xl bg-[#F0FAF8] border border-[#9FD8CB] text-[#2A5D54] font-bold shrink-0">
+                            AI: {(feasibility.technical_feasibility || '').slice(0, 40)}…
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Plain-English Recommendation Card */}
+                      {(() => {
+                        const rec = getBestTechStackRecommendation(draft?.idea, understanding, techKnownInputs)
+                        if (!rec) return null
+                        return (
+                          <div className="rounded-2xl bg-gradient-to-r from-[#FFF8F3] to-[#FEF3C7]/40 border border-[#FFAAA6]/40 p-4 space-y-1.5 shadow-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-[#8E4B49] text-white flex items-center justify-center text-xs font-bold">★</span>
+                              <span className="text-xs font-black text-[#8E4B49] uppercase tracking-wider">{rec.badge}</span>
+                            </div>
+                            <p className="text-xs text-[#534342] leading-relaxed">
+                              {rec.reason}
+                            </p>
+                          </div>
+                        )
+                      })()}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {allStacks.map(stack => {
+                          const isSelected = selectedStack === stack.id
+                          return (
+                            <button key={stack.id} type="button" onClick={() => handleSelectStack(stack.id)}
+                              className={`relative text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md ${isSelected ? 'border-[#1D1B18] bg-white shadow-md' : 'border-[#EFEAE4] bg-[#FAFAF9] hover:border-[#D4CFC9]'}`}
+                            >
+                              {isSelected && (
+                                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#1D1B18] flex items-center justify-center">
+                                  <Check size={11} className="text-white" />
+                                </span>
+                              )}
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-xl">{stack.icon}</span>
+                                <span className="text-sm font-bold text-[#1D1B18]">{stack.name}</span>
+                              </div>
+                              <p className="text-xs text-[#534342] mb-2">{stack.desc}</p>
+                              <div className="flex flex-wrap gap-1">
+                                {stack.tags.map(t => (
+                                  <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${isSelected ? 'bg-[#1D1B18] text-white border-[#1D1B18]' : 'bg-white text-[#534342] border-[#E5E0DA]'}`}>
+                                    {t}
+                                  </span>
+                                ))}
+                              </div>
+                            </button>
+                          )
+                        })}
+
+                        {/* + Custom Tech Stack Button */}
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomModal(true)}
+                          className="p-4 rounded-2xl border-2 border-dashed border-[#D5CFC7] bg-[#FAF8F5] hover:border-[#1D1B18] hover:bg-white text-left transition-all flex flex-col justify-between group min-h-[140px] cursor-pointer"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="text-xl">⚙️</span>
+                              <span className="text-sm font-bold text-[#1D1B18] group-hover:text-[#8E4B49] transition-colors">+ Custom Stack</span>
+                            </div>
+                            <p className="text-xs text-[#7C766F] leading-relaxed">
+                              Configure your own frontend, backend, database and cloud provider.
+                            </p>
+                          </div>
+                          <span className="text-[11px] font-bold text-[#8E4B49] underline pt-2">Build custom architecture →</span>
+                        </button>
+                      </div>
+
+                      {/* "What do you already know?" */}
+                      {selectedStack && (() => {
+                        const stack = allStacks.find(s => s.id === selectedStack)
+                        if (!stack) return null
+                        return (
+                          <div className="pt-2 space-y-2 border-t border-[#EFEAE4]">
+                            <p className="text-xs font-bold text-[#534342]">Which of these do you already know?</p>
+                            <div className="flex flex-wrap gap-2">
+                              {stack.skills.map(tech => (
+                                <button key={tech} type="button" onClick={() => toggleKnownTech(tech)}
+                                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${techKnownInputs.includes(tech) ? 'bg-[#2A9D8F] border-[#2A9D8F] text-white' : 'bg-white border-[#EFEAE4] text-[#534342] hover:border-[#2A9D8F]'}`}>
+                                  {techKnownInputs.includes(tech) ? <><Check size={11} className="inline mr-1" /></> : ''}
+                                  {tech}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-[#9B9590]">We'll suggest learning resources for the ones you don't know yet. Saved to your profile.</p>
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Custom Tech Stack Modal */}
+                  {showCustomModal && (
+                    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+                      <div className="bg-white rounded-3xl border border-[#E8E2D9] p-6 max-w-md w-full shadow-xl space-y-4 font-['Plus_Jakarta_Sans']">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-[#FFF1ED] text-[#8E4B49] flex items-center justify-center font-bold text-sm">⚡</span>
+                            <h3 className="text-sm font-black text-[#1D1B18]">Configure Custom Tech Stack</h3>
+                          </div>
+                          <button type="button" onClick={() => setShowCustomModal(false)} className="text-[#8C847E] hover:text-[#1D1B18] p-1">
+                            <X size={16} />
+                          </button>
+                        </div>
+
+                        <form onSubmit={handleSaveCustomStack} className="space-y-3">
+                          <label className="block space-y-1">
+                            <span className="text-[11px] font-bold text-[#534342]">Stack Name *</span>
+                            <input
+                              type="text"
+                              required
+                              value={customForm.name}
+                              onChange={e => setCustomForm(f => ({ ...f, name: e.target.value }))}
+                              placeholder="e.g. SvelteKit + FastAPI + SQLite"
+                              className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                            />
+                          </label>
+
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <label className="block space-y-1">
+                              <span className="text-[11px] font-bold text-[#534342]">Frontend</span>
+                              <input
+                                type="text"
+                                value={customForm.frontend}
+                                onChange={e => setCustomForm(f => ({ ...f, frontend: e.target.value }))}
+                                placeholder="e.g. SvelteKit, React, Vue"
+                                className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                              />
+                            </label>
+                            <label className="block space-y-1">
+                              <span className="text-[11px] font-bold text-[#534342]">Backend</span>
+                              <input
+                                type="text"
+                                value={customForm.backend}
+                                onChange={e => setCustomForm(f => ({ ...f, backend: e.target.value }))}
+                                placeholder="e.g. FastAPI, Go, Express"
+                                className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2.5">
+                            <label className="block space-y-1">
+                              <span className="text-[11px] font-bold text-[#534342]">Database</span>
+                              <input
+                                type="text"
+                                value={customForm.database}
+                                onChange={e => setCustomForm(f => ({ ...f, database: e.target.value }))}
+                                placeholder="e.g. PostgreSQL, Redis"
+                                className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                              />
+                            </label>
+                            <label className="block space-y-1">
+                              <span className="text-[11px] font-bold text-[#534342]">Cloud / Hosting</span>
+                              <input
+                                type="text"
+                                value={customForm.cloud}
+                                onChange={e => setCustomForm(f => ({ ...f, cloud: e.target.value }))}
+                                placeholder="e.g. Render, Fly.io, AWS"
+                                className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowCustomModal(false)}
+                              className="px-4 py-2 rounded-xl text-xs font-bold text-[#8C847E] hover:text-[#1D1B18]"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-5 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black shadow-xs cursor-pointer"
+                            >
+                              Save & Select Stack
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2b — YouTube learning videos with REAL Thumbnails */}
+                  {selectedStack && (() => {
+                    const stack = allStacks.find(s => s.id === selectedStack)
+                    const unknownTech = stack?.learn?.filter(t => !techKnownInputs.includes(t)) || []
+                    if (!unknownTech.length) return null
+                    return (
+                      <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
+                        <div className="flex items-center gap-2">
+                          <Play size={16} className="text-[#FF0000]" />
+                          <h2 className="text-sm font-bold text-[#1D1B18]">Learn the stack</h2>
+                          <span className="text-xs text-[#7C766F]">Best verified courses to get started, curated for you</span>
+                        </div>
+                        {ytLoading ? (
+                          <div className="flex items-center gap-2 text-xs text-[#7C766F] py-2">
+                            <MiniLoader color="#7C766F" /> Loading verified courses…
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {unknownTech.map(tech => {
+                              const vids = ytVideos[tech] || []
+                              return (
+                                <div key={tech} className="space-y-2">
+                                  <span className="text-xs font-bold text-[#534342] uppercase tracking-wider">{tech}</span>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {vids.length ? vids.map((v, i) => {
+                                      const thumb = getYouTubeThumb(v.url)
+                                      return (
+                                        <a key={i} href={v.url} target="_blank" rel="noreferrer"
+                                          className="flex flex-col sm:flex-row items-start gap-3 p-2.5 rounded-2xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#FF6B6B] hover:shadow-md transition-all no-underline group">
+                                          <div className="relative w-full sm:w-36 h-20 rounded-xl overflow-hidden bg-black shrink-0">
+                                            {thumb ? (
+                                              <img src={thumb} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                            ) : (
+                                              <div className="w-full h-full bg-[#1D1B18] flex items-center justify-center">
+                                                <Play size={20} className="text-white" />
+                                              </div>
+                                            )}
+                                            <div className="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/10 transition-colors">
+                                              <div className="w-7 h-7 rounded-full bg-[#FF0000] text-white flex items-center justify-center shadow-md">
+                                                <Play size={11} fill="white" className="ml-0.5" />
+                                              </div>
+                                            </div>
+                                            {v.duration && v.duration !== '—' && (
+                                              <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-bold text-white tracking-wide">
+                                                {v.duration}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div className="min-w-0 flex-1 py-0.5">
+                                            <div className="text-xs font-bold text-[#1D1B18] line-clamp-2 group-hover:text-[#FF6B6B] transition-colors leading-snug">
+                                              {v.title}
+                                            </div>
+                                            <div className="text-[11px] text-[#7C766F] flex items-center gap-1.5 mt-1.5">
+                                              <span className="font-semibold">{v.channel}</span>
+                                              <span className="text-[10px] text-[#2A9D8F]">✓</span>
+                                            </div>
+                                          </div>
+                                        </a>
+                                      )
+                                    }) : (
+                                      <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(tech + ' tutorial for beginners')}`} target="_blank" rel="noreferrer"
+                                        className="flex items-center gap-2 p-3 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#FF6B6B] transition-colors no-underline text-xs text-[#8E4B49] font-bold">
+                                        <Play size={13} className="text-[#FF0000]" />
+                                        Search {tech} tutorials on YouTube
+                                        <ExternalLink size={11} />
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     )
                   })()}
 
-                  {/* BOM Components List */}
-                  {bomLoading ? (
-                    <div className="py-8 flex flex-col items-center justify-center text-center space-y-2">
-                      <MiniLoader color="#D97706" />
-                      <span className="text-xs font-bold text-[#534342]">Analyzing requirements & generating Bill of Materials…</span>
+                  {/* 2c — Repository setup */}
+                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-sm font-bold text-[#1D1B18]">Set up your repository</h2>
+                        <p className="text-xs text-[#7C766F] mt-0.5">UDAAN uses your repo to track code, verify tests and measure progress.</p>
+                      </div>
+                      <div className="flex items-center gap-1 bg-[#F7F4F0] p-1 rounded-xl">
+                        <button type="button" onClick={() => { setRepoRequired(true); persist({ repoRequired: true }) }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${repoRequired ? 'bg-white text-[#1D1B18] shadow-sm' : 'text-[#7C766F]'}`}>
+                          Yes
+                        </button>
+                        <button type="button" onClick={() => { setRepoRequired(false); persist({ repoRequired: false }) }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${!repoRequired ? 'bg-white text-[#1D1B18] shadow-sm' : 'text-[#7C766F]'}`}>
+                          Skip for now
+                        </button>
+                      </div>
                     </div>
-                  ) : hardwareBom.length === 0 ? (
-                    <div className="p-6 rounded-xl border border-dashed border-[#EFEAE4] text-center space-y-2">
-                      <Package size={24} className="text-[#9CA3AF] mx-auto" />
-                      <p className="text-xs text-[#7C766F] m-0">No hardware components configured yet.</p>
-                      <button
-                        type="button"
-                        onClick={fetchHardwareBom}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1D1B18] text-white text-xs font-bold hover:bg-black cursor-pointer"
-                      >
-                        <Sparkles size={12} /> Auto-Generate BOM for My Idea
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {hardwareBom.map((comp) => (
-                        <div
-                          key={comp.id}
-                          className="p-3.5 rounded-2xl border-2 transition-all hover:shadow-sm space-y-2.5 relative bg-white"
-                          style={{ borderColor: comp.color || '#EFEAE4' }}
-                        >
-                          <div className="flex items-start gap-2.5">
-                            <img
-                              src={comp.image || getComponentLiveImage(comp.name, comp.category)}
-                              alt={comp.name}
-                              className="w-14 h-14 rounded-xl object-cover border border-[#EFEAE4] shrink-0 bg-[#FAF8F5]"
-                              onError={(e) => {
-                                e.target.onerror = null
-                                e.target.src = getComponentLiveImage(comp.name, comp.category)
-                              }}
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-1">
-                                <span
-                                  className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider"
-                                  style={{ background: comp.bg || '#FAF8F5', color: comp.color || '#534342' }}
-                                >
-                                  {comp.category}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveComponentFromBom(comp.id)}
-                                  className="text-[#9CA3AF] hover:text-[#DC2626] text-xs p-0.5 cursor-pointer"
-                                  title="Remove component"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                              <h3 className="text-xs font-bold text-[#1D1B18] mt-1 truncate">{comp.name}</h3>
-                              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                                <span className="text-[11px] font-black text-[#D97706]">
-                                  ₹{(comp.unit_price || comp.priceMin || 0) * (comp.quantity || 1)}
-                                </span>
-                                <span className="text-[9.5px] font-semibold text-[#534342] bg-[#FAF8F5] px-1.5 py-0.2 rounded border border-[#EFEAE4]">
-                                  {comp.quantity || 1} {comp.unit || 'pcs'} @ ₹{comp.unit_price || comp.priceMin || 0}/{comp.unit || 'pcs'}
-                                </span>
-                              </div>
-                              <div className="pt-1 flex items-center gap-1.5">
-                                <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0] px-1.5 py-0.2 rounded-full">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
-                                  {comp.availability || 'In Stock (MakerBazar)'}
-                                </span>
-                              </div>
+
+                    {repoRequired && (
+                      connectedRepo ? (
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-[#F0FAF8] border border-[#9FD8CB]">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 size={18} className="text-[#2A9D8F]" />
+                            <div>
+                              <span className="text-xs font-bold text-[#1D1B18] block">{connectedRepo.fullName}</span>
+                              <span className="text-[11px] text-[#534342]">{connectedRepo.branch} branch · {connectedRepo.isEmpty ? 'Empty' : `${connectedRepo.fileCount} files`}</span>
                             </div>
                           </div>
+                          <button type="button" onClick={() => { setConnectedRepo(null); setRepoUrlInput(''); persist({ repository: null }) }}
+                            className="text-xs text-[#8E4B49] font-bold hover:underline px-2 py-1 rounded-lg">
+                            Disconnect
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {/* Tabs */}
+                          <div className="flex gap-3 border-b border-[#EFEAE4] pb-2">
+                            {[['connect', 'Connect existing'], ['create', 'Create new with GitHub']].map(([key, label]) => (
+                              <button key={key} type="button" onClick={() => setRepoTab(key)}
+                                className={`text-xs font-bold pb-1.5 border-b-2 transition-colors ${repoTab === key ? 'text-[#8E4B49] border-[#8E4B49]' : 'text-[#7C766F] border-transparent hover:text-[#1D1B18]'}`}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
 
-                          {comp.description && (
-                            <p className="text-[11px] text-[#534342] leading-relaxed m-0 line-clamp-2">
-                              {comp.description}
-                            </p>
-                          )}
-
-                          {comp.wiring_tip && (
-                            <div className="p-2 rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] text-[10.5px] text-[#534342] flex items-start gap-1.5">
-                              <span className="text-xs">🔌</span>
-                              <span className="line-clamp-2"><strong>Wiring:</strong> {comp.wiring_tip}</span>
+                          {repoTab === 'connect' && (
+                            <div className="flex gap-2">
+                              <div className="relative flex-1">
+                                <Github size={14} className="absolute left-3 top-3 text-[#7C766F]" />
+                                <input type="text" value={repoUrlInput} onChange={e => setRepoUrlInput(e.target.value)}
+                                  placeholder="https://github.com/username/repo"
+                                  className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-medium focus:border-[#8E4B49] focus:outline-none" />
+                              </div>
+                              <button type="button" onClick={handleInspectRepo} disabled={repoChecking}
+                                className="px-4 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors flex items-center gap-1.5 shrink-0">
+                                {repoChecking ? <MiniLoader color="#fff" /> : <Github size={13} />}
+                                Connect
+                              </button>
                             </div>
                           )}
 
-                          <div className="pt-1 border-t border-[#F3EDE7] flex items-center justify-between gap-1 flex-wrap">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {(comp.vendors || []).map((v, vi) => (
-                                <a
-                                  key={vi}
-                                  href={v.direct_search_url || v.link}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md border transition-colors flex items-center gap-1 ${
-                                    v.vendor === 'MakerBazar' || vi === 0
-                                      ? 'bg-[#FFF7ED] text-[#C2410C] border-[#FDBA74] hover:bg-[#FFEDD5]'
-                                      : 'bg-white text-[#534342] border-[#EFEAE4] hover:bg-[#FAF8F5]'
-                                  }`}
-                                  title={`Buy from ${v.vendor || v.name}`}
-                                >
-                                  🛒 {v.vendor || v.name}
-                                  {(v.vendor === 'MakerBazar' || vi === 0) && (
-                                    <span className="text-[7.5px] font-black uppercase bg-[#F97316] text-white px-0.8 rounded">
-                                      Default
-                                    </span>
-                                  )}
-                                </a>
-                              ))}
-                            </div>
+                          {repoTab === 'create' && (
+                            <div className="space-y-3">
+                              <div className="p-3 rounded-xl bg-[#FFF8F3] border border-[#FFAAA6]/40 text-xs text-[#534342] flex items-start gap-2">
+                                <Github size={14} className="text-[#1D1B18] shrink-0 mt-0.5" />
+                                <span>Create a GitHub repository directly using your connected account or enter a Personal Access Token below for instant creation.</span>
+                              </div>
 
-                            {comp.learnUrl && (
-                              <a
-                                href={comp.learnUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-[10px] font-bold text-[#2563EB] hover:underline flex items-center gap-0.5"
-                              >
-                                <BookOpen size={10} /> Docs
-                              </a>
+                              <div className="space-y-2">
+                                <input
+                                  type="password"
+                                  value={createRepoToken}
+                                  onChange={e => setCreateRepoToken(e.target.value)}
+                                  placeholder="GitHub Personal Access Token / Secret Key (Optional - skips OAuth)"
+                                  className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-mono focus:border-[#8E4B49] focus:outline-none"
+                                />
+                                <span className="text-[10px] text-[#9B9590] block">
+                                  Paste a classic token with <code>repo</code> scope to create directly, or leave blank to authenticate via OAuth.
+                                </span>
+                              </div>
+
+                              <div className="flex gap-2">
+                                <input type="text" value={createRepoName} onChange={e => setCreateRepoName(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
+                                  placeholder={understanding.project_name?.toLowerCase().replace(/\s+/g, '-') || 'my-project'}
+                                  className="flex-1 px-3 py-2.5 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-mono focus:border-[#8E4B49] focus:outline-none" />
+                                <button type="button" onClick={() => setCreateRepoPrivate(p => !p)}
+                                  className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${createRepoPrivate ? 'bg-[#1D1B18] text-white border-[#1D1B18]' : 'bg-white border-[#EFEAE4] text-[#534342]'}`}>
+                                  {createRepoPrivate ? '🔒 Private' : '🌐 Public'}
+                                </button>
+                                <button type="button" onClick={handleCreateGitHubRepo} disabled={createRepoLoading}
+                                  className="px-4 py-2.5 rounded-xl bg-[#8E4B49] text-white text-xs font-bold hover:bg-[#7A3C3A] transition-colors flex items-center gap-1.5 shrink-0">
+                                  {createRepoLoading ? <MiniLoader color="#fff" /> : <Github size={13} />}
+                                  Create Repo
+                                </button>
+                              </div>
+
+                              {createRepoError && (
+                                <p className="text-xs text-[#8E4B49] font-medium">{createRepoError}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {repoError && <p className="text-xs text-[#8E4B49] font-medium">{repoError}</p>}
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  {/* 2d — Feasibility summary pills */}
+                  {hasStageContent(feasibility) && feasibility.mvp_scope && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="bg-white rounded-2xl border border-[#EFEAE4] p-4 space-y-2">
+                        <span className="text-xs font-bold text-[#7A3C3A] flex items-center gap-1.5">
+                          <Rocket size={13} /> Build for MVP
+                        </span>
+                        <PillList items={feasibility.mvp_scope.essential_features || []} color="#7A3C3A" bg="#FFF1ED" />
+                      </div>
+                      <div className="bg-white rounded-2xl border border-[#EFEAE4] p-4 space-y-2">
+                        <span className="text-xs font-bold text-[#766320] flex items-center gap-1.5">
+                          <Clock size={13} /> Save for later
+                        </span>
+                        <PillList items={feasibility.mvp_scope.postpone || []} color="#766320" bg="#FFFBEB" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ─── STEP 3: TEAM & TIMELINE ─────────────────────────────────────── */}
+              {step === 3 && (
+                <div className="space-y-4">
+                  {/* Timeline inputs */}
+                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
+                    <h2 className="text-sm font-bold text-[#1D1B18]">When do you want to ship?</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        { label: '🗓 Launch deadline', type: 'date', val: deadline, min: todayIso, set: v => { setDeadline(v); persist({ deadline: v }) } },
+                        { label: '👥 Team size', type: 'number', val: teamSize, min: 1, max: 10, set: v => updateTeamSizeCount(v) },
+                        { label: '⏱ Hours/week per person', type: 'number', val: weeklyHours, min: 5, max: 80, set: v => { setWeeklyHours(parseInt(v, 10) || 20); persist({ weeklyHours: parseInt(v, 10) || 20 }) } },
+                      ].map(({ label, type, val, min, max, set }) => (
+                        <div key={label} className="space-y-1.5">
+                          <label className="text-xs font-bold text-[#534342] block">{label}</label>
+                          <input type={type} value={val} min={min} max={max} onChange={e => set(e.target.value)}
+                            className="w-full px-3 py-2.5 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-sm font-bold focus:border-[#8E4B49] focus:outline-none" />
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Stats banner */}
+                    <div className="grid grid-cols-3 gap-3 pt-2">
+                      {[
+                        { label: 'Days remaining', val: daysRemaining },
+                        { label: 'Weekly team hours', val: `${totalWeeklyHrs}h` },
+                        { label: 'Sprint pace', val: daysRemaining > 60 ? 'Sustainable' : daysRemaining > 30 ? 'Moderate' : 'Intense' },
+                      ].map(({ label, val }) => (
+                        <div key={label} className="text-center p-3 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4]">
+                          <div className="text-lg font-black text-[#8E4B49]">{val}</div>
+                          <div className="text-[11px] text-[#7C766F] mt-0.5">{label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Team members */}
+                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-bold text-[#1D1B18]">Team members ({teamMembers.length})</h2>
+                      <button type="button" onClick={() => updateTeamSizeCount(teamSize + 1)} className="flex items-center gap-1 text-xs font-bold text-[#8E4B49] hover:underline">
+                        <Plus size={13} /> Add
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {teamMembers.map((m, i) => (
+                        <div key={m.id || i} className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] items-center">
+                          <input type="text" value={m.name} onChange={e => setTeamMembers(prev => { const c = [...prev]; c[i] = { ...c[i], name: e.target.value }; return c })}
+                            placeholder={`Member ${i + 1}`} className="px-2.5 py-1.5 rounded-xl bg-white border border-[#EFEAE4] text-xs font-bold" />
+                          <select value={m.role} onChange={e => setTeamMembers(prev => { const c = [...prev]; c[i] = { ...c[i], role: e.target.value }; return c })}
+                            className="px-2.5 py-1.5 rounded-xl bg-white border border-[#EFEAE4] text-xs">
+                            {roleOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                          <input type="text" value={m.focus || ''} onChange={e => setTeamMembers(prev => { const c = [...prev]; c[i] = { ...c[i], focus: e.target.value }; return c })}
+                            placeholder="Primary focus" className="px-2.5 py-1.5 rounded-xl bg-white border border-[#EFEAE4] text-xs" />
+                          <div className="flex items-center gap-1">
+                            <input type="number" min="1" max="80" value={m.hours} onChange={e => setTeamMembers(prev => { const c = [...prev]; c[i] = { ...c[i], hours: parseInt(e.target.value, 10) || weeklyHours }; return c })}
+                              className="w-16 px-2 py-1.5 rounded-xl bg-white border border-[#EFEAE4] text-xs font-bold text-center" />
+                            <span className="text-[10px] text-[#7C766F]">h/wk</span>
+                            {teamMembers.length > 1 && (
+                              <button type="button" onClick={() => updateTeamSizeCount(teamSize - 1)} className="ml-auto text-[#8E4B49] p-1 rounded-lg hover:bg-[#FFF1ED]">
+                                <Trash2 size={13} />
+                              </button>
                             )}
                           </div>
                         </div>
                       ))}
                     </div>
-                  )}
-
-                  {/* Direct Component Buy Links with Live Product Images */}
-                  <div className="p-4 rounded-2xl bg-[#FAF8F5] border border-[#EFEAE4] space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-bold text-[#1D1B18] block">Direct Buy Links for Project Components</span>
-                        <span className="text-[11px] text-[#7C766F]">Live pricing and direct shopping links across trusted Indian distributors</span>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
-                        ₹ INR Pricing
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                      {hardwareBom.slice(0, 4).map((c, i) => (
-                        <div key={i} className="p-2.5 rounded-xl border border-[#EFEAE4] bg-white flex flex-col justify-between gap-2 shadow-2xs">
-                          <div className="flex items-center gap-2">
-                            <img
-                              src={c.image || getComponentLiveImage(c.name, c.category)}
-                              alt={c.name}
-                              className="w-10 h-10 rounded-lg object-cover border border-[#EFEAE4] shrink-0"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <h4 className="text-xs font-bold text-[#1D1B18] truncate m-0">{c.name}</h4>
-                              <span className="text-[10.5px] font-bold text-[#D97706] block">₹{c.priceMin} – ₹{c.priceMax}</span>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-1 pt-1.5 border-t border-[#F3EDE7]">
-                            <a
-                              href={`https://makerbazar.in/search?q=${encodeURIComponent(c.name)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[9.5px] font-bold px-1.5 py-1 rounded bg-[#FFF7ED] text-[#C2410C] hover:bg-[#FFEDD5] text-center no-underline truncate"
-                            >
-                              MakerBazar →
-                            </a>
-                            <a
-                              href={`https://robocraze.com/search?type=product&q=${encodeURIComponent(c.name)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-[9.5px] font-bold px-1.5 py-1 rounded bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE] text-center no-underline truncate"
-                            >
-                              Robocraze →
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 </div>
               )}
 
-              {/* 2a — Tech stack cards (for Software and Hybrid) */}
-              {domain !== 'hardware' && (
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-sm font-bold text-[#1D1B18]">Pick your tech stack</h2>
-                    <p className="text-xs text-[#7C766F] mt-0.5">UDAAN picked the best options for your idea type. Choose one or create your custom stack.</p>
-                  </div>
-                  {hasStageContent(feasibility) && (
-                    <span className="text-[11px] px-2 py-1 rounded-xl bg-[#F0FAF8] border border-[#9FD8CB] text-[#2A5D54] font-bold shrink-0">
-                      AI: {(feasibility.technical_feasibility || '').slice(0, 40)}…
-                    </span>
-                  )}
-                </div>
-
-                {/* Plain-English Recommendation Card */}
-                {(() => {
-                  const rec = getBestTechStackRecommendation(draft?.idea, understanding, techKnownInputs)
-                  if (!rec) return null
-                  return (
-                    <div className="rounded-2xl bg-gradient-to-r from-[#FFF8F3] to-[#FEF3C7]/40 border border-[#FFAAA6]/40 p-4 space-y-1.5 shadow-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-[#8E4B49] text-white flex items-center justify-center text-xs font-bold">★</span>
-                        <span className="text-xs font-black text-[#8E4B49] uppercase tracking-wider">{rec.badge}</span>
-                      </div>
-                      <p className="text-xs text-[#534342] leading-relaxed">
-                        {rec.reason}
-                      </p>
+              {/* ─── STEP 4: FLIGHT PLAN ROADMAP ────────────────────────────────── */}
+              {step === 4 && (
+                <div className="space-y-4">
+                  {stageLoading === 'flight_plan' ? (
+                    <div className="bg-white rounded-2xl border border-[#EFEAE4] p-8 flex flex-col items-center">
+                      <UdaanLoader character="rocket" size="md"
+                        message={['Planning sprints…', 'Sequencing milestones…', 'Mapping your team…', 'Building roadmap…']}
+                        sub="Gemini AI · roadmap synthesis" />
                     </div>
-                  )
-                })()}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {allStacks.map(stack => {
-                    const isSelected = selectedStack === stack.id
-                    return (
-                      <button key={stack.id} type="button" onClick={() => handleSelectStack(stack.id)}
-                        className={`relative text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md ${isSelected ? 'border-[#1D1B18] bg-white shadow-md' : 'border-[#EFEAE4] bg-[#FAFAF9] hover:border-[#D4CFC9]'}`}
-                      >
-                        {isSelected && (
-                          <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#1D1B18] flex items-center justify-center">
-                            <Check size={11} className="text-white" />
-                          </span>
-                        )}
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xl">{stack.icon}</span>
-                          <span className="text-sm font-bold text-[#1D1B18]">{stack.name}</span>
-                        </div>
-                        <p className="text-xs text-[#534342] mb-2">{stack.desc}</p>
-                        <div className="flex flex-wrap gap-1">
-                          {stack.tags.map(t => (
-                            <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${isSelected ? 'bg-[#1D1B18] text-white border-[#1D1B18]' : 'bg-white text-[#534342] border-[#E5E0DA]'}`}>
-                              {t}
-                            </span>
-                          ))}
-                        </div>
-                      </button>
-                    )
-                  })}
-
-                  {/* + Custom Tech Stack Button */}
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomModal(true)}
-                    className="p-4 rounded-2xl border-2 border-dashed border-[#D5CFC7] bg-[#FAF8F5] hover:border-[#1D1B18] hover:bg-white text-left transition-all flex flex-col justify-between group min-h-[140px] cursor-pointer"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-xl">⚙️</span>
-                        <span className="text-sm font-bold text-[#1D1B18] group-hover:text-[#8E4B49] transition-colors">+ Custom Stack</span>
-                      </div>
-                      <p className="text-xs text-[#7C766F] leading-relaxed">
-                        Configure your own frontend, backend, database and cloud provider.
-                      </p>
-                    </div>
-                    <span className="text-[11px] font-bold text-[#8E4B49] underline pt-2">Build custom architecture →</span>
-                  </button>
-                </div>
-
-                {/* "What do you already know?" */}
-                {selectedStack && (() => {
-                  const stack = allStacks.find(s => s.id === selectedStack)
-                  if (!stack) return null
-                  return (
-                    <div className="pt-2 space-y-2 border-t border-[#EFEAE4]">
-                      <p className="text-xs font-bold text-[#534342]">Which of these do you already know?</p>
-                      <div className="flex flex-wrap gap-2">
-                        {stack.skills.map(tech => (
-                          <button key={tech} type="button" onClick={() => toggleKnownTech(tech)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${techKnownInputs.includes(tech) ? 'bg-[#2A9D8F] border-[#2A9D8F] text-white' : 'bg-white border-[#EFEAE4] text-[#534342] hover:border-[#2A9D8F]'}`}>
-                            {techKnownInputs.includes(tech) ? <><Check size={11} className="inline mr-1" /></> : ''}
-                            {tech}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-[#9B9590]">We'll suggest learning resources for the ones you don't know yet. Saved to your profile.</p>
-                    </div>
-                  )
-                })()}
-              </div>
-              )}
-
-              {/* Custom Tech Stack Modal */}
-              {showCustomModal && (
-                <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-                  <div className="bg-white rounded-3xl border border-[#E8E2D9] p-6 max-w-md w-full shadow-xl space-y-4 font-['Plus_Jakarta_Sans']">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-[#FFF1ED] text-[#8E4B49] flex items-center justify-center font-bold text-sm">⚡</span>
-                        <h3 className="text-sm font-black text-[#1D1B18]">Configure Custom Tech Stack</h3>
-                      </div>
-                      <button type="button" onClick={() => setShowCustomModal(false)} className="text-[#8C847E] hover:text-[#1D1B18] p-1">
-                        <X size={16} />
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleSaveCustomStack} className="space-y-3">
-                      <label className="block space-y-1">
-                        <span className="text-[11px] font-bold text-[#534342]">Stack Name *</span>
-                        <input
-                          type="text"
-                          required
-                          value={customForm.name}
-                          onChange={e => setCustomForm(f => ({ ...f, name: e.target.value }))}
-                          placeholder="e.g. SvelteKit + FastAPI + SQLite"
-                          className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
-                        />
-                      </label>
-
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <label className="block space-y-1">
-                          <span className="text-[11px] font-bold text-[#534342]">Frontend</span>
-                          <input
-                            type="text"
-                            value={customForm.frontend}
-                            onChange={e => setCustomForm(f => ({ ...f, frontend: e.target.value }))}
-                            placeholder="e.g. SvelteKit, React, Vue"
-                            className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
-                          />
-                        </label>
-                        <label className="block space-y-1">
-                          <span className="text-[11px] font-bold text-[#534342]">Backend</span>
-                          <input
-                            type="text"
-                            value={customForm.backend}
-                            onChange={e => setCustomForm(f => ({ ...f, backend: e.target.value }))}
-                            placeholder="e.g. FastAPI, Go, Express"
-                            className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
-                          />
-                        </label>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <label className="block space-y-1">
-                          <span className="text-[11px] font-bold text-[#534342]">Database</span>
-                          <input
-                            type="text"
-                            value={customForm.database}
-                            onChange={e => setCustomForm(f => ({ ...f, database: e.target.value }))}
-                            placeholder="e.g. PostgreSQL, Redis"
-                            className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
-                          />
-                        </label>
-                        <label className="block space-y-1">
-                          <span className="text-[11px] font-bold text-[#534342]">Cloud / Hosting</span>
-                          <input
-                            type="text"
-                            value={customForm.cloud}
-                            onChange={e => setCustomForm(f => ({ ...f, cloud: e.target.value }))}
-                            placeholder="e.g. Render, Fly.io, AWS"
-                            className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-semibold focus:border-[#8E4B49] outline-none"
-                          />
-                        </label>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-2 pt-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowCustomModal(false)}
-                          className="px-4 py-2 rounded-xl text-xs font-bold text-[#8C847E] hover:text-[#1D1B18]"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-5 py-2 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black shadow-xs cursor-pointer"
-                        >
-                          Save & Select Stack
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* 2b — YouTube learning videos with REAL Thumbnails */}
-              {selectedStack && (() => {
-                const stack = allStacks.find(s => s.id === selectedStack)
-                const unknownTech = stack?.learn?.filter(t => !techKnownInputs.includes(t)) || []
-                if (!unknownTech.length) return null
-                return (
-                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
-                    <div className="flex items-center gap-2">
-                      <Play size={16} className="text-[#FF0000]" />
-                      <h2 className="text-sm font-bold text-[#1D1B18]">Learn the stack</h2>
-                      <span className="text-xs text-[#7C766F]">Best verified courses to get started, curated for you</span>
-                    </div>
-                    {ytLoading ? (
-                      <div className="flex items-center gap-2 text-xs text-[#7C766F] py-2">
-                        <MiniLoader color="#7C766F" /> Loading verified courses…
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {unknownTech.map(tech => {
-                          const vids = ytVideos[tech] || []
-                          return (
-                            <div key={tech} className="space-y-2">
-                              <span className="text-xs font-bold text-[#534342] uppercase tracking-wider">{tech}</span>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                {vids.length ? vids.map((v, i) => {
-                                  const thumb = getYouTubeThumb(v.url)
-                                  return (
-                                    <a key={i} href={v.url} target="_blank" rel="noreferrer"
-                                      className="flex flex-col sm:flex-row items-start gap-3 p-2.5 rounded-2xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#FF6B6B] hover:shadow-md transition-all no-underline group">
-                                      <div className="relative w-full sm:w-36 h-20 rounded-xl overflow-hidden bg-black shrink-0">
-                                        {thumb ? (
-                                          <img src={thumb} alt={v.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                        ) : (
-                                          <div className="w-full h-full bg-[#1D1B18] flex items-center justify-center">
-                                            <Play size={20} className="text-white" />
-                                          </div>
-                                        )}
-                                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center group-hover:bg-black/10 transition-colors">
-                                          <div className="w-7 h-7 rounded-full bg-[#FF0000] text-white flex items-center justify-center shadow-md">
-                                            <Play size={11} fill="white" className="ml-0.5" />
-                                          </div>
-                                        </div>
-                                        {v.duration && v.duration !== '—' && (
-                                          <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-bold text-white tracking-wide">
-                                            {v.duration}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="min-w-0 flex-1 py-0.5">
-                                        <div className="text-xs font-bold text-[#1D1B18] line-clamp-2 group-hover:text-[#FF6B6B] transition-colors leading-snug">
-                                          {v.title}
-                                        </div>
-                                        <div className="text-[11px] text-[#7C766F] flex items-center gap-1.5 mt-1.5">
-                                          <span className="font-semibold">{v.channel}</span>
-                                          <span className="text-[10px] text-[#2A9D8F]">✓</span>
-                                        </div>
-                                      </div>
-                                    </a>
-                                  )
-                                }) : (
-                                  <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(tech + ' tutorial for beginners')}`} target="_blank" rel="noreferrer"
-                                    className="flex items-center gap-2 p-3 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#FF6B6B] transition-colors no-underline text-xs text-[#8E4B49] font-bold">
-                                    <Play size={13} className="text-[#FF0000]" />
-                                    Search {tech} tutorials on YouTube
-                                    <ExternalLink size={11} />
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              })()}
-
-              {/* 2c — Repository setup */}
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-bold text-[#1D1B18]">Set up your repository</h2>
-                    <p className="text-xs text-[#7C766F] mt-0.5">UDAAN uses your repo to track code, verify tests and measure progress.</p>
-                  </div>
-                  <div className="flex items-center gap-1 bg-[#F7F4F0] p-1 rounded-xl">
-                    <button type="button" onClick={() => { setRepoRequired(true); persist({ repoRequired: true }) }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${repoRequired ? 'bg-white text-[#1D1B18] shadow-sm' : 'text-[#7C766F]'}`}>
-                      Yes
-                    </button>
-                    <button type="button" onClick={() => { setRepoRequired(false); persist({ repoRequired: false }) }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${!repoRequired ? 'bg-white text-[#1D1B18] shadow-sm' : 'text-[#7C766F]'}`}>
-                      Skip for now
-                    </button>
-                  </div>
-                </div>
-
-                {repoRequired && (
-                  connectedRepo ? (
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-[#F0FAF8] border border-[#9FD8CB]">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 size={18} className="text-[#2A9D8F]" />
-                        <div>
-                          <span className="text-xs font-bold text-[#1D1B18] block">{connectedRepo.fullName}</span>
-                          <span className="text-[11px] text-[#534342]">{connectedRepo.branch} branch · {connectedRepo.isEmpty ? 'Empty' : `${connectedRepo.fileCount} files`}</span>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => { setConnectedRepo(null); setRepoUrlInput(''); persist({ repository: null }) }}
-                        className="text-xs text-[#8E4B49] font-bold hover:underline px-2 py-1 rounded-lg">
-                        Disconnect
+                  ) : !(flightPlan.milestones || []).length ? (
+                    <div className="bg-white rounded-2xl border border-[#EFEAE4] p-10 text-center space-y-3">
+                      <Rocket size={28} className="text-[#8E4B49] mx-auto opacity-70" />
+                      <p className="text-sm font-bold">Ready to generate your roadmap</p>
+                      <button type="button" onClick={() => generateStageDirectly('flight_plan')} className="px-5 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors">
+                        Generate Roadmap
                       </button>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      {/* Tabs */}
-                      <div className="flex gap-3 border-b border-[#EFEAE4] pb-2">
-                        {[['connect', 'Connect existing'], ['create', 'Create new with GitHub']].map(([key, label]) => (
-                          <button key={key} type="button" onClick={() => setRepoTab(key)}
-                            className={`text-xs font-bold pb-1.5 border-b-2 transition-colors ${repoTab === key ? 'text-[#8E4B49] border-[#8E4B49]' : 'text-[#7C766F] border-transparent hover:text-[#1D1B18]'}`}>
-                            {label}
-                          </button>
-                        ))}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        {flightPlan.summary && <p className="text-sm text-[#534342] leading-relaxed max-w-xl">{flightPlan.summary}</p>}
+                        <button type="button" onClick={() => generateStageDirectly('flight_plan')} disabled={Boolean(stageLoading)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#EFEAE4] text-xs font-bold text-[#534342] hover:bg-[#F7F4F0] transition-colors shrink-0">
+                          {stageLoading === 'flight_plan' ? <MiniLoader color="#534342" /> : <RefreshCw size={12} />}
+                          Regenerate
+                        </button>
                       </div>
 
-                      {repoTab === 'connect' && (
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <Github size={14} className="absolute left-3 top-3 text-[#7C766F]" />
-                            <input type="text" value={repoUrlInput} onChange={e => setRepoUrlInput(e.target.value)}
-                              placeholder="https://github.com/username/repo"
-                              className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-medium focus:border-[#8E4B49] focus:outline-none" />
-                          </div>
-                          <button type="button" onClick={handleInspectRepo} disabled={repoChecking}
-                            className="px-4 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors flex items-center gap-1.5 shrink-0">
-                            {repoChecking ? <MiniLoader color="#fff" /> : <Github size={13} />}
-                            Connect
-                          </button>
-                        </div>
-                      )}
-
-                      {repoTab === 'create' && (
-                        <div className="space-y-3">
-                          <div className="p-3 rounded-xl bg-[#FFF8F3] border border-[#FFAAA6]/40 text-xs text-[#534342] flex items-start gap-2">
-                            <Github size={14} className="text-[#1D1B18] shrink-0 mt-0.5" />
-                            <span>Create a GitHub repository directly using your connected account or enter a Personal Access Token below for instant creation.</span>
-                          </div>
-
-                          <div className="space-y-2">
-                            <input
-                              type="password"
-                              value={createRepoToken}
-                              onChange={e => setCreateRepoToken(e.target.value)}
-                              placeholder="GitHub Personal Access Token / Secret Key (Optional - skips OAuth)"
-                              className="w-full px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-mono focus:border-[#8E4B49] focus:outline-none"
-                            />
-                            <span className="text-[10px] text-[#9B9590] block">
-                              Paste a classic token with <code>repo</code> scope to create directly, or leave blank to authenticate via OAuth.
-                            </span>
-                          </div>
-
-                          <div className="flex gap-2">
-                            <input type="text" value={createRepoName} onChange={e => setCreateRepoName(e.target.value.toLowerCase().replace(/\s+/g, '-'))}
-                              placeholder={understanding.project_name?.toLowerCase().replace(/\s+/g, '-') || 'my-project'}
-                              className="flex-1 px-3 py-2.5 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs font-mono focus:border-[#8E4B49] focus:outline-none" />
-                            <button type="button" onClick={() => setCreateRepoPrivate(p => !p)}
-                              className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${createRepoPrivate ? 'bg-[#1D1B18] text-white border-[#1D1B18]' : 'bg-white border-[#EFEAE4] text-[#534342]'}`}>
-                              {createRepoPrivate ? '🔒 Private' : '🌐 Public'}
-                            </button>
-                            <button type="button" onClick={handleCreateGitHubRepo} disabled={createRepoLoading}
-                              className="px-4 py-2.5 rounded-xl bg-[#8E4B49] text-white text-xs font-bold hover:bg-[#7A3C3A] transition-colors flex items-center gap-1.5 shrink-0">
-                              {createRepoLoading ? <MiniLoader color="#fff" /> : <Github size={13} />}
-                              Create Repo
-                            </button>
-                          </div>
-
-                          {createRepoError && (
-                            <p className="text-xs text-[#8E4B49] font-medium">{createRepoError}</p>
-                          )}
-                        </div>
-                      )}
-
-                      {repoError && <p className="text-xs text-[#8E4B49] font-medium">{repoError}</p>}
-                    </div>
-                  )
-                )}
-              </div>
-
-              {/* 2d — Feasibility summary pills */}
-              {hasStageContent(feasibility) && feasibility.mvp_scope && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-4 space-y-2">
-                    <span className="text-xs font-bold text-[#7A3C3A] flex items-center gap-1.5">
-                      <Rocket size={13} /> Build for MVP
-                    </span>
-                    <PillList items={feasibility.mvp_scope.essential_features || []} color="#7A3C3A" bg="#FFF1ED" />
-                  </div>
-                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-4 space-y-2">
-                    <span className="text-xs font-bold text-[#766320] flex items-center gap-1.5">
-                      <Clock size={13} /> Save for later
-                    </span>
-                    <PillList items={feasibility.mvp_scope.postpone || []} color="#766320" bg="#FFFBEB" />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ─── STEP 3: TEAM & TIMELINE ─────────────────────────────────────── */}
-          {step === 3 && (
-            <div className="space-y-4">
-              {/* Timeline inputs */}
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
-                <h2 className="text-sm font-bold text-[#1D1B18]">When do you want to ship?</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    { label: '🗓 Launch deadline', type: 'date', val: deadline, min: todayIso, set: v => { setDeadline(v); persist({ deadline: v }) } },
-                    { label: '👥 Team size', type: 'number', val: teamSize, min: 1, max: 10, set: v => updateTeamSizeCount(v) },
-                    { label: '⏱ Hours/week per person', type: 'number', val: weeklyHours, min: 5, max: 80, set: v => { setWeeklyHours(parseInt(v, 10) || 20); persist({ weeklyHours: parseInt(v, 10) || 20 }) } },
-                  ].map(({ label, type, val, min, max, set }) => (
-                    <div key={label} className="space-y-1.5">
-                      <label className="text-xs font-bold text-[#534342] block">{label}</label>
-                      <input type={type} value={val} min={min} max={max} onChange={e => set(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-sm font-bold focus:border-[#8E4B49] focus:outline-none" />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Stats banner */}
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                  {[
-                    { label: 'Days remaining', val: daysRemaining },
-                    { label: 'Weekly team hours', val: `${totalWeeklyHrs}h` },
-                    { label: 'Sprint pace', val: daysRemaining > 60 ? 'Sustainable' : daysRemaining > 30 ? 'Moderate' : 'Intense' },
-                  ].map(({ label, val }) => (
-                    <div key={label} className="text-center p-3 rounded-xl bg-[#FFF8F3] border border-[#EFEAE4]">
-                      <div className="text-lg font-black text-[#8E4B49]">{val}</div>
-                      <div className="text-[11px] text-[#7C766F] mt-0.5">{label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Team members */}
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-[#1D1B18]">Team members ({teamMembers.length})</h2>
-                  <button type="button" onClick={() => updateTeamSizeCount(teamSize + 1)} className="flex items-center gap-1 text-xs font-bold text-[#8E4B49] hover:underline">
-                    <Plus size={13} /> Add
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {teamMembers.map((m, i) => (
-                    <div key={m.id || i} className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] items-center">
-                      <input type="text" value={m.name} onChange={e => setTeamMembers(prev => { const c = [...prev]; c[i] = { ...c[i], name: e.target.value }; return c })}
-                        placeholder={`Member ${i + 1}`} className="px-2.5 py-1.5 rounded-xl bg-white border border-[#EFEAE4] text-xs font-bold" />
-                      <select value={m.role} onChange={e => setTeamMembers(prev => { const c = [...prev]; c[i] = { ...c[i], role: e.target.value }; return c })}
-                        className="px-2.5 py-1.5 rounded-xl bg-white border border-[#EFEAE4] text-xs">
-                        {roleOptions.map(r => <option key={r} value={r}>{r}</option>)}
-                      </select>
-                      <input type="text" value={m.focus || ''} onChange={e => setTeamMembers(prev => { const c = [...prev]; c[i] = { ...c[i], focus: e.target.value }; return c })}
-                        placeholder="Primary focus" className="px-2.5 py-1.5 rounded-xl bg-white border border-[#EFEAE4] text-xs" />
-                      <div className="flex items-center gap-1">
-                        <input type="number" min="1" max="80" value={m.hours} onChange={e => setTeamMembers(prev => { const c = [...prev]; c[i] = { ...c[i], hours: parseInt(e.target.value, 10) || weeklyHours }; return c })}
-                          className="w-16 px-2 py-1.5 rounded-xl bg-white border border-[#EFEAE4] text-xs font-bold text-center" />
-                        <span className="text-[10px] text-[#7C766F]">h/wk</span>
-                        {teamMembers.length > 1 && (
-                          <button type="button" onClick={() => updateTeamSizeCount(teamSize - 1)} className="ml-auto text-[#8E4B49] p-1 rounded-lg hover:bg-[#FFF1ED]">
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* ─── STEP 4: FLIGHT PLAN ROADMAP ────────────────────────────────── */}
-          {step === 4 && (
-            <div className="space-y-4">
-              {stageLoading === 'flight_plan' ? (
-                <div className="bg-white rounded-2xl border border-[#EFEAE4] p-8 flex flex-col items-center">
-                  <UdaanLoader character="rocket" size="md"
-                    message={['Planning sprints…', 'Sequencing milestones…', 'Mapping your team…', 'Building roadmap…']}
-                    sub="Gemini AI · roadmap synthesis" />
-                </div>
-              ) : !(flightPlan.milestones || []).length ? (
-                <div className="bg-white rounded-2xl border border-[#EFEAE4] p-10 text-center space-y-3">
-                  <Rocket size={28} className="text-[#8E4B49] mx-auto opacity-70" />
-                  <p className="text-sm font-bold">Ready to generate your roadmap</p>
-                  <button type="button" onClick={() => generateStageDirectly('flight_plan')} className="px-5 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors">
-                    Generate Roadmap
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    {flightPlan.summary && <p className="text-sm text-[#534342] leading-relaxed max-w-xl">{flightPlan.summary}</p>}
-                    <button type="button" onClick={() => generateStageDirectly('flight_plan')} disabled={Boolean(stageLoading)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white border border-[#EFEAE4] text-xs font-bold text-[#534342] hover:bg-[#F7F4F0] transition-colors shrink-0">
-                      {stageLoading === 'flight_plan' ? <MiniLoader color="#534342" /> : <RefreshCw size={12} />}
-                      Regenerate
-                    </button>
-                  </div>
-
-                  {(flightPlan.milestones || []).map((ms, idx) => {
-                    const accents = [['#FFAAA6', '#7A3C3A'], ['#FDE68A', '#766320'], ['#9FD8CB', '#2A5D54'], ['#C4B5FD', '#4B3B8C']]
-                    const [border, text] = accents[idx % accents.length]
-                    return (
-                      <div key={idx} className="bg-white rounded-2xl border p-5 space-y-3 shadow-xs" style={{ borderColor: border }}>
-                        <div className="flex items-center gap-3">
-                          <span className="w-7 h-7 rounded-full text-white text-xs font-black flex items-center justify-center shrink-0" style={{ background: text }}>
-                            {String(idx + 1).padStart(2, '0')}
-                          </span>
-                          <div>
-                            <h3 className="text-sm font-bold text-[#1D1B18]">{ms.title}</h3>
-                            <span className="text-[11px] font-semibold" style={{ color: text }}>{ms.category} · {ms.target_date}</span>
-                          </div>
-                          <span className="ml-auto text-[11px] text-[#7C766F]">{ms.tasks?.length || 0} tasks</span>
-                        </div>
-
-                        {ms.purpose && <p className="text-xs text-[#534342] italic">{ms.purpose}</p>}
-
-                        <div className="space-y-2">
-                          {(ms.tasks || []).map((t, ti) => (
-                            <div key={ti} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <ChevronRight size={12} className="text-[#9B9590] shrink-0" />
-                                <span className="font-bold text-[#1D1B18] truncate">{t.title}</span>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${t.priority === 'high' ? 'bg-[#FFAAA6]/40 text-[#7A3C3A]' : 'bg-[#FBE191]/40 text-[#766320]'}`}>
-                                  {t.priority || 'medium'}
-                                </span>
+                      {(flightPlan.milestones || []).map((ms, idx) => {
+                        const accents = [['#FFAAA6', '#7A3C3A'], ['#FDE68A', '#766320'], ['#9FD8CB', '#2A5D54'], ['#C4B5FD', '#4B3B8C']]
+                        const [border, text] = accents[idx % accents.length]
+                        return (
+                          <div key={idx} className="bg-white rounded-2xl border p-5 space-y-3 shadow-xs" style={{ borderColor: border }}>
+                            <div className="flex items-center gap-3">
+                              <span className="w-7 h-7 rounded-full text-white text-xs font-black flex items-center justify-center shrink-0" style={{ background: text }}>
+                                {String(idx + 1).padStart(2, '0')}
+                              </span>
+                              <div>
+                                <h3 className="text-sm font-bold text-[#1D1B18]">{ms.title}</h3>
+                                <span className="text-[11px] font-semibold" style={{ color: text }}>{ms.category} · {ms.target_date}</span>
                               </div>
-                              <span className="text-[10px] text-[#7C766F] shrink-0">{t.effort_estimate || '—'}</span>
+                              <span className="ml-auto text-[11px] text-[#7C766F]">{ms.tasks?.length || 0} tasks</span>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* ─── STEP 5: BUSINESS MODEL & FINANCIAL PLANNER ──────────────────── */}
-          {step === 5 && (
-            <div className="space-y-5">
-              {/* Header banner */}
-              <div className="bg-gradient-to-r from-[#FFF8F3] via-[#FFF1ED] to-[#FEF3C7]/40 rounded-2xl border border-[#FFAAA6]/50 p-5 shadow-xs space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-lg bg-[#8E4B49] text-white flex items-center justify-center font-bold text-xs">💰</span>
-                  <h2 className="text-sm font-black text-[#1D1B18]">Business Model & Financial Planning</h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#8E4B49] border border-[#FFAAA6]">
-                    {projectType} · {domain.toUpperCase()}
-                  </span>
-                </div>
-                <p className="text-xs text-[#534342] leading-relaxed">
-                  Plan how your project monetizes, allocate your capital across critical stages, and access Indian startup grants and prizes.
-                </p>
-              </div>
+                            {ms.purpose && <p className="text-xs text-[#534342] italic">{ms.purpose}</p>}
 
-              {/* Section A: Revenue Models */}
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div>
-                    <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">1. Choose Your Primary Revenue Model</h3>
-                    <p className="text-xs text-[#7C766F] mt-0.5">Select how your project will earn money and sustain development.</p>
-                  </div>
-                  {aiRevenueRecommendation && (
-                    <div className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#FFFBEB] to-[#FEF3C7] border border-[#FDE68A] flex items-center gap-2">
-                      <span className="text-xs">🤖</span>
-                      <span className="text-xs font-bold text-[#92400E]">
-                        AI Pick: <b>{aiRevenueRecommendation.title}</b>
-                      </span>
+                            <div className="space-y-2">
+                              {(ms.tasks || []).map((t, ti) => (
+                                <div key={ti} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <ChevronRight size={12} className="text-[#9B9590] shrink-0" />
+                                    <span className="font-bold text-[#1D1B18] truncate">{t.title}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${t.priority === 'high' ? 'bg-[#FFAAA6]/40 text-[#7A3C3A]' : 'bg-[#FBE191]/40 text-[#766320]'}`}>
+                                      {t.priority || 'medium'}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-[#7C766F] shrink-0">{t.effort_estimate || '—'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>
+              )}
 
-                {/* AI Rationale banner */}
-                {aiRevenueRecommendation && (
-                  <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs text-[#534342] flex items-start gap-2.5">
-                    <span className="text-[#8E4B49] font-black text-sm shrink-0">💡</span>
-                    <div>
-                      <strong className="text-[#1D1B18] font-bold block mb-0.5">Why AI picked this model:</strong>
-                      <span className="leading-relaxed">{aiRevenueRecommendation.reasoning}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {REVENUE_MODELS.map(model => {
-                    const isSelected = selectedRevenueModel === model.id
-                    const isAiPick = aiRevenueRecommendation?.modelId === model.id
-                    return (
-                      <button
-                        key={model.id}
-                        type="button"
-                        onClick={() => { setSelectedRevenueModel(model.id); persist({ business_model: { revenue_model: model.id, budget: projectBudget } }) }}
-                        className={`p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col cursor-pointer ${
-                          isSelected
-                            ? 'border-[#8E4B49] bg-[#FFFDFB] shadow-sm ring-2 ring-[#8E4B49]/10'
-                            : 'border-[#EFEAE4] bg-white hover:border-[#D4CFC9]'
-                        }`}
-                      >
-                        {isAiPick && (
-                          <span className="absolute top-2.5 right-2.5 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
-                            ★ AI Recommended
-                          </span>
-                        )}
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xl">{model.icon}</span>
-                          <span className="text-xs font-bold text-[#1D1B18]">{model.name}</span>
-                        </div>
-                        <p className="text-[11px] text-[#534342] leading-relaxed mb-3">{model.desc}</p>
-                        <div className="mt-auto pt-2 border-t border-[#F3EDE7] flex items-center justify-between text-[10px] text-[#8E4B49] font-bold">
-                          <span>{isSelected ? '✓ Selected Model' : 'Click to select'}</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Section B: Budget Allocation Planner */}
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">2. Project Budget & Resource Allocation</h3>
-                    <p className="text-xs text-[#7C766F] mt-0.5">Slide to set your expected budget to see smart spending recommendations.</p>
-                  </div>
-                  <div className="px-3 py-1 rounded-xl bg-[#FFF8F3] border border-[#FFAAA6] text-[#8E4B49] font-black text-sm">
-                    ₹{projectBudget.toLocaleString('en-IN')}
-                  </div>
-                </div>
-
-                <input
-                  type="range"
-                  min={0}
-                  max={150000}
-                  step={2500}
-                  value={projectBudget}
-                  onChange={e => {
-                    const val = Number(e.target.value)
-                    setProjectBudget(val)
-                    persist({ business_model: { revenue_model: selectedRevenueModel, budget: val } })
-                  }}
-                  className="w-full accent-[#8E4B49] cursor-pointer"
-                />
-
-                {/* Visual Multi-Segment Budget Bar */}
-                {(() => {
-                  const categories = getBudgetCategoriesForDomain(domain)
-                  return (
-                    <div className="space-y-3">
-                      <div className="h-4 rounded-full overflow-hidden flex bg-[#F3EDE7] shadow-inner">
-                        {categories.map((cat, i) => (
-                          <div
-                            key={i}
-                            style={{ width: `${cat.pct}%`, background: cat.color }}
-                            title={`${cat.label}: ₹${Math.round((projectBudget * cat.pct) / 100).toLocaleString('en-IN')}`}
-                          />
-                        ))}
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-                        {categories.map((cat, i) => {
-                          const amount = Math.round((projectBudget * cat.pct) / 100)
-                          return (
-                            <div key={i} className="p-2.5 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs space-y-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
-                                <span className="font-bold text-[#534342] text-[10.5px] truncate">{cat.label}</span>
-                              </div>
-                              <div className="font-black text-[#1D1B18] text-xs">
-                                ₹{amount.toLocaleString('en-IN')} <small className="text-[#7C766F] font-normal">({cat.pct}%)</small>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })()}
-              </div>
-
-              {/* Section C: 6-Month Cash Flow & Revenue Projection */}
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
-                <div>
-                  <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">3. 6-Month Execution & Cash Flow Projection</h3>
-                  <p className="text-xs text-[#7C766F] mt-0.5">Conservative milestones based on a {teamSize}-person team and {totalWeeklyHrs} total hrs/week.</p>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-[#EFEAE4] bg-[#FAF8F5] text-[#534342]">
-                        <th className="py-2.5 px-3 font-bold rounded-l-xl">Timeline</th>
-                        <th className="py-2.5 px-3 font-bold">Milestone Focus</th>
-                        <th className="py-2.5 px-3 font-bold">{domain === 'hardware' ? 'Units Built' : 'Active Users'}</th>
-                        <th className="py-2.5 px-3 font-bold">Projected Revenue</th>
-                        <th className="py-2.5 px-3 font-bold">Estimated Cost</th>
-                        <th className="py-2.5 px-3 font-bold rounded-r-xl">Net Margin</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#F3EDE7]">
-                      {[
-                        {
-                          time: 'Month 1–2',
-                          focus: domain === 'hardware' ? 'BOM Sourcing & Breadboard Prototype' : 'Core Architecture & MVP Build',
-                          traction: domain === 'hardware' ? '1–2 Test Units' : '0 (Private Alpha)',
-                          revenue: '₹0',
-                          cost: `₹${Math.round(projectBudget * 0.4).toLocaleString('en-IN')}`,
-                          net: `-₹${Math.round(projectBudget * 0.4).toLocaleString('en-IN')}`,
-                          netColor: '#DC2626',
-                        },
-                        {
-                          time: 'Month 3',
-                          focus: 'Beta Release & User Validation',
-                          traction: domain === 'hardware' ? '5–10 Pilot Kits' : '50 Active Users',
-                          revenue: `₹${Math.round(projectBudget * 0.15).toLocaleString('en-IN')}`,
-                          cost: `₹${Math.round(projectBudget * 0.25).toLocaleString('en-IN')}`,
-                          net: `-₹${Math.round(projectBudget * 0.1).toLocaleString('en-IN')}`,
-                          netColor: '#D97706',
-                        },
-                        {
-                          time: 'Month 4–5',
-                          focus: 'Organic Growth & Feature Polish',
-                          traction: domain === 'hardware' ? '25 Pilot Devices' : '200 Active Users',
-                          revenue: `₹${Math.round(projectBudget * 0.55).toLocaleString('en-IN')}`,
-                          cost: `₹${Math.round(projectBudget * 0.2).toLocaleString('en-IN')}`,
-                          net: `+₹${Math.round(projectBudget * 0.35).toLocaleString('en-IN')}`,
-                          netColor: '#16A34A',
-                        },
-                        {
-                          time: 'Month 6',
-                          focus: 'Scale & Break-Even Target',
-                          traction: domain === 'hardware' ? '60+ Units' : '500+ Users',
-                          revenue: `₹${Math.round(projectBudget * 0.95).toLocaleString('en-IN')}`,
-                          cost: `₹${Math.round(projectBudget * 0.15).toLocaleString('en-IN')}`,
-                          net: `+₹${Math.round(projectBudget * 0.8).toLocaleString('en-IN')}`,
-                          netColor: '#16A34A',
-                        },
-                      ].map((row, idx) => (
-                        <tr key={idx} className="hover:bg-[#FFFDFB] transition-colors">
-                          <td className="py-2.5 px-3 font-bold text-[#1D1B18]">{row.time}</td>
-                          <td className="py-2.5 px-3 text-[#534342]">{row.focus}</td>
-                          <td className="py-2.5 px-3 font-semibold text-[#1D1B18]">{row.traction}</td>
-                          <td className="py-2.5 px-3 font-bold text-[#16A34A]">{row.revenue}</td>
-                          <td className="py-2.5 px-3 text-[#7C766F]">{row.cost}</td>
-                          <td className="py-2.5 px-3 font-black" style={{ color: row.netColor }}>{row.net}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Section D: Curated Funding Sources */}
-              <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
-                <div>
-                  <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">4. Recommended Funding & Grants</h3>
-                  <p className="text-xs text-[#7C766F] mt-0.5">Top accessible grants and competition funds for {projectType} creators.</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {(FUNDING_SOURCES[projectType] || FUNDING_SOURCES['Startup']).map((fund, i) => (
-                    <a
-                      key={i}
-                      href={fund.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-3.5 rounded-2xl border transition-all hover:shadow-xs no-underline flex flex-col bg-white cursor-pointer"
-                      style={{ borderColor: fund.color + '40' }}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-base">{fund.icon}</span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: fund.bg, color: fund.color }}>
-                          {fund.type}
-                        </span>
-                      </div>
-                      <h4 className="text-xs font-bold text-[#1D1B18] mb-1">{fund.name}</h4>
-                      <span className="text-xs font-black mb-3" style={{ color: fund.color }}>{fund.amount}</span>
-                      <span className="mt-auto text-[10.5px] font-bold text-[#8E4B49] flex items-center gap-1">
-                        Apply or Explore <ExternalLink size={11} />
+              {/* ─── STEP 5: BUSINESS MODEL & FINANCIAL PLANNER ──────────────────── */}
+              {step === 5 && (
+                <div className="space-y-5">
+                  {/* Header banner */}
+                  <div className="bg-gradient-to-r from-[#FFF8F3] via-[#FFF1ED] to-[#FEF3C7]/40 rounded-2xl border border-[#FFAAA6]/50 p-5 shadow-xs space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-[#8E4B49] text-white flex items-center justify-center font-bold text-xs">💰</span>
+                      <h2 className="text-sm font-black text-[#1D1B18]">Business Model & Financial Planning</h2>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-[#8E4B49] border border-[#FFAAA6]">
+                        {projectType} · {domain.toUpperCase()}
                       </span>
-                    </a>
-                  ))}
+                    </div>
+                    <p className="text-xs text-[#534342] leading-relaxed">
+                      Plan how your project monetizes, allocate your capital across critical stages, and access Indian startup grants and prizes.
+                    </p>
+                  </div>
+
+                  {/* Section A: Revenue Models */}
+                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
+                    <div className="flex items-start justify-between gap-3 flex-wrap">
+                      <div>
+                        <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">1. Choose Your Primary Revenue Model</h3>
+                        <p className="text-xs text-[#7C766F] mt-0.5">Select how your project will earn money and sustain development.</p>
+                      </div>
+                      {aiRevenueRecommendation && (
+                        <div className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#FFFBEB] to-[#FEF3C7] border border-[#FDE68A] flex items-center gap-2">
+                          <span className="text-xs">🤖</span>
+                          <span className="text-xs font-bold text-[#92400E]">
+                            AI Pick: <b>{aiRevenueRecommendation.title}</b>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI Rationale banner */}
+                    {aiRevenueRecommendation && (
+                      <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs text-[#534342] flex items-start gap-2.5">
+                        <span className="text-[#8E4B49] font-black text-sm shrink-0">💡</span>
+                        <div>
+                          <strong className="text-[#1D1B18] font-bold block mb-0.5">Why AI picked this model:</strong>
+                          <span className="leading-relaxed">{aiRevenueRecommendation.reasoning}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {REVENUE_MODELS.map(model => {
+                        const isSelected = selectedRevenueModel === model.id
+                        const isAiPick = aiRevenueRecommendation?.modelId === model.id
+                        return (
+                          <button
+                            key={model.id}
+                            type="button"
+                            onClick={() => { setSelectedRevenueModel(model.id); persist({ business_model: { revenue_model: model.id, budget: projectBudget } }) }}
+                            className={`p-4 rounded-2xl border-2 text-left transition-all relative flex flex-col cursor-pointer ${isSelected
+                                ? 'border-[#8E4B49] bg-[#FFFDFB] shadow-sm ring-2 ring-[#8E4B49]/10'
+                                : 'border-[#EFEAE4] bg-white hover:border-[#D4CFC9]'
+                              }`}
+                          >
+                            {isAiPick && (
+                              <span className="absolute top-2.5 right-2.5 text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]">
+                                ★ AI Recommended
+                              </span>
+                            )}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xl">{model.icon}</span>
+                              <span className="text-xs font-bold text-[#1D1B18]">{model.name}</span>
+                            </div>
+                            <p className="text-[11px] text-[#534342] leading-relaxed mb-3">{model.desc}</p>
+                            <div className="mt-auto pt-2 border-t border-[#F3EDE7] flex items-center justify-between text-[10px] text-[#8E4B49] font-bold">
+                              <span>{isSelected ? '✓ Selected Model' : 'Click to select'}</span>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Section B: Budget Allocation Planner */}
+                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-4 shadow-xs">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">2. Project Budget & Resource Allocation</h3>
+                        <p className="text-xs text-[#7C766F] mt-0.5">Slide to set your expected budget to see smart spending recommendations.</p>
+                      </div>
+                      <div className="px-3 py-1 rounded-xl bg-[#FFF8F3] border border-[#FFAAA6] text-[#8E4B49] font-black text-sm">
+                        ₹{projectBudget.toLocaleString('en-IN')}
+                      </div>
+                    </div>
+
+                    <input
+                      type="range"
+                      min={0}
+                      max={150000}
+                      step={2500}
+                      value={projectBudget}
+                      onChange={e => {
+                        const val = Number(e.target.value)
+                        setProjectBudget(val)
+                        persist({ business_model: { revenue_model: selectedRevenueModel, budget: val } })
+                      }}
+                      className="w-full accent-[#8E4B49] cursor-pointer"
+                    />
+
+                    {/* Visual Multi-Segment Budget Bar */}
+                    {(() => {
+                      const categories = getBudgetCategoriesForDomain(domain, domains)
+                      return (
+                        <div className="space-y-3">
+                          <div className="h-4 rounded-full overflow-hidden flex bg-[#F3EDE7] shadow-inner">
+                            {categories.map((cat, i) => (
+                              <div
+                                key={i}
+                                style={{ width: `${cat.pct}%`, background: cat.color }}
+                                title={`${cat.label}: ₹${Math.round((projectBudget * cat.pct) / 100).toLocaleString('en-IN')}`}
+                              />
+                            ))}
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                            {categories.map((cat, i) => {
+                              const amount = Math.round((projectBudget * cat.pct) / 100)
+                              return (
+                                <div key={i} className="p-2.5 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs space-y-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
+                                    <span className="font-bold text-[#534342] text-[10.5px] truncate">{cat.label}</span>
+                                  </div>
+                                  <div className="font-black text-[#1D1B18] text-xs">
+                                    ₹{amount.toLocaleString('en-IN')} <small className="text-[#7C766F] font-normal">({cat.pct}%)</small>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Section C: 6-Month Cash Flow & Revenue Projection */}
+                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
+                    <div>
+                      <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">3. 6-Month Execution & Cash Flow Projection</h3>
+                      <p className="text-xs text-[#7C766F] mt-0.5">Conservative milestones based on a {teamSize}-person team and {totalWeeklyHrs} total hrs/week.</p>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-[#EFEAE4] bg-[#FAF8F5] text-[#534342]">
+                            <th className="py-2.5 px-3 font-bold rounded-l-xl">Timeline</th>
+                            <th className="py-2.5 px-3 font-bold">Milestone Focus</th>
+                            <th className="py-2.5 px-3 font-bold">{domain === 'hardware' ? 'Units Built' : 'Active Users'}</th>
+                            <th className="py-2.5 px-3 font-bold">Projected Revenue</th>
+                            <th className="py-2.5 px-3 font-bold">Estimated Cost</th>
+                            <th className="py-2.5 px-3 font-bold rounded-r-xl">Net Margin</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#F3EDE7]">
+                          {[
+                            {
+                              time: 'Month 1–2',
+                              focus: domain === 'hardware' ? 'BOM Sourcing & Breadboard Prototype' : 'Core Architecture & MVP Build',
+                              traction: domain === 'hardware' ? '1–2 Test Units' : '0 (Private Alpha)',
+                              revenue: '₹0',
+                              cost: `₹${Math.round(projectBudget * 0.4).toLocaleString('en-IN')}`,
+                              net: `-₹${Math.round(projectBudget * 0.4).toLocaleString('en-IN')}`,
+                              netColor: '#DC2626',
+                            },
+                            {
+                              time: 'Month 3',
+                              focus: 'Beta Release & User Validation',
+                              traction: domain === 'hardware' ? '5–10 Pilot Kits' : '50 Active Users',
+                              revenue: `₹${Math.round(projectBudget * 0.15).toLocaleString('en-IN')}`,
+                              cost: `₹${Math.round(projectBudget * 0.25).toLocaleString('en-IN')}`,
+                              net: `-₹${Math.round(projectBudget * 0.1).toLocaleString('en-IN')}`,
+                              netColor: '#D97706',
+                            },
+                            {
+                              time: 'Month 4–5',
+                              focus: 'Organic Growth & Feature Polish',
+                              traction: domain === 'hardware' ? '25 Pilot Devices' : '200 Active Users',
+                              revenue: `₹${Math.round(projectBudget * 0.55).toLocaleString('en-IN')}`,
+                              cost: `₹${Math.round(projectBudget * 0.2).toLocaleString('en-IN')}`,
+                              net: `+₹${Math.round(projectBudget * 0.35).toLocaleString('en-IN')}`,
+                              netColor: '#16A34A',
+                            },
+                            {
+                              time: 'Month 6',
+                              focus: 'Scale & Break-Even Target',
+                              traction: domain === 'hardware' ? '60+ Units' : '500+ Users',
+                              revenue: `₹${Math.round(projectBudget * 0.95).toLocaleString('en-IN')}`,
+                              cost: `₹${Math.round(projectBudget * 0.15).toLocaleString('en-IN')}`,
+                              net: `+₹${Math.round(projectBudget * 0.8).toLocaleString('en-IN')}`,
+                              netColor: '#16A34A',
+                            },
+                          ].map((row, idx) => (
+                            <tr key={idx} className="hover:bg-[#FFFDFB] transition-colors">
+                              <td className="py-2.5 px-3 font-bold text-[#1D1B18]">{row.time}</td>
+                              <td className="py-2.5 px-3 text-[#534342]">{row.focus}</td>
+                              <td className="py-2.5 px-3 font-semibold text-[#1D1B18]">{row.traction}</td>
+                              <td className="py-2.5 px-3 font-bold text-[#16A34A]">{row.revenue}</td>
+                              <td className="py-2.5 px-3 text-[#7C766F]">{row.cost}</td>
+                              <td className="py-2.5 px-3 font-black" style={{ color: row.netColor }}>{row.net}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Section D: Curated Funding Sources */}
+                  <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 space-y-3.5 shadow-xs">
+                    <div>
+                      <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">4. Recommended Funding & Grants</h3>
+                      <p className="text-xs text-[#7C766F] mt-0.5">Top accessible grants and competition funds for {projectType} creators.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {(FUNDING_SOURCES[projectType] || FUNDING_SOURCES['Startup']).map((fund, i) => (
+                        <a
+                          key={i}
+                          href={fund.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-3.5 rounded-2xl border transition-all hover:shadow-xs no-underline flex flex-col bg-white cursor-pointer"
+                          style={{ borderColor: fund.color + '40' }}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-base">{fund.icon}</span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: fund.bg, color: fund.color }}>
+                              {fund.type}
+                            </span>
+                          </div>
+                          <h4 className="text-xs font-bold text-[#1D1B18] mb-1">{fund.name}</h4>
+                          <span className="text-xs font-black mb-3" style={{ color: fund.color }}>{fund.amount}</span>
+                          <span className="mt-auto text-[10.5px] font-bold text-[#8E4B49] flex items-center gap-1">
+                            Apply or Explore <ExternalLink size={11} />
+                          </span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Section E: AI Rationale */}
+                  <div className="bg-[#FFFDF8] rounded-2xl border border-[#FDE68A] p-4 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowRationale(p => !p)}
+                      className="w-full flex items-center justify-between text-left cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Lightbulb size={14} className="text-[#D97706]" />
+                        <span className="text-xs font-black text-[#92400E]">AI Recommendation Rationale</span>
+                      </div>
+                      {showRationale ? <ChevronDown size={14} className="text-[#92400E]" /> : <ChevronRight size={14} className="text-[#92400E]" />}
+                    </button>
+
+                    {showRationale && (
+                      <div className="pt-2 border-t border-[#FDE68A]/60 text-xs text-[#78350F] space-y-1.5 leading-relaxed">
+                        <p className="m-0">
+                          • <strong>Domain fit:</strong> For a <strong>{domain.toUpperCase()}</strong> project, {domain === 'hardware' ? 'upfront component purchase and hardware unit sales' : domain === 'hybrid' ? 'hardware sales combined with recurring cloud subscription' : 'subscription or freemium models'} minimize burn rate while maximizing customer lifetime value (LTV).
+                        </p>
+                        <p className="m-0">
+                          • <strong>Pacing:</strong> With a <strong>{teamSize}-person team</strong> working <strong>{totalWeeklyHrs} hrs/week</strong>, Month 1–2 focuses strictly on de-risking the highest-uncertainty pillar before spending on paid marketing.
+                        </p>
+                        <p className="m-0">
+                          • <strong>Grants:</strong> Government grants and hackathons offer 100% non-dilutive capital, giving you runway without giving away early equity.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Section E: AI Rationale */}
-              <div className="bg-[#FFFDF8] rounded-2xl border border-[#FDE68A] p-4 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRationale(p => !p)}
-                  className="w-full flex items-center justify-between text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Lightbulb size={14} className="text-[#D97706]" />
-                    <span className="text-xs font-black text-[#92400E]">AI Recommendation Rationale</span>
-                  </div>
-                  {showRationale ? <ChevronDown size={14} className="text-[#92400E]" /> : <ChevronRight size={14} className="text-[#92400E]" />}
-                </button>
-
-                {showRationale && (
-                  <div className="pt-2 border-t border-[#FDE68A]/60 text-xs text-[#78350F] space-y-1.5 leading-relaxed">
-                    <p className="m-0">
-                      • <strong>Domain fit:</strong> For a <strong>{domain.toUpperCase()}</strong> project, {domain === 'hardware' ? 'upfront component purchase and hardware unit sales' : domain === 'hybrid' ? 'hardware sales combined with recurring cloud subscription' : 'subscription or freemium models'} minimize burn rate while maximizing customer lifetime value (LTV).
-                    </p>
-                    <p className="m-0">
-                      • <strong>Pacing:</strong> With a <strong>{teamSize}-person team</strong> working <strong>{totalWeeklyHrs} hrs/week</strong>, Month 1–2 focuses strictly on de-risking the highest-uncertainty pillar before spending on paid marketing.
-                    </p>
-                    <p className="m-0">
-                      • <strong>Grants:</strong> Government grants and hackathons offer 100% non-dilutive capital, giving you runway without giving away early equity.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Notifications */}
-          {notice && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2A5D54]/10 border border-[#2A5D54]/30 text-[#2A5D54] text-xs font-semibold">
-              <Check size={15} /> {notice}
-            </div>
-          )}
-          {error && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFAAA6]/20 border border-[#FFAAA6] text-[#8E4B49] text-xs font-semibold">
-              <AlertCircle size={15} /> {error}
-            </div>
-          )}
+              {/* Notifications */}
+              {notice && (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2A5D54]/10 border border-[#2A5D54]/30 text-[#2A5D54] text-xs font-semibold">
+                  <Check size={15} /> {notice}
+                </div>
+              )}
+              {error && (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#FFAAA6]/20 border border-[#FFAAA6] text-[#8E4B49] text-xs font-semibold">
+                  <AlertCircle size={15} /> {error}
+                </div>
+              )}
 
             </div>
 

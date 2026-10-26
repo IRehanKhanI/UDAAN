@@ -352,6 +352,9 @@ BUSINESS_MODEL_DEFAULTS = {
     'software': ['subscription', 'freemium'],
     'hardware': ['one_time', 'hardware_service'],
     'hybrid': ['one_time', 'subscription'],
+    'digital': ['subscription', 'freemium'],
+    'physical': ['one_time', 'hardware_service'],
+    'services': ['service_fee', 'marketplace'],
 }
 
 
@@ -1379,7 +1382,13 @@ class ClassifyDomainView(APIView):
         idea = str(request.data.get('idea', '')).strip()
         project_type = str(request.data.get('project_type', 'Startup')).strip()
         if not idea:
-            return Response({'domain': 'software', 'confidence': 0.8, 'reasoning': 'No idea text provided.'}, status=status.HTTP_200_OK)
+            return Response({
+                'domains': ['digital'],
+                'domain': 'software',
+                'confidence': 0.8,
+                'reasoning': 'No idea text provided.',
+                'detected_keywords': []
+            }, status=status.HTTP_200_OK)
 
         result = classify_project_domain(idea, project_type)
         return Response(result, status=status.HTTP_200_OK)

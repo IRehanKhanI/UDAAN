@@ -883,19 +883,29 @@ def generate_glimpse_response(*, prompt, action, conversation, website=None):
 
 def classify_project_domain(idea, project_type='Startup'):
     """
-    Classify whether a project is software, hardware, or hybrid (both) using AI
-    with a deterministic fallback.
+    Classify whether a project spans Digital Products, Physical Products, and/or Businesses & Services.
+    Supports multi-category combinations (e.g. ['digital', 'services']).
     """
     idea_str = str(idea or '').strip()
     if not idea_str:
-        return {'domain': 'software', 'confidence': 0.7, 'reasoning': 'Default fallback', 'detected_keywords': []}
+        return {
+            'domains': ['digital'],
+            'domain': 'software',
+            'confidence': 0.7,
+            'reasoning': 'Default fallback',
+            'detected_keywords': []
+        }
 
     schema = {
         'type': 'object',
         'properties': {
-            'domain': {
-                'type': 'string',
-                'enum': ['software', 'hardware', 'hybrid'],
+            'domains': {
+                'type': 'array',
+                'items': {
+                    'type': 'string',
+                    'enum': ['digital', 'physical', 'services'],
+                },
+                'description': 'One or more categories that apply. Can pick combination of digital, physical, and services.',
             },
             'confidence': {'type': 'number'},
             'reasoning': {'type': 'string'},
@@ -904,20 +914,22 @@ def classify_project_domain(idea, project_type='Startup'):
                 'items': {'type': 'string'},
             },
         },
-        'required': ['domain', 'confidence', 'reasoning', 'detected_keywords'],
+        'required': ['domains', 'confidence', 'reasoning', 'detected_keywords'],
     }
 
-    prompt = f"""You are a technical domain classifier for innovative student and startup projects.
-Classify the following idea into EXACTLY one of three domains:
-- 'software': Pure software (web apps, mobile apps, SaaS, algorithms, APIs, databases, browser extensions).
-- 'hardware': Pure physical hardware / embedded devices / robotics / mechanics / PCB circuits with minimal or firmware-only software.
-- 'hybrid': Projects requiring BOTH custom physical hardware (sensors, microcontrollers, motors, actuators, IoT chips) AND a software platform/app/cloud dashboard.
+    prompt = f"""You are an expert product and business classifier.
+Classify the following idea into ONE OR MORE of the following 3 categories:
+1. 'digital': Digital Products - Websites, mobile apps, SaaS, AI tools, APIs, and online platforms.
+2. 'physical': Physical Products - Electronics, hardware, robotics, IoT, clothing brands, manufacturing, and custom-made products.
+3. 'services': Businesses & Services - Retail shops, clothing stores, e-commerce, agencies, consulting, freelancing, and other service businesses.
+
+IMPORTANT: You CAN and SHOULD pick combinations if the idea encompasses multiple categories (e.g. product and service both at the same time, like an agency platform with custom consulting -> ['digital', 'services'], or an IoT device with mobile app -> ['digital', 'physical']).
 
 Project Type: {project_type}
 Idea:
 {idea_str}
 
-Provide clear reasoning and list key hardware or software signals identified."""
+Provide clear reasoning and list identified keywords."""
 
     payload = {
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
@@ -945,11 +957,30 @@ Provide clear reasoning and list key hardware or software signals identified."""
                 if raw_text.startswith('```'):
                     raw_text = raw_text.strip('`').removeprefix('json').strip()
                 parsed, _ = json.JSONDecoder().raw_decode(raw_text[raw_text.find('{'):])
-                domain = str(parsed.get('domain', 'software')).lower()
-                if domain not in {'software', 'hardware', 'hybrid'}:
-                    domain = 'software'
+                raw_domains = parsed.get('domains') or []
+                if isinstance(raw_domains, str):
+                    raw_domains = [raw_domains]
+                valid_domains = [d.lower() for d in raw_domains if d.lower() in {'digital', 'physical', 'services'}]
+                if not valid_domains:
+                    leg = str(parsed.get('domain', '')).lower()
+                    if leg == 'hardware':
+                        valid_domains = ['physical']
+                    elif leg == 'hybrid':
+                        valid_domains = ['digital', 'physical']
+                    else:
+                        valid_domains = ['digital']
+
+                # Compute legacy domain for backwards compatibility
+                if 'physical' in valid_domains and ('digital' in valid_domains or 'services' in valid_domains):
+                    legacy = 'hybrid'
+                elif 'physical' in valid_domains:
+                    legacy = 'hardware'
+                else:
+                    legacy = 'software'
+
                 return {
-                    'domain': domain,
+                    'domains': valid_domains,
+                    'domain': legacy,
                     'confidence': float(parsed.get('confidence', 0.85)),
                     'reasoning': str(parsed.get('reasoning', '')).strip(),
                     'detected_keywords': [str(k) for k in parsed.get('detected_keywords', [])][:10],
@@ -959,40 +990,65 @@ Provide clear reasoning and list key hardware or software signals identified."""
 
     # Heuristic fallback
     lower = idea_str.lower()
-    hw_signals = [
+    digital_signals = [
+        'app', 'website', 'web', 'saas', 'api', 'apis', 'platform', 'ai tool', 'software',
+        'dashboard', 'database', 'cloud', 'portal', 'mobile app', 'ios', 'android', 'flutter',
+        'react', 'frontend', 'backend', 'fullstack', 'cli', 'extension', 'crm', 'cms',
+        'algorithm', 'bot', 'deep learning', 'machine learning', 'nlp', 'llm', 'chatgpt'
+    ]
+    physical_signals = [
         'arduino', 'raspberry pi', 'rpi', 'esp8266', 'esp32', 'sensor', 'sensors', 'motor', 'motors',
-        'servo', 'circuit', 'pcb', 'iot', 'drone', 'robot', 'robotics', 'electronics', '3d print',
-        'actuator', 'led', 'battery', 'prototype', 'embedded', 'hardware', 'wearable', 'cane', 'stick',
-        'rfid', 'bluetooth module', 'gpio', 'microcontroller', 'breadboard', 'ultrasonic', 'gps',
-        'buzzer', 'accelerometer', 'gyroscope', 'relay', 'camera module', 'solenoid', 'antenna', 'transmitter',
-        'resistor', 'capacitor', 'soldering', 'micro-controller', 'transceiver'
+        'servo', 'circuit', 'pcb', 'iot', 'drone', 'drones', 'robot', 'robotics', 'electronics',
+        '3d print', '3d printing', 'actuator', 'led', 'battery', 'prototype', 'embedded', 'hardware',
+        'wearable', 'cane', 'stick', 'rfid', 'bluetooth module', 'gpio', 'microcontroller',
+        'breadboard', 'ultrasonic', 'gps', 'buzzer', 'accelerometer', 'gyroscope', 'relay',
+        'camera module', 'clothing brand', 'apparel', 'fashion brand', 't-shirt', 'hoodie',
+        'garment', 'textile', 'fabric', 'manufactur', 'manufacturing', 'custom-made', 'physical product',
+        'device', 'gadget', 'merchandise'
     ]
-    sw_signals = [
-        'app', 'website', 'platform', 'dashboard', 'api', 'software',
-        'web app', 'mobile app', 'saas', 'backend', 'frontend', 'database', 'cloud', 'portal', 'crm', 'marketplace'
+    services_signals = [
+        'retail', 'shop', 'shops', 'store', 'stores', 'clothing store', 'e-commerce', 'ecommerce',
+        'agency', 'agencies', 'consulting', 'consultant', 'freelanc', 'freelancer', 'marketplace',
+        'service business', 'services', 'salon', 'restaurant', 'cafe', 'bakery', 'catering',
+        'delivery service', 'logistics', 'maintenance', 'repair', 'studio', 'contractor',
+        'outsourc', 'escrow', 'cleaning', 'brokerage', 'coaching', 'tutoring', 'boutique'
     ]
-    found_hw = [k for k in hw_signals if k in lower]
-    found_sw = [k for k in sw_signals if k in lower]
+    found_digital = [k for k in digital_signals if k in lower]
+    found_physical = [k for k in physical_signals if k in lower]
+    found_services = [k for k in services_signals if k in lower]
 
-    if len(found_hw) >= 1 and len(found_sw) >= 1:
-        return {
-            'domain': 'hybrid',
-            'confidence': 0.75,
-            'reasoning': f'Detected hardware elements ({", ".join(found_hw[:3])}) and software components ({", ".join(found_sw[:3])}).',
-            'detected_keywords': found_hw + found_sw,
-        }
-    if len(found_hw) >= 1:
-        return {
-            'domain': 'hardware',
-            'confidence': 0.8,
-            'reasoning': f'Detected hardware elements ({", ".join(found_hw[:3])}).',
-            'detected_keywords': found_hw,
-        }
+    chosen = []
+    if found_digital:
+        chosen.append('digital')
+    if found_physical:
+        chosen.append('physical')
+    if found_services:
+        chosen.append('services')
+
+    if not chosen:
+        chosen = ['digital']
+
+    if 'physical' in chosen and ('digital' in chosen or 'services' in chosen):
+        legacy = 'hybrid'
+    elif 'physical' in chosen:
+        legacy = 'hardware'
+    else:
+        legacy = 'software'
+
+    parts = []
+    if 'digital' in chosen:
+        parts.append(f"Digital Products ({', '.join(found_digital[:2]) or 'software/web'})")
+    if 'physical' in chosen:
+        parts.append(f"Physical Products ({', '.join(found_physical[:2]) or 'hardware/goods'})")
+    if 'services' in chosen:
+        parts.append(f"Businesses & Services ({', '.join(found_services[:2]) or 'commerce/services'})")
+
     return {
-        'domain': 'software',
-        'confidence': 0.85,
-        'reasoning': 'Classified as software project based on description.',
-        'detected_keywords': found_sw,
+        'domains': chosen,
+        'domain': legacy,
+        'confidence': 0.82,
+        'reasoning': f"Detected signals for {', and '.join(parts)}.",
+        'detected_keywords': (found_digital + found_physical + found_services)[:10],
     }
 
 

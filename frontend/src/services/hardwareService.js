@@ -108,8 +108,16 @@ export async function classifyProjectDomain(idea, projectType = 'Startup') {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idea, project_type: projectType }),
     })
+    let domains = result?.domains
+    if (!domains || !Array.isArray(domains) || domains.length === 0) {
+      if (result?.domain === 'hardware') domains = ['physical']
+      else if (result?.domain === 'hybrid') domains = ['digital', 'physical']
+      else if (result?.domain === 'services') domains = ['services']
+      else domains = ['digital']
+    }
     return {
-      domain: result?.domain || 'software',
+      domains,
+      domain: result?.domain || (domains.includes('physical') ? (domains.length > 1 ? 'hybrid' : 'hardware') : 'software'),
       confidence: result?.confidence || 0.8,
       reasoning: result?.reasoning || '',
       detected_keywords: result?.detected_keywords || [],
@@ -122,33 +130,65 @@ export async function classifyProjectDomain(idea, projectType = 'Startup') {
 
 function classifyDomainFallback(idea = '') {
   const lower = idea.toLowerCase()
-  const hwSignals = [
+  const digitalSignals = [
+    'app', 'website', 'web', 'saas', 'api', 'apis', 'platform', 'ai tool', 'software',
+    'dashboard', 'database', 'cloud', 'portal', 'mobile app', 'ios', 'android', 'flutter',
+    'react', 'frontend', 'backend', 'fullstack', 'cli', 'extension', 'crm', 'cms',
+    'algorithm', 'bot', 'deep learning', 'machine learning', 'nlp', 'llm', 'chatgpt'
+  ]
+  const physicalSignals = [
     'arduino', 'raspberry pi', 'rpi', 'esp8266', 'esp32', 'sensor', 'sensors', 'motor', 'motors',
-    'servo', 'circuit', 'pcb', 'iot', 'drone', 'robot', 'robotics', 'electronics', '3d print',
-    'actuator', 'led', 'battery', 'prototype', 'embedded', 'hardware', 'wearable', 'cane', 'stick',
-    'rfid', 'bluetooth module', 'gpio', 'microcontroller', 'breadboard', 'ultrasonic', 'gps',
-    'buzzer', 'accelerometer', 'gyroscope', 'relay', 'camera module', 'solenoid', 'antenna', 'transmitter',
-    'resistor', 'capacitor', 'soldering', 'micro-controller', 'transceiver'
+    'servo', 'circuit', 'pcb', 'iot', 'drone', 'drones', 'robot', 'robotics', 'electronics',
+    '3d print', '3d printing', 'actuator', 'led', 'battery', 'prototype', 'embedded', 'hardware',
+    'wearable', 'cane', 'stick', 'rfid', 'bluetooth module', 'gpio', 'microcontroller',
+    'breadboard', 'ultrasonic', 'gps', 'buzzer', 'accelerometer', 'gyroscope', 'relay',
+    'camera module', 'clothing brand', 'apparel', 'fashion brand', 't-shirt', 'hoodie',
+    'garment', 'textile', 'fabric', 'manufactur', 'manufacturing', 'custom-made', 'physical product',
+    'device', 'gadget', 'merchandise'
   ]
-  const swSignals = [
-    'app', 'website', 'platform', 'dashboard', 'api', 'software',
-    'web app', 'mobile app', 'saas', 'backend', 'frontend', 'database', 'cloud', 'portal', 'crm', 'marketplace'
+  const servicesSignals = [
+    'retail', 'shop', 'shops', 'store', 'stores', 'clothing store', 'e-commerce', 'ecommerce',
+    'agency', 'agencies', 'consulting', 'consultant', 'freelanc', 'freelancer', 'marketplace',
+    'service business', 'services', 'salon', 'restaurant', 'cafe', 'bakery', 'catering',
+    'delivery service', 'logistics', 'maintenance', 'repair', 'studio', 'contractor',
+    'outsourc', 'escrow', 'cleaning', 'brokerage', 'coaching', 'tutoring', 'boutique'
   ]
-  const foundHw = hwSignals.filter(k => lower.includes(k))
-  const foundSw = swSignals.filter(k => lower.includes(k))
-  const hwScore = foundHw.length
-  const swScore = foundSw.length
+
+  const foundDigital = digitalSignals.filter(k => lower.includes(k))
+  const foundPhysical = physicalSignals.filter(k => lower.includes(k))
+  const foundServices = servicesSignals.filter(k => lower.includes(k))
+
+  const domains = []
+  if (foundDigital.length > 0) domains.push('digital')
+  if (foundPhysical.length > 0) domains.push('physical')
+  if (foundServices.length > 0) domains.push('services')
+
+  if (domains.length === 0) {
+    domains.push('digital')
+  }
 
   let domain = 'software'
-  let reasoning = 'Detected software requirements from idea.'
-  if (hwScore >= 1 && swScore >= 1) {
+  if (domains.includes('physical') && (domains.includes('digital') || domains.includes('services'))) {
     domain = 'hybrid'
-    reasoning = `Detected hardware components (${foundHw.slice(0, 3).join(', ')}) with software integration (${foundSw.slice(0, 3).join(', ')}).`
-  } else if (hwScore >= 1) {
+  } else if (domains.includes('physical')) {
     domain = 'hardware'
-    reasoning = `Detected physical hardware components (${foundHw.slice(0, 3).join(', ')}).`
+  } else {
+    domain = 'software'
   }
-  return { domain, confidence: 0.85, reasoning, detected_keywords: [...foundHw, ...foundSw] }
+
+  const parts = []
+  if (domains.includes('digital')) parts.push(`Digital Products (${foundDigital.slice(0, 2).join(', ') || 'software/platform'})`)
+  if (domains.includes('physical')) parts.push(`Physical Products (${foundPhysical.slice(0, 2).join(', ') || 'hardware/goods'})`)
+  if (domains.includes('services')) parts.push(`Businesses & Services (${foundServices.slice(0, 2).join(', ') || 'commerce/services'})`)
+
+  const reasoning = `Detected signals for ${parts.join(' and ')}.`
+  return {
+    domains,
+    domain,
+    confidence: 0.85,
+    reasoning,
+    detected_keywords: [...foundDigital, ...foundPhysical, ...foundServices].slice(0, 10),
+  }
 }
 
 // ─── API: Generate Bill of Materials via backend AI ──────────────────────────
@@ -358,7 +398,7 @@ export function getComponentLiveImage(name = '', category = '') {
 }
 
 // ─── AI Business Model Recommendation ───────────────────────────────────────
-export function predictBestRevenueModel({ idea = '', problem = '', outcome = '', domain = 'software', category = 'Startup', targetUsers = '' }) {
+export function predictBestRevenueModel({ idea = '', problem = '', outcome = '', domain = 'software', domains = [], category = 'Startup', targetUsers = '' } = {}) {
   const combined = `${idea} ${problem} ${outcome} ${targetUsers}`.toLowerCase()
 
   // 1. Grant / Prize funded: Student, college, hackathon, social impact, NGO, research
@@ -380,7 +420,7 @@ export function predictBestRevenueModel({ idea = '', problem = '', outcome = '',
       modelId: 'grant',
       confidence: 0.94,
       badge: '★ AI Recommended Pick',
-      title: 'Grant & Prize Funded',
+      title: 'Grant Funded',
       reasoning: `Recommended for ${category}: Enables building and validating your core MVP with non-dilutive government and institutional grants (SSIP, NIDHI PRAYAS, Smart India Hackathon) without premature monetization friction.`,
     }
   }
@@ -397,14 +437,15 @@ export function predictBestRevenueModel({ idea = '', problem = '', outcome = '',
     }
   }
 
-  // 3. One-Time Hardware Sale: Pure hardware or hybrid physical kit
-  if (domain === 'hardware' || (domain === 'hybrid' && (combined.includes('kit') || combined.includes('device') || combined.includes('gadget') || combined.includes('robot') || combined.includes('drone') || combined.includes('wearable') || combined.includes('smart') || combined.includes('lock') || combined.includes('plant')))) {
+  // 3. One-Time Hardware / Physical Product Sale: Pure hardware, physical products or hybrid kit
+  const isPhysical = (Array.isArray(domains) && domains.includes('physical')) || domain === 'hardware' || (domain === 'hybrid' && (combined.includes('kit') || combined.includes('device') || combined.includes('gadget') || combined.includes('robot') || combined.includes('drone') || combined.includes('wearable') || combined.includes('smart') || combined.includes('lock') || combined.includes('plant') || combined.includes('clothing') || combined.includes('apparel') || combined.includes('product')))
+  if (isPhysical) {
     return {
       modelId: 'one_time',
       confidence: 0.90,
       badge: '★ AI Recommended Pick',
-      title: 'One-Time Hardware Sale',
-      reasoning: `Recommended for physical hardware & IoT: Generates upfront cash-flow per unit sold (35–60% hardware margins) to cover bill of materials, assembly, and shipping.`,
+      title: 'One-Time Product / Hardware Sale',
+      reasoning: `Recommended for physical products & hardware: Generates upfront cash-flow per unit sold (35–60% margins) to cover materials, manufacturing, assembly, and shipping.`,
     }
   }
 
