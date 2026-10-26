@@ -138,9 +138,14 @@ Both directories include fully documented [`example.env`](file:///c:/Users/User/
 | `CORS_ALLOW_ALL_ORIGINS` | Enables mobile access from any device on WiFi | `True` in dev |
 | `GEMINI_API_KEY` | Google Gemini API key for roadmap & mind map synthesis | Get from Google AI Studio |
 | `GEMINI_MODEL` | Primary Gemini model | `gemini-2.5-flash` |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account ID for marketing image generation | Required for campaign creatives |
+| `CLOUDFLARE_API_TOKEN` | Server-only Cloudflare API token with Workers AI access | Required for campaign creatives |
+| `CLOUDFLARE_AI_IMAGE_MODEL` | Workers AI image model | `@cf/black-forest-labs/flux-1-schnell` |
 | `BRAVE_API_KEY` | Real web discovery for competitor pricing & complaints | Optional (Brave Search API) |
 | `TAVILY_API_KEY` | Deep competitor content extraction | Optional (Tavily AI) |
 | `DB_ENGINE` | Database engine (`sqlite` or `postgresql`) | `sqlite` |
+
+Marketing captions continue to use the configured Gemini/Groq text provider. Marketing campaign images use Cloudflare Workers AI through Django; the Cloudflare token is never sent to the frontend. Add the Cloudflare values to `backend/.env`, restart Django, and grant the token permission to run Workers AI models. The campaign workflow accepts one to three image concepts, stores successful JPEGs in Django media storage, preserves partial failures, and supports per-image retry.
 
 ### Frontend (`frontend/.env`):
 | Variable | Description | Recommended Setting |

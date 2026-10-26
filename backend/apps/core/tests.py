@@ -1,5 +1,6 @@
 import json
 import os
+from xml.etree import ElementTree
 from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase
@@ -12,6 +13,70 @@ from .gemini_service import (
     GeminiConfigurationError, GeminiRequestError, _parse_json_candidate,
     generate_idea_stage, _validate_stage_result,
 )
+from .cloudflare_ai_service import CloudflareConfigurationError, generate_cloudflare_image
+from .marketing_views import compose_marketing_creative
+
+
+class CloudflareImageServiceTests(SimpleTestCase):
+    @patch.dict(os.environ, {'CLOUDFLARE_ACCOUNT_ID': '', 'CLOUDFLARE_API_TOKEN': ''})
+    def test_missing_cloudflare_credentials_are_actionable(self):
+        with self.assertRaisesRegex(CloudflareConfigurationError, 'CLOUDFLARE_ACCOUNT_ID'):
+            generate_cloudflare_image(prompt='A clean product photo')
+
+    @patch.dict(os.environ, {
+        'CLOUDFLARE_ACCOUNT_ID': 'account',
+        'CLOUDFLARE_API_TOKEN': 'token',
+        'CLOUDFLARE_AI_IMAGE_MODEL': '@cf/black-forest-labs/flux-1-schnell',
+    })
+    @patch('apps.core.cloudflare_ai_service.urlopen')
+    def test_decodes_cloudflare_base64_jpeg_response(self, urlopen_mock):
+        response = urlopen_mock.return_value.__enter__.return_value
+        response.headers = {'Content-Type': 'application/json'}
+        response.read.return_value = json.dumps({
+            'success': True,
+            'result': {'image': 'aGVsbG8='},
+        }).encode()
+
+        image, mime_type = generate_cloudflare_image(prompt='A clean product photo')
+
+        self.assertEqual(image, b'hello')
+        self.assertEqual(mime_type, 'image/jpeg')
+        request = urlopen_mock.call_args.args[0]
+        self.assertIn('/accounts/account/ai/run/@cf/black-forest-labs/flux-1-schnell', request.full_url)
+        self.assertEqual(request.headers['Authorization'], 'Bearer token')
+        self.assertEqual(json.loads(request.data.decode()), {'prompt': 'A clean product photo'})
+
+    def test_composed_creative_contains_exact_copy_and_embedded_background(self):
+        rendered, mime_type = compose_marketing_creative(
+            b'background-bytes',
+            'image/jpeg',
+            copy_item={'title': 'SolarFlow', 'hook': 'Power your future', 'body': 'Save time with verified tools.', 'cta': 'Explore the project'},
+            inputs={'platform': 'LinkedIn', 'creative_format': 'LinkedIn post'},
+            style_index=1,
+        )
+        text = rendered.decode('utf-8')
+        self.assertEqual(mime_type, 'image/svg+xml')
+        self.assertIn('Power your future', text)
+        self.assertIn('Save time with verified tools.', text)
+        self.assertIn('Explore the project', text)
+        self.assertIn('data:image/jpeg;base64,YmFja2dyb3VuZC1ieXRlcw==', text)
+
+    def test_all_creative_styles_produce_valid_svg_for_long_copy(self):
+        for style_index in range(3):
+            rendered, mime_type = compose_marketing_creative(
+                b'background-bytes',
+                'image/jpeg',
+                copy_item={
+                    'title': 'A long campaign title that must wrap safely',
+                    'hook': 'A long headline that remains readable without overlapping the supporting copy',
+                    'body': 'Supporting copy stays in its own bounded region with clear spacing before the CTA.',
+                    'cta': 'Start your free pilot today',
+                },
+                inputs={'platform': 'Instagram', 'creative_format': 'Instagram post'},
+                style_index=style_index,
+            )
+            ElementTree.fromstring(rendered)
+            self.assertEqual(mime_type, 'image/svg+xml')
 
 
 def valid_result(stage):
@@ -2047,4 +2112,3 @@ class FlightPlanMarketRadarTests(TestCase):
         self.assertEqual(res_dup.status_code, 200)
         self.assertEqual(res_dup.json()['xp_awarded'], 0)
         self.assertEqual(res_dup.json()['total_xp'], 350)
-

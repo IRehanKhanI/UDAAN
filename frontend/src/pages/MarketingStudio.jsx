@@ -1,31 +1,40 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowRight, Bookmark, Check, ChevronDown, Copy, FileText, Megaphone, MessageSquareText, Pencil, RefreshCw, Search, Sparkles, WandSparkles, X } from 'lucide-react'
+import {
+  ArrowLeft, ArrowRight, Bookmark, Check, ChevronDown, Copy, Download,
+  FileText, Mail, Megaphone, MessageSquareText, Pencil, RefreshCw,
+  Search, Sparkles, WandSparkles, X, Zap, TrendingUp, Globe
+} from 'lucide-react'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import { readSavedProjects } from '../services/projectStorage.js'
 import { getLearningProject, listLearningProjects } from '../services/learningService.js'
 import { getTeamWorkspace } from '../services/teamService.js'
-import { deleteMarketingContent, generateMarketingContent, listMarketingContent, saveMarketingContent, updateMarketingContent } from '../services/marketingService.js'
+import { deleteMarketingCampaign, deleteMarketingContent, generateMarketingCampaign, generateMarketingContent, listMarketingCampaigns, listMarketingContent, regenerateMarketingCampaignAsset, saveMarketingContent, updateMarketingCampaign, updateMarketingContent } from '../services/marketingService.js'
 import './MarketingStudio.css'
 
 const tabs = [
-  { id: 'create', label: 'Create content', mode: null, icon: Sparkles },
-  { id: 'saved', label: 'Saved content', mode: null, icon: Bookmark },
+  { id: 'create', label: 'Create Content', icon: Sparkles },
+  { id: 'saved',  label: 'Saved Library', icon: Bookmark  },
 ]
+
 const contentTypes = [
-  { mode: 'social', title: 'Social post', subtitle: 'LinkedIn, Instagram, X, Facebook or Reddit', icon: MessageSquareText },
-  { mode: 'showcase', title: 'Project showcase', subtitle: 'Launch, portfolio, demo day or README', icon: Megaphone },
-  { mode: 'repurpose', title: 'Repurpose content', subtitle: 'Turn a source into useful formats', icon: RefreshCw },
-  { mode: 'campaign', title: 'Campaign plan', subtitle: 'A proposed 7 or 30 day calendar', icon: FileText },
-  { mode: 'tool', title: 'Marketing toolkit', subtitle: 'Descriptions, pitches, email and more', icon: WandSparkles },
+  { mode: 'social',    title: 'Social Post',       subtitle: 'LinkedIn, X, Instagram, Reddit',       icon: MessageSquareText },
+  { mode: 'showcase',  title: 'Project Showcase',   subtitle: 'Launch, portfolio, demo day',           icon: TrendingUp        },
+  { mode: 'repurpose', title: 'Repurpose',          subtitle: 'Transform existing content',            icon: RefreshCw         },
+  { mode: 'campaign',  title: 'Campaign Plan',      subtitle: '7, 14 or 30-day calendar',              icon: FileText          },
+  { mode: 'tool',      title: 'Marketing Toolkit',  subtitle: 'Pitches, value props, FAQs',            icon: WandSparkles      },
+  { mode: 'email',     title: 'Email Sequence',     subtitle: 'Purposeful audience sequences',         icon: Mail              },
+  { mode: 'launch',    title: 'Launch Announce',    subtitle: 'Grounded product announcements',        icon: Megaphone         },
+  { mode: 'landing',  title: 'Landing Page Copy',  subtitle: 'Conversion-focused page sections',       icon: Globe              },
 ]
-const platforms = ['LinkedIn', 'Instagram caption', 'X post', 'X thread', 'Facebook', 'Reddit community post']
-const tones = ['Professional', 'Conversational', 'Storytelling', 'Educational', 'Bold', 'Humorous']
-const formats = ['LinkedIn post', 'Instagram caption', '5–8 slide carousel outline', '30–60 second video script', 'X post or thread', 'Demo narration', 'Promotional email']
+
+const platforms     = ['LinkedIn', 'Instagram', 'X', 'Facebook', 'Reddit', 'Email', 'Website']
+const tones         = ['Professional', 'Conversational', 'Storytelling', 'Educational', 'Bold', 'Humorous']
+const formats       = ['LinkedIn post', 'Instagram caption', '5–8 slide carousel outline', '30–60 second video script', 'X post or thread', 'Demo narration', 'Promotional email']
 const showcaseTypes = ['Project launch announcement', 'Build-in-public update', 'Portfolio description', 'Hackathon introduction', 'Demo-day announcement', 'Feature launch', 'Team achievement', 'GitHub repository description', 'README introduction', 'Elevator pitch']
-const toolTypes = ['Product description', 'Landing-page copy', 'Startup elevator pitch', 'Event announcement', 'Personal brand introduction', 'Educational post', 'Internship announcement', 'Achievement announcement', 'Demo-day script', 'Promotional email', 'Audience-specific messaging', 'Call to action variations', 'Headline variations', 'Custom request']
-const navCopy = { social: 'Social post', showcase: 'Project showcase', repurpose: 'Repurpose', campaign: 'Campaign', tool: 'Marketing tool' }
+const toolTypes     = ['Product description', 'Landing-page copy', 'Startup elevator pitch', 'Event announcement', 'Personal brand introduction', 'Educational post', 'Internship announcement', 'Achievement announcement', 'Demo-day script', 'Promotional email', 'Audience-specific messaging', 'Call to action variations', 'Headline variations', 'Custom request']
+const navCopy       = { social: 'Social post', showcase: 'Project showcase', repurpose: 'Repurpose', campaign: 'Campaign', tool: 'Marketing toolkit', email: 'Email sequence', launch: 'Launch announcement', landing: 'Landing page' }
 
 function normalizeProject(project) {
   const understanding = project.understanding || {}
@@ -39,71 +48,136 @@ function normalizeProject(project) {
     workflow: project.workflow || {},
   }
 }
+
 function makeWorkspaceItem(item) {
   const completeBody = [item.hook, item.body, item.cta, ...(item.hashtags || [])].filter(Boolean).join('\n\n')
   return { ...item, body: completeBody, saved: false, favorite: false }
 }
+
 function dateLabel(value) {
   if (!value) return ''
   const date = new Date(value)
   return Number.isNaN(date.valueOf()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
+
 function projectSummary(project, teamWorkspace) {
   const milestones = project?.workflow?.flight_plan?.milestones || []
-  const planned = milestones.flatMap(item => item.tasks || []).length
-  const features = project?.latest_assessment?.task_assessments || {}
-  const verified = Object.values(features).filter(item => item.status === 'verified').length
-  const completed = teamWorkspace?.tasks?.filter(task => task.status === 'completed').length ?? project?.workspace_completed_tasks ?? 0
+  const planned    = milestones.flatMap(item => item.tasks || []).length
+  const features   = project?.latest_assessment?.task_assessments || {}
+  const verified   = Object.values(features).filter(item => item.status === 'verified').length
+  const completed  = teamWorkspace?.tasks?.filter(task => task.status === 'completed').length ?? project?.workspace_completed_tasks ?? 0
   return { milestones, planned, verified, completed }
 }
 
 export default function MarketingStudio() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [projects, setProjects] = useState(() => readSavedProjects().map(normalizeProject))
-  const [selectedId, setSelectedId] = useState(() => searchParams.get('project') || localStorage.getItem('udaan:selected-project') || 'custom')
+  const [menuOpen, setMenuOpen]         = useState(false)
+  const [projects, setProjects]         = useState(() => readSavedProjects().map(normalizeProject))
+  const [backendProjectIds, setBackendProjectIds] = useState(() => new Set())
+  const [selectedId, setSelectedId]     = useState(() => searchParams.get('project') || localStorage.getItem('udaan:selected-project') || 'custom')
   const [teamWorkspace, setTeamWorkspace] = useState(null)
-  const [activeTab, setActiveTab] = useState('create')
-  const [mode, setMode] = useState('social')
-  const [inputs, setInputs] = useState({ topic: '', objective: 'awareness', audience: '', tone: 'Professional', length: 'Medium', keywords: '', cta: '', extra_instructions: '', platform: 'LinkedIn', showcase_type: showcaseTypes[0], formats: [formats[0], formats[2], formats[3]], campaign_days: 7, campaign_platform: 'LinkedIn', template: toolTypes[0], source_content: '', context_override: '' })
-  const [editContext, setEditContext] = useState(false)
-  const [results, setResults] = useState([])
-  const [approach, setApproach] = useState('')
+  const [activeTab, setActiveTab]       = useState('create')
+  const [mode, setMode]                 = useState('social')
+  const [wizardStep, setWizardStep]     = useState(1)
+  const [advancedBriefOpen, setAdvancedBriefOpen] = useState(false)
+  const [inputs, setInputs]             = useState({
+    topic: '', objective: 'awareness', audience: '', customer_problem: '',
+    value_proposition: '', tone: 'Professional', language: 'English',
+    key_message: '', length: 'Medium', keywords: '', cta: '',
+    desired_next_action: '', recipient_type: '', extra_instructions: '',
+    platform: 'LinkedIn',
+    showcase_type: showcaseTypes[0], formats: [formats[0], formats[2], formats[3]],
+    campaign_days: 7, campaign_platform: 'LinkedIn', template: toolTypes[0],
+    channels: ['LinkedIn'], budget: '', measurable_goals: '',
+    competitor_links: [], brand_voice: '', launch_status: 'Not confirmed',
+    source_content: '', source_url: '', context_override: '', image_count: 3,
+  })
+  const [editContext, setEditContext]   = useState(false)
+  const [results, setResults]           = useState([])
+  const [campaign, setCampaign]         = useState(null)
+  const [approach, setApproach]         = useState('')
   const [generationBusy, setGenerationBusy] = useState(false)
-  const [refineBusy, setRefineBusy] = useState('')
-  const [library, setLibrary] = useState([])
+  const [refineBusy, setRefineBusy]     = useState('')
+  const [library, setLibrary]           = useState([])
   const [libraryLoaded, setLibraryLoaded] = useState(false)
-  const [libraryBusy, setLibraryBusy] = useState(false)
-  const [libraryFilters, setLibraryFilters] = useState({ q: '', project: '', type: '', platform: '' })
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [copying, setCopying] = useState('')
+  const [libraryBusy, setLibraryBusy]   = useState(false)
+  const [libraryFilters, setLibraryFilters] = useState({ q: '', project: '', type: '', platform: '', status: '' })
+  const [error, setError]               = useState('')
+  const [notice, setNotice]             = useState('')
+  const [copying, setCopying]           = useState('')
 
   const selectedProject = projects.find(item => String(item.id) === String(selectedId)) || null
-  const summary = useMemo(() => projectSummary(selectedProject, teamWorkspace), [selectedProject, teamWorkspace])
-  const savedProjects = projects
+  const selectedBackendProjectId = selectedProject && backendProjectIds.has(String(selectedProject.id))
+    ? selectedProject.id
+    : null
+  const summary         = useMemo(() => projectSummary(selectedProject, teamWorkspace), [selectedProject, teamWorkspace])
+  const savedProjects   = projects
+  useEffect(() => {
+    if (!selectedProject) {
+      if (selectedId === 'custom') {
+        setInputs(current => ({ ...current, audience: '', customer_problem: '', value_proposition: '' }))
+      }
+      return
+    }
+    setInputs(current => ({
+      ...current,
+      audience: selectedProject.target_users || '',
+      customer_problem: selectedProject.description || '',
+      value_proposition: selectedProject.expected_outcome || '',
+    }))
+  }, [selectedProject?.id, selectedId])
+  useEffect(() => {
+    if (wizardStep !== 3) return
+    const projectName = selectedProject?.name || ''
+    const value = inputs.value_proposition.trim()
+    const description = selectedProject?.description || ''
+    const technologies = (selectedProject?.repository?.detected_technologies || [])
+      .map(item => item?.name || item)
+      .filter(Boolean)
+      .slice(0, 5)
+    const verifiedTasks = Object.values(selectedProject?.latest_assessment?.task_assessments || {})
+      .filter(item => item?.status === 'verified')
+      .map(item => item.taskTitle)
+      .filter(Boolean)
+      .slice(0, 5)
+    const factualPoints = [...verifiedTasks, ...technologies]
+    setInputs(current => ({
+      ...current,
+      topic: current.topic || (projectName ? `Introduce ${projectName} to the selected audience` : ''),
+      key_message: current.key_message || value,
+      avoid_claims: current.avoid_claims || 'Avoid unsupported metrics, testimonials, capabilities or outcomes.',
+      brand_voice: current.brand_voice || 'Clear, credible and grounded in verified project facts.',
+      extra_instructions: current.extra_instructions || (description ? `Use this confirmed project description as context: ${description}` : ''),
+      keywords: current.keywords || factualPoints.join(', '),
+    }))
+  }, [wizardStep, selectedProject?.id, selectedProject?.name, selectedProject?.description, selectedProject?.expected_outcome, inputs.value_proposition])
 
   const loadProjects = useCallback(async () => {
     const localProjects = readSavedProjects().map(normalizeProject)
     const byId = new Map(localProjects.map(project => [String(project.id), project]))
     try {
       const response = await listLearningProjects()
-      for (const project of response?.results || []) {
+      const backendProjects = response?.results || []
+      setBackendProjectIds(new Set(backendProjects.map(project => String(project.id))))
+      for (const project of backendProjects) {
         const previous = byId.get(String(project.id)) || {}
         byId.set(String(project.id), normalizeProject({ ...previous, ...project, name: previous.name || project.understanding?.project_name, description: previous.description || project.understanding?.problem_statement }))
       }
     } catch { /* Local project drafts remain selectable if account listing is unavailable. */ }
     const hydrated = await Promise.allSettled([...byId.values()].map(project => getLearningProject(project.id)))
+    const verifiedIds = new Set(backendProjects.map(project => String(project.id)))
     hydrated.forEach(result => {
       if (result.status !== 'fulfilled') return
-      const project = result.value
+      const project  = result.value
+      verifiedIds.add(String(project.id))
       const previous = byId.get(String(project.id)) || {}
       byId.set(String(project.id), normalizeProject({ ...previous, ...project, name: previous.name || project.understanding?.project_name, description: previous.description || project.understanding?.problem_statement }))
     })
+    setBackendProjectIds(verifiedIds)
     setProjects([...byId.values()])
     const requested = searchParams.get('project')
     const remembered = localStorage.getItem('udaan:selected-project')
-    const all = [...byId.keys()]
+    const all    = [...byId.keys()]
     const chosen = requested && byId.has(String(requested)) ? requested : remembered && byId.has(String(remembered)) ? remembered : all[0] || 'custom'
     setSelectedId(String(chosen))
   }, [])
@@ -111,8 +185,17 @@ export default function MarketingStudio() {
   const loadLibrary = useCallback(async filters => {
     setLibraryBusy(true)
     try {
-      const response = await listMarketingContent(filters || {})
-      setLibrary(response.results || [])
+      const [response, campaignResponse] = await Promise.all([listMarketingContent(filters || {}), listMarketingCampaigns({ q: filters?.q || '' })])
+      const campaigns = (campaignResponse.results || []).map(item => ({
+        ...item,
+        id: `campaign-${item.id}`,
+        campaign_id: item.id,
+        isCampaign: true,
+        body: item.copy?.body || item.copy?.caption || '',
+        title: item.title || 'Marketing campaign',
+        content_type: item.content_type || 'Campaign',
+      }))
+      setLibrary([...(response.results || []), ...campaigns])
       setLibraryLoaded(true)
     } catch (err) {
       setError(err.message || 'Saved content could not be loaded.')
@@ -134,16 +217,29 @@ export default function MarketingStudio() {
     return () => { active = false }
   }, [selectedProject?.id])
   useEffect(() => {
-    if (activeTab === 'saved') void loadLibrary({ q: libraryFilters.q, project: libraryFilters.project, type: libraryFilters.type, platform: libraryFilters.platform })
-  }, [activeTab, libraryFilters.project, libraryFilters.type, libraryFilters.platform, loadLibrary])
+    if (activeTab === 'saved') void loadLibrary({ q: libraryFilters.q, project: libraryFilters.project, type: libraryFilters.type, platform: libraryFilters.platform, status: libraryFilters.status })
+  }, [activeTab, libraryFilters.project, libraryFilters.type, libraryFilters.platform, libraryFilters.status, loadLibrary])
 
-  const switchTab = tab => {
-    setActiveTab(tab)
-    const nextMode = tabs.find(item => item.id === tab)?.mode
-    if (nextMode) setMode(nextMode)
-    setError(''); setNotice('')
+  const switchTab  = tab => { setActiveTab(tab); const nextMode = tabs.find(item => item.id === tab)?.mode; if (nextMode) setMode(nextMode); setError(''); setNotice('') }
+  const setField   = (key, value) => setInputs(current => ({ ...current, [key]: value }))
+  const selectProject = projectId => {
+    setSelectedId(projectId)
+    setResults([])
+    setApproach('')
+    setError('')
+    const project = projects.find(item => String(item.id) === String(projectId))
+    if (project) {
+      setInputs(current => ({
+        ...current,
+        audience: project.target_users || '',
+        customer_problem: project.description || '',
+        value_proposition: project.expected_outcome || '',
+        context_override: '',
+      }))
+    } else {
+      setInputs(current => ({ ...current, audience: '', customer_problem: '', value_proposition: '', context_override: '' }))
+    }
   }
-  const setField = (key, value) => setInputs(current => ({ ...current, [key]: value }))
   const generationInputs = useMemo(() => {
     const base = { ...inputs }
     if (mode !== 'repurpose') delete base.source_content
@@ -155,26 +251,70 @@ export default function MarketingStudio() {
   const generate = async event => {
     event?.preventDefault?.()
     if (generationBusy) return
-    if (mode === 'repurpose' && !inputs.source_content.trim()) { setError('Add the source content you want to repurpose.'); return }
-    if (mode !== 'repurpose' && !inputs.topic.trim() && !inputs.source_content.trim()) { setError('Describe what you want to create first.'); return }
-    setGenerationBusy(true); setError(''); setNotice('')
+    if (mode === 'repurpose' && !inputs.source_content.trim() && !inputs.source_url.trim()) { setError('Add source content or a URL to repurpose.'); return }
+    if (mode !== 'repurpose' && !inputs.audience.trim() && !selectedProject?.target_users) { setError('Add a target audience so the brief can guide the generation.'); return }
+    if (mode !== 'repurpose' && !inputs.topic.trim() && !inputs.source_content.trim() && !inputs.source_url.trim()) { setError('Describe what you want to create first.'); return }
+    setGenerationBusy(true); setError(''); setNotice(''); setWizardStep(4)
     try {
-      const response = await generateMarketingContent({ mode, project_id: selectedProject?.id || null, inputs: generationInputs })
-      setResults((response.result?.items || []).map((item, index) => ({ ...makeWorkspaceItem(item), localKey: `${Date.now()}-${index}`, content_type: mode, generation_inputs: { ...generationInputs, mode }, project: selectedProject?.id || null, projectName: selectedProject?.name || null })))
-      setApproach(response.result?.approach || '')
+      const campaignMode = ['social', 'showcase', 'launch', 'landing'].includes(mode)
+      if (campaignMode) {
+        const response = await generateMarketingCampaign({
+          mode,
+          project_id: selectedBackendProjectId,
+          inputs: {
+            ...generationInputs,
+            creative_format: inputs.platform ? `${inputs.platform} ${navCopy[mode]}` : navCopy[mode],
+            aspect_ratio: mode === 'launch' ? '16:9' : '1:1',
+          },
+        })
+        setCampaign(response)
+        const item = response.copy || {}
+        setResults([{ ...makeWorkspaceItem(item), localKey: `${Date.now()}-campaign`, id: response.id, saved: true, content_type: mode, generation_inputs: { ...generationInputs, mode }, project: selectedBackendProjectId, projectName: selectedProject?.name || null }])
+        setApproach('Three distinct campaign concepts were generated from the same project-grounded brief.')
+      } else {
+        const response = await generateMarketingContent({ mode, project_id: selectedBackendProjectId, inputs: generationInputs })
+        setCampaign(null)
+        setResults((response.result?.items || []).map((item, index) => ({ ...makeWorkspaceItem(item), localKey: `${Date.now()}-${index}`, content_type: mode, generation_inputs: { ...generationInputs, mode }, project: selectedBackendProjectId, projectName: selectedProject?.name || null })))
+        setApproach(response.result?.approach || '')
+      }
       setNotice('Drafts are ready to review and edit. Nothing has been published.')
       setActiveTab('create')
-    } catch (err) { setError(err.message || 'Content generation failed. Your request is still here; try again or revise it.') }
+    } catch (err) { if (!results.length) setWizardStep(3); setError(err.message || 'Content generation failed. Your request is still here — try again or revise it.') }
     finally { setGenerationBusy(false) }
   }
 
-  const copyResult = async item => {
-    try { await navigator.clipboard.writeText(item.body); setCopying(item.localKey || item.id); setNotice('Content copied to clipboard.') }
-    catch { setError('Clipboard access was blocked by the browser. Select the text and copy it manually.') }
+  const saveCampaignCopy = async item => {
+    try {
+      const updated = await updateMarketingCampaign(campaign.id, { copy: { ...campaign.copy, title: item.title, body: item.body, cta: item.cta } })
+      setCampaign(updated)
+      setNotice('Campaign copy saved.')
+    } catch (err) { setError(err.message || 'Campaign copy could not be saved.') }
   }
+
+  const selectCampaignAsset = async index => {
+    try {
+      const updated = await updateMarketingCampaign(campaign.id, { selected_asset: index })
+      setCampaign(updated)
+      setNotice('Campaign image selected.')
+    } catch (err) { setError(err.message || 'The selected image could not be saved.') }
+  }
+
+  const retryCampaignAsset = async index => {
+    try {
+      const updated = await regenerateMarketingCampaignAsset(campaign.id, index)
+      setCampaign(updated)
+      setNotice(`Image concept ${index + 1} regenerated.`)
+    } catch (err) { setError(err.message || 'This image could not be regenerated.') }
+  }
+
+  const copyResult = async item => {
+    try { await navigator.clipboard.writeText(item.body); setCopying(item.localKey || item.id); setNotice('Copied to clipboard.') }
+    catch { setError('Clipboard access was blocked. Select the text and copy manually.') }
+  }
+
   const saveResult = async item => {
     setError(''); setNotice('')
-    const payload = { title: item.title || 'Untitled draft', body: item.body, content_type: item.content_type || mode, platform: item.platform || item.format || '', project_id: item.project || selectedProject?.id || null, generation_inputs: item.generation_inputs || generationInputs, status: 'saved' }
+    const payload = { title: item.title || 'Untitled draft', body: item.body, content_type: item.content_type || mode, platform: item.platform || item.format || '', project_id: item.project || selectedBackendProjectId, generation_inputs: item.generation_inputs || generationInputs, status: 'ready_for_review' }
     try {
       const saved = item.id ? await updateMarketingContent(item.id, payload) : await saveMarketingContent(payload)
       setResults(current => current.map(row => row.localKey === item.localKey || row.id === item.id ? { ...row, ...saved, saved: true, projectName: saved.project_name || row.projectName } : row))
@@ -182,10 +322,16 @@ export default function MarketingStudio() {
       setNotice('Saved to your content library.')
     } catch (err) { setError(err.message || 'This draft could not be saved.') }
   }
+
   const deleteSaved = async item => {
-    try { await deleteMarketingContent(item.id); setLibrary(current => current.filter(row => row.id !== item.id)); setResults(current => current.filter(row => row.id !== item.id)); setNotice('Saved draft deleted.') }
-    catch (err) { setError(err.message || 'Could not delete this saved draft.') }
+    try {
+      if (item.isCampaign) await deleteMarketingCampaign(item.campaign_id)
+      else await deleteMarketingContent(item.id)
+      setLibrary(current => current.filter(row => row.id !== item.id)); setResults(current => current.filter(row => row.id !== item.id)); setNotice('Draft deleted.')
+    }
+    catch (err) { setError(err.message || 'Could not delete this draft.') }
   }
+
   const refine = async (item, action) => {
     const key = `${item.localKey || item.id}:${action}`
     setRefineBusy(key); setError('')
@@ -197,81 +343,552 @@ export default function MarketingStudio() {
     } catch (err) { setError(err.message || `Could not ${action} this draft.`) }
     finally { setRefineBusy('') }
   }
+
   const openSaved = item => {
+    if (item.isCampaign) {
+      setCampaign({ ...item, id: item.campaign_id })
+      setSelectedId(item.project || 'custom')
+      setResults([{ ...makeWorkspaceItem(item.copy || {}), localKey: `campaign-${item.campaign_id}`, id: item.campaign_id, saved: true, content_type: 'social', project: item.project, projectName: item.project_name }])
+      setActiveTab('create'); setWizardStep(4); setApproach('Saved campaign reopened for editing.')
+      return
+    }
     setSelectedId(item.project || 'custom')
     setResults(current => [{ ...item, localKey: `saved-${item.id}`, saved: true, generation_inputs: item.generation_inputs || {}, projectName: item.project_name }])
-    setMode(item.content_type || 'tool'); setActiveTab('create'); setApproach('Saved draft reopened for editing.')
+    setMode(item.content_type || 'tool'); setActiveTab('create'); setWizardStep(4); setApproach('Saved draft reopened for editing.')
     if (item.generation_inputs) setInputs(current => ({ ...current, ...item.generation_inputs }))
   }
-  const duplicateSaved = item => {
-    openSaved({ ...item, id: null, title: `${item.title} — copy`, status: 'draft' })
-    setNotice('Copy opened as an unsaved draft.')
+
+  const duplicateSaved = item => { openSaved({ ...item, id: null, title: `${item.title} — copy`, status: 'draft' }); setNotice('Copy opened as an unsaved draft.') }
+  const repurposeResult = item => { setSelectedId(item.project || selectedId); setMode('repurpose'); setField('source_content', item.body); setField('topic', item.title); setActiveTab('create'); setNotice('Source text added. Choose the formats to create.') }
+
+  const exportResult = item => {
+    const text = `${item.title || 'Marketing draft'}\n\n${item.body || ''}\n\n${item.cta ? `CTA: ${item.cta}\n` : ''}${item.hashtags?.length ? `\n${item.hashtags.join(' ')}` : ''}`
+    const url    = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href  = url
+    anchor.download = `${(item.title || 'marketing-draft').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'marketing-draft'}.txt`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setNotice('Draft exported as a text file.')
   }
-  const repurposeResult = item => {
-    setSelectedId(item.project || selectedId); setMode('repurpose'); setField('source_content', item.body); setField('topic', item.title); setActiveTab('repurpose'); setNotice('Source text added. Choose the formats to create.')
+
+  const continueStrategy = () => {
+    setError('')
+    if (!inputs.audience.trim()) { setError('Tell us who the ideal customer is.'); return }
+    if (!inputs.customer_problem.trim()) { setError('Describe the customer problem.'); return }
+    if (!inputs.value_proposition.trim()) { setError('Describe how the project helps this customer.'); return }
+    setWizardStep(2)
   }
-  const toggleFormat = format => setField('formats', inputs.formats.includes(format) ? inputs.formats.filter(item => item !== format) : [...inputs.formats, format])
+  const continueFormat = () => {
+    setError('')
+    if (mode === 'repurpose' && !inputs.source_content.trim() && !inputs.source_url.trim()) { setError('Add source content or a URL to repurpose.'); return }
+    if ((mode === 'social' || mode === 'showcase' || mode === 'launch' || mode === 'landing') && !inputs.platform) { setError('Choose a target platform.'); return }
+    setWizardStep(3)
+  }
+  const backWizard = () => { setError(''); setWizardStep(value => Math.max(1, value - 1)) }
+
+  const toggleFormat   = format => setField('formats', inputs.formats.includes(format) ? inputs.formats.filter(item => item !== format) : [...inputs.formats, format])
   const visibleLibrary = library.filter(item => !libraryFilters.q || `${item.title} ${item.body}`.toLowerCase().includes(libraryFilters.q.toLowerCase()))
 
   return (
-    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] ms-page">
+    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col ms-page">
       <Sidebar activePage="marketing-studio" open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="lg:pl-80 flex-1 flex flex-col min-w-0">
         <Header
           currentProject={selectedProject}
           onToggleMobileMenu={() => setMenuOpen(!menuOpen)}
-          onProjectSelect={(p) => {
-            setSelectedId(p.id)
-            setResults([])
-            setApproach('')
-            setError('')
-          }}
+          onProjectSelect={p => selectProject(p.id)}
         />
 
-        <main className="ud-main flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
           <div className="ms-content w-full">
-            <section className="ms-heading"><div><span className="ms-eyebrow"><Megaphone size={15} /> MARKETING STUDIO</span><h1>Turn your ideas into content worth sharing.</h1><p>Make project-aware posts, campaigns and creative that stays grounded in what’s real.</p></div>
-              <label className="ms-project-select"><span>Creating for</span><select value={selectedProject?.id || 'custom'} onChange={event => { setSelectedId(event.target.value); setResults([]); setApproach(''); setError('') }}><option value="custom">Custom Content — No Project</option>{savedProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select><ChevronDown size={15} /></label>
-            </section>
-            {error && <div className="ms-feedback ms-error" role="alert"><X size={15} />{error}<button onClick={() => setError('')} aria-label="Dismiss"><X size={14} /></button></div>}
-            {notice && <div className="ms-feedback ms-success" role="status"><Check size={15} />{notice}<button onClick={() => setNotice('')} aria-label="Dismiss"><X size={14} /></button></div>}
-            <nav className="ms-tabs" aria-label="Marketing Studio sections">{tabs.map(tab => { const Icon = tab.icon; return <button type="button" key={tab.id} className={activeTab === tab.id ? 'active' : ''} onClick={() => switchTab(tab.id)}><Icon size={15} />{tab.label}</button> })}</nav>
-            {activeTab === 'saved' ? <section className="ms-panel ms-library-panel"><div className="ms-panel-heading"><div><span className="ms-eyebrow">YOUR LIBRARY</span><h2>Saved content</h2><p>Drafts are private to your account or this browser workspace.</p></div><button className="ms-secondary" onClick={() => void loadLibrary()} disabled={libraryBusy}><RefreshCw size={14} /> Refresh</button></div>
-              <div className="ms-library-filters"><label><Search size={15} /><input placeholder="Search saved drafts" value={libraryFilters.q} onChange={event => setLibraryFilters(current => ({ ...current, q: event.target.value }))} /></label><select value={libraryFilters.project} onChange={event => setLibraryFilters(current => ({ ...current, project: event.target.value }))}><option value="">All projects</option><option value="custom">Custom content</option>{projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select><select value={libraryFilters.type} onChange={event => setLibraryFilters(current => ({ ...current, type: event.target.value }))}><option value="">All types</option>{Object.entries(navCopy).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select><select value={libraryFilters.platform} onChange={event => setLibraryFilters(current => ({ ...current, platform: event.target.value }))}><option value="">All platforms</option>{platforms.map(value => <option value={value} key={value}>{value}</option>)}</select></div>
-              {libraryBusy ? <div className="ms-empty"><span className="ms-spinner" /> Loading your library…</div> : visibleLibrary.length ? <div className="ms-library-grid">{visibleLibrary.map(item => <SavedCard key={item.id} item={item} onOpen={openSaved} onDuplicate={duplicateSaved} onDelete={deleteSaved} />)}</div> : <EmptyState title={libraryLoaded ? 'Your library is ready for a first draft' : 'Loading saved content'} copy={libraryLoaded ? 'Save a generated variation to keep it here for later editing.' : 'Fetching content saved to this workspace.'} />}
-            </section> : <>
-              <section className="ms-create-layout">
-                <div className="ms-panel ms-form-panel">
-                  <div className="ms-panel-heading"><div><span className="ms-eyebrow">CREATE CONTENT</span><h2>What do you want to create?</h2><p>Give UDAAN a clear brief. You can edit every result before sharing it.</p></div><span className="ms-lock-note"><Sparkles size={13} /> AI draft</span></div>
-                  {activeTab === 'create' && <div className="ms-type-grid">{contentTypes.map(type => <ContentTypeCard key={type.mode} item={type} selected={mode === type.mode} onClick={() => setMode(type.mode)} />)}</div>}
-                  {activeTab !== 'create' && <div className="ms-mode-notice"><span className="ms-type-icon"><WandSparkles size={17} /></span><div><b>{tabs.find(item => item.id === activeTab)?.label}</b><small>{activeTab === 'campaign' ? 'A proposed publishing plan—nothing gets scheduled.' : activeTab === 'repurpose' ? 'Preserve the source meaning while adapting its format.' : 'Use your project context to draft a shareable story.'}</small></div></div>}
-                  {selectedProject && <section className="ms-context-card"><div className="ms-context-top"><span className="ms-context-mark">{selectedProject.name.slice(0, 1).toUpperCase()}</span><div><strong>{selectedProject.name}</strong><small>{selectedProject.project_type} · project context added automatically</small></div><button type="button" onClick={() => setEditContext(value => !value)}>{editContext ? 'Close context editor' : <><Pencil size={13} /> Edit context</>}</button></div>
-                    {!editContext ? <div className="ms-context-summary"><p>{selectedProject.description || selectedProject.idea || 'No project description has been added yet.'}</p><div>{(selectedProject.repository?.detected_technologies || []).slice(0, 5).map(item => <span key={item.name || item}>{item.name || item}</span>)}<small>{summary.milestones.length} planned milestones · {summary.completed} tasks marked complete · {summary.verified} independently verified</small></div></div> : <label className="ms-context-edit">Add, correct or remove details for this generation<textarea rows="5" maxLength="7000" value={inputs.context_override} onChange={event => setField('context_override', event.target.value)} placeholder="Correct the project summary or add confirmed details. Avoid adding claims you cannot support." /></label>}
-                    <p className="ms-context-footnote">Planned features remain plans. A task marked complete is user-recorded progress; verified claims require saved check evidence.</p>
-                  </section>}
-                  <form className="ms-form" onSubmit={generate}>
-                    <div className="ms-form-grid">
-                      <label className="ms-field ms-wide"><span>{mode === 'repurpose' ? 'Source content' : mode === 'campaign' ? 'Campaign topic or project' : 'Topic, project or request'} <i>*</i></span><textarea rows={mode === 'repurpose' ? 5 : 3} maxLength={8000} value={mode === 'repurpose' ? inputs.source_content : inputs.topic} onChange={event => setField(mode === 'repurpose' ? 'source_content' : 'topic', event.target.value)} placeholder={mode === 'repurpose' ? 'Paste the text or rough notes to transform…' : selectedProject ? 'For example: introduce the current booking flow in a portfolio post…' : 'For example: write a friendly introduction for my design portfolio…'} /></label>
-                      {mode !== 'repurpose' && <><label className="ms-field"><span>Goal</span><select value={inputs.objective} onChange={event => setField('objective', event.target.value)}>{['awareness', 'engagement', 'launch', 'portfolio', 'recruitment', 'education', 'conversion'].map(value => <option key={value} value={value}>{value[0].toUpperCase() + value.slice(1)}</option>)}</select></label><label className="ms-field"><span>Audience</span><input value={inputs.audience} onChange={event => setField('audience', event.target.value)} placeholder={selectedProject ? 'Use project audience' : 'Who should this reach?'} /></label></>}
-                      {mode === 'social' && <label className="ms-field"><span>Platform</span><select value={inputs.platform} onChange={event => setField('platform', event.target.value)}>{platforms.map(value => <option key={value}>{value}</option>)}</select></label>}
-                      {mode === 'showcase' && <label className="ms-field"><span>Showcase type</span><select value={inputs.showcase_type} onChange={event => setField('showcase_type', event.target.value)}>{showcaseTypes.map(value => <option key={value}>{value}</option>)}</select></label>}
-                      {mode === 'tool' && <label className="ms-field"><span>Template</span><select value={inputs.template} onChange={event => setField('template', event.target.value)}>{toolTypes.map(value => <option key={value}>{value}</option>)}</select></label>}
-                      {mode === 'repurpose' && <div className="ms-field ms-wide"><span>Target formats</span><div className="ms-format-list">{formats.map(format => <label key={format}><input type="checkbox" checked={inputs.formats.includes(format)} onChange={() => toggleFormat(format)} /> {format}</label>)}</div></div>}
-                      {mode === 'campaign' && <><label className="ms-field"><span>Duration</span><select value={inputs.campaign_days} onChange={event => setField('campaign_days', Number(event.target.value))}><option value={7}>7-day launch plan</option><option value={14}>14-day campaign</option><option value={30}>30-day calendar</option></select></label><label className="ms-field"><span>Primary platform</span><select value={inputs.campaign_platform} onChange={event => setField('campaign_platform', event.target.value)}>{platforms.map(value => <option key={value}>{value}</option>)}</select></label></>}
-                      {mode !== 'repurpose' && mode !== 'campaign' && <label className="ms-field"><span>Tone</span><select value={inputs.tone} onChange={event => setField('tone', event.target.value)}>{tones.map(value => <option key={value}>{value}</option>)}</select></label>}
-                      {mode !== 'campaign' && mode !== 'repurpose' && <label className="ms-field"><span>Length</span><select value={inputs.length} onChange={event => setField('length', event.target.value)}>{['Short', 'Medium', 'Long'].map(value => <option key={value}>{value}</option>)}</select></label>}
-                      {mode !== 'repurpose' && mode !== 'campaign' && <label className="ms-field"><span>Keywords <small>optional</small></span><input value={inputs.keywords} onChange={event => setField('keywords', event.target.value)} placeholder="Terms to include" /></label>}
-                      {mode !== 'repurpose' && mode !== 'campaign' && <label className="ms-field"><span>Call to action <small>optional</small></span><input value={inputs.cta} onChange={event => setField('cta', event.target.value)} placeholder="What should readers do next?" /></label>}
-                      <label className="ms-field ms-wide"><span>Additional instructions <small>optional</small></span><textarea rows="2" maxLength="1800" value={inputs.extra_instructions} onChange={event => setField('extra_instructions', event.target.value)} placeholder="Add confirmed details, phrases to avoid, or a specific creative direction." /></label>
-                    </div>
-                    <div className="ms-form-foot"><span><Sparkles size={14} /> {selectedProject ? 'Uses your saved project details and repository evidence.' : 'Custom mode supports unrelated creative requests.'} No live trend research is configured.</span><button className="ms-primary" type="submit" disabled={generationBusy}>{generationBusy ? <><span className="ms-spinner" /> Creating drafts…</> : <><Sparkles size={15} /> Generate content <ArrowRight size={15} /></>}</button></div>
-                  </form>
+
+            {/* ── Hero Header ── */}
+            <section className="ms-heading">
+              <div>
+                <span className="ms-eyebrow">
+                  <Zap size={12} /> Marketing Studio
+                </span>
+                <h1>Turn ideas into content<br />worth sharing.</h1>
+                <p>
+                  Generate project-aware social posts, campaigns, launch announcements
+                  and more — all grounded in what's real about your work.
+                </p>
+              </div>
+              <div className="ms-project-selector-wrap">
+                <span className="ms-project-selector-label">Creating for</span>
+                <div className="ms-project-select">
+                  <select
+                    value={selectedProject?.id || 'custom'}
+                    onChange={e => selectProject(e.target.value)}
+                  >
+                    <option value="custom">✦ Custom Content (No Project)</option>
+                    {savedProjects.map(project => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} />
                 </div>
+              </div>
+            </section>
+
+            {/* ── Feedback ── */}
+            {error  && <div className="ms-feedback ms-error"  role="alert"><X size={15} />{error}<button  onClick={() => setError('')}  aria-label="Dismiss"><X size={13} /></button></div>}
+            {notice && <div className="ms-feedback ms-success" role="status"><Check size={15} />{notice}<button onClick={() => setNotice('')} aria-label="Dismiss"><X size={13} /></button></div>}
+
+            {/* ── Tabs ── */}
+            <nav className="ms-tabs" aria-label="Marketing Studio sections">
+              {tabs.map(tab => { const Icon = tab.icon; return (
+                <button type="button" key={tab.id} className={activeTab === tab.id ? 'active' : ''} onClick={() => switchTab(tab.id)}>
+                  <Icon size={14} />{tab.label}
+                </button>
+              )})}
+            </nav>
+
+            {/* ════════════════════════════════════
+                SAVED LIBRARY TAB
+            ════════════════════════════════════ */}
+            {activeTab === 'saved' ? (
+              <section className="ms-panel ms-library-panel">
+                <div className="ms-library-header">
+                  <div>
+                    <span className="ms-eyebrow"><Bookmark size={12} /> Your Library</span>
+                    <h2>Saved Content</h2>
+                    <p>Drafts are private to your account or this browser workspace.</p>
+                  </div>
+                  <button className="ms-secondary" onClick={() => void loadLibrary()} disabled={libraryBusy}>
+                    <RefreshCw size={13} /> Refresh
+                  </button>
+                </div>
+
+                <div className="ms-library-filters">
+                  <label>
+                    <Search size={15} />
+                    <input
+                      placeholder="Search saved drafts…"
+                      value={libraryFilters.q}
+                      onChange={e => setLibraryFilters(c => ({ ...c, q: e.target.value }))}
+                    />
+                  </label>
+                  <select value={libraryFilters.project} onChange={e => setLibraryFilters(c => ({ ...c, project: e.target.value }))}>
+                    <option value="">All projects</option>
+                    <option value="custom">Custom content</option>
+                    {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <select value={libraryFilters.type} onChange={e => setLibraryFilters(c => ({ ...c, type: e.target.value }))}>
+                    <option value="">All types</option>
+                    {Object.entries(navCopy).map(([k, label]) => <option value={k} key={k}>{label}</option>)}
+                  </select>
+                  <select value={libraryFilters.platform} onChange={e => setLibraryFilters(c => ({ ...c, platform: e.target.value }))}>
+                    <option value="">All platforms</option>
+                    {platforms.map(v => <option value={v} key={v}>{v}</option>)}
+                  </select>
+                  <select value={libraryFilters.status} onChange={e => setLibraryFilters(c => ({ ...c, status: e.target.value }))}>
+                    <option value="">All statuses</option>
+                    <option value="ready_for_review">Ready for review</option>
+                    <option value="approved">Approved</option>
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
+
+                {libraryBusy
+                  ? <div className="ms-empty"><span className="ms-spinner" /> Loading your library…</div>
+                  : visibleLibrary.length
+                    ? <div className="ms-library-grid">{visibleLibrary.map(item => <SavedCard key={item.id} item={item} onOpen={openSaved} onDuplicate={duplicateSaved} onDelete={deleteSaved} />)}</div>
+                    : <EmptyState title={libraryLoaded ? 'Your library is empty' : 'Loading content'} copy={libraryLoaded ? 'Save a generated draft to keep it here for editing later.' : 'Fetching content saved to this workspace…'} />
+                }
               </section>
-              {mode === 'repurpose' && activeTab === 'repurpose' && <p className="ms-repurpose-hint">Choose the formats above. UDAAN will create one draft for each selected format, preserving the original source meaning.</p>}
-              {approach && results.length > 0 && <div className="ms-approach"><Sparkles size={15} /><div><b>Creative direction</b><span>{approach}</span></div></div>}
-              {results.length > 0 && <section className="ms-results"><div className="ms-results-heading"><div><span className="ms-eyebrow">YOUR DRAFTS</span><h2>Review, edit and choose a favorite</h2><p>{results.length} editable option{results.length === 1 ? '' : 's'} · nothing is published automatically</p></div><button className="ms-secondary" onClick={generate} disabled={generationBusy}><RefreshCw size={14} /> Regenerate set</button></div>              <div className="ms-result-grid">{results.map((item, index) => <ResultCard key={item.localKey || item.id || index} item={item} index={index} busy={refineBusy} copying={copying} tone={inputs.tone} onChange={(key, value) => setResults(current => current.map(row => row === item ? { ...row, [key]: value } : row))} onCopy={() => void copyResult(item)} onSave={() => void saveResult(item)} onRefine={action => void refine(item, action)} onRepurpose={() => repurposeResult(item)} />)}</div></section>}
-            </>}
+
+            ) : (
+            /* ════════════════════════════════════
+               CREATE CONTENT TAB
+            ════════════════════════════════════ */
+              <>
+                <section className="ms-wizard">
+                  <div className="ms-wizard-progress" aria-label="Marketing brief progress">
+                    {[['Audience & Strategy', 'Understand your customer'], ['Content Format', 'Choose what to create'], ['Creative Brief', 'Set the direction'], ['Generated Content', 'Edit and save']].map(([label, hint], index) => {
+                      const number = index + 1
+                      return <button type="button" key={label} className={wizardStep === number ? 'active' : wizardStep > number ? 'complete' : ''} onClick={() => number < wizardStep && setWizardStep(number)} disabled={number > wizardStep}><span>{String(number).padStart(2, '0')}</span><b>{label}</b><small>{hint}</small></button>
+                    })}
+                  </div>
+                  {wizardStep === 1 && <section className="ms-wizard-panel">
+                    <span className="ms-eyebrow"><Globe size={13} /> Step 01 · Audience & Strategy</span>
+                    <h2>Who are you trying to reach?</h2>
+                    <p className="ms-wizard-lede">Let's understand your customer before creating your marketing.</p>
+                    {selectedProject && <><div className="ms-wizard-project"><span className="ms-context-mark">{selectedProject.name.slice(0, 1).toUpperCase()}</span><div><b>{selectedProject.name}</b><small>{selectedProject.project_type} · context from your saved project</small></div><button type="button" onClick={() => setEditContext(value => !value)}><Pencil size={12} /> {editContext ? 'Close context' : 'Edit project context'}</button></div>{editContext && <label className="ms-field ms-wizard-context-edit"><span>Context used for generation</span><textarea rows="3" maxLength="7000" value={inputs.context_override} onChange={e => setField('context_override', e.target.value)} placeholder="Add or correct confirmed project details. Planned features remain plans." /></label>}</>}
+                    <div className="ms-wizard-grid ms-strategy-grid">
+                      <label className="ms-field ms-wide"><span>Target audience <i>*</i></span><textarea rows="2" value={inputs.audience} onChange={e => setField('audience', e.target.value)} placeholder="Who are we trying to reach?" /></label>
+                      <label className="ms-field ms-wide"><span>Customer problem <i>*</i></span><textarea rows="2" value={inputs.customer_problem} onChange={e => setField('customer_problem', e.target.value)} placeholder="What problem do they face?" /></label>
+                      <label className="ms-field ms-wide"><span>Value proposition <i>*</i></span><textarea rows="2" value={inputs.value_proposition} onChange={e => setField('value_proposition', e.target.value)} placeholder="How does this project help them?" /></label>
+                      <label className="ms-field"><span>Marketing goal <i>*</i></span><select value={inputs.objective} onChange={e => setField('objective', e.target.value)}>{['awareness', 'leads', 'signups', 'sales', 'beta testers', 'investors'].map(value => <option key={value}>{value}</option>)}</select></label>
+                    </div>
+                    <div className="ms-wizard-actions"><button className="ms-primary" type="button" onClick={continueStrategy}>Continue to Content Format <ArrowRight size={14} /></button></div>
+                  </section>}
+                  {wizardStep === 2 && <section className="ms-wizard-panel">
+                    <span className="ms-eyebrow"><Sparkles size={13} /> Step 02 · Content Format</span>
+                    <h2>What do you want to create?</h2><p className="ms-wizard-lede">Choose the format that best supports your marketing goal.</p>
+                    <div className="ms-wizard-type-grid">{contentTypes.map(type => <ContentTypeCard key={type.mode} item={type} selected={mode === type.mode} onClick={() => setMode(type.mode)} />)}</div>
+                    {(mode === 'social' || mode === 'showcase' || mode === 'launch' || mode === 'landing' || mode === 'email') && <div className="ms-wizard-platform"><span className="ms-field-label">Target platform or destination</span><div className="ms-platform-options" role="group" aria-label="Target platform or destination">{platforms.map(value => <button type="button" key={value} className={inputs.platform === value ? 'selected' : ''} onClick={() => setField('platform', value)}>{value}</button>)}</div></div>}
+                    {mode === 'campaign' && <div className="ms-wizard-grid"><label className="ms-field"><span>Campaign duration</span><select value={inputs.campaign_days} onChange={e => setField('campaign_days', Number(e.target.value))}><option value={7}>7 days</option><option value={14}>14 days</option><option value={30}>30 days</option></select></label><label className="ms-field"><span>Primary channel</span><select value={inputs.campaign_platform} onChange={e => setField('campaign_platform', e.target.value)}>{platforms.map(value => <option key={value}>{value}</option>)}</select></label></div>}
+                    {mode === 'email' && <div className="ms-wizard-grid"><label className="ms-field"><span>Recipient type</span><input value={inputs.recipient_type} onChange={e => setField('recipient_type', e.target.value)} placeholder="Leads, early adopters, customers…" /></label><label className="ms-field"><span>Purpose / next action</span><input value={inputs.desired_next_action} onChange={e => setField('desired_next_action', e.target.value)} placeholder="Reply, book a call, activate…" /></label></div>}
+                    {mode === 'repurpose' && <label className="ms-field ms-wide"><span>Source content or URL <i>*</i></span><textarea rows="3" value={inputs.source_content} onChange={e => setField('source_content', e.target.value)} placeholder="Paste source text; a URL is accepted as a reference only unless fetched by an integration." /></label>}
+                    <div className="ms-wizard-actions"><button className="ms-secondary" type="button" onClick={backWizard}><ArrowLeft size={14} /> Back</button><button className="ms-primary" type="button" onClick={continueFormat}>Continue to Creative Brief <ArrowRight size={14} /></button></div>
+                  </section>}
+                  {wizardStep === 3 && <section className="ms-wizard-panel">
+                    <span className="ms-eyebrow"><Pencil size={13} /> Step 03 · Creative Brief</span>
+                    <h2>Give your content its direction.</h2><p className="ms-wizard-lede">Only add details relevant to the selected format. Your audience and project facts stay attached.</p>
+                    <div className="ms-wizard-summary"><b>{inputs.audience}</b><span>{inputs.objective}</span><span>{contentTypes.find(item => item.mode === mode)?.title}</span><span>{inputs.platform || inputs.campaign_platform}</span></div>
+                    <div className="ms-wizard-grid">
+                      <label className="ms-field ms-wide"><span>Core message or announcement <i>*</i></span><textarea rows="3" value={inputs.topic} onChange={e => setField('topic', e.target.value)} placeholder="What should this content communicate?" /></label>
+                      <label className="ms-field"><span>Tone</span><select value={inputs.tone} onChange={e => setField('tone', e.target.value)}>{['Professional', 'Friendly', 'Bold', 'Educational', 'Inspirational', 'Conversational'].map(value => <option key={value}>{value}</option>)}</select></label>
+                      <label className="ms-field"><span>Language</span><input value={inputs.language} onChange={e => setField('language', e.target.value)} /></label>
+                      <label className="ms-field"><span>Key points to include</span><textarea rows="2" value={inputs.key_message} onChange={e => setField('key_message', e.target.value)} placeholder="Facts, features or framing to include" /></label>
+                      <label className="ms-field"><span>Claims or topics to avoid</span><textarea rows="2" value={inputs.avoid_claims || ''} onChange={e => setField('avoid_claims', e.target.value)} placeholder="Unsupported metrics, promises or topics" /></label>
+                      <label className="ms-field"><span>Preferred length</span><select value={inputs.length} onChange={e => setField('length', e.target.value)}><option>Short</option><option>Medium</option><option>Long</option></select></label>
+                      <label className="ms-field"><span>Brand voice</span><textarea rows="2" value={inputs.brand_voice} onChange={e => setField('brand_voice', e.target.value)} placeholder="Optional guidance" /></label>
+                      <label className="ms-field"><span>Keywords / hashtags</span><input value={inputs.keywords} onChange={e => setField('keywords', e.target.value)} placeholder="Optional" /></label>
+                      <label className="ms-field"><span>Call to action <small>optional</small></span><input value={inputs.cta} onChange={e => setField('cta', e.target.value)} placeholder="Sign up, book a demo, request a pilot…" /></label>
+                      {['social', 'showcase', 'launch', 'landing'].includes(mode) && (
+                        <label className="ms-field"><span>AI image concepts</span><select value={inputs.image_count} onChange={e => setField('image_count', Number(e.target.value))}><option value="1">1 image</option><option value="2">2 images</option><option value="3">3 images</option></select></label>
+                      )}
+                    </div>
+                    <div className="ms-facts-note"><b>Project facts</b><span>Generated claims will be grounded in saved project context. Planned work and completed-but-unverified work are not treated as verified capabilities.</span></div>
+                    <div className="ms-wizard-actions"><button className="ms-secondary" type="button" onClick={backWizard}><ArrowLeft size={14} /> Back</button><button className="ms-primary" type="button" onClick={generate} disabled={generationBusy}>{generationBusy ? <><span className="ms-spinner" /> Generating…</> : <>Generate Marketing Content <Sparkles size={14} /></>}</button></div>
+                  </section>}
+                  {wizardStep === 4 && results.length === 0 && <section className="ms-wizard-panel ms-wizard-empty"><span className="ms-spinner" /><h2>Preparing your workspace</h2><p>Generation did not return content. Review the error above and try again.</p></section>}
+                </section>
+                <div className="ms-create-layout ms-legacy-create-layout">
+                  <div className="ms-panel ms-form-panel">
+                    {/* Panel heading */}
+                    <div className="ms-panel-heading">
+                      <div>
+                        <span className="ms-eyebrow"><Sparkles size={12} /> Create Content</span>
+                        <h2>Build your marketing brief</h2>
+                        <p>Start with the audience and outcome. UDAAN uses this brief and verified project context to create editable drafts.</p>
+                      </div>
+                      <span className="ms-lock-note"><Sparkles size={12} /> AI-Powered</span>
+                    </div>
+
+                    {/* Content Type Grid */}
+                    <div className="ms-type-section">
+                      <div className="ms-section-label"><Globe size={12} /> Choose content type</div>
+                      <div className="ms-type-grid">
+                        {contentTypes.map(type => <ContentTypeCard key={type.mode} item={type} selected={mode === type.mode} onClick={() => setMode(type.mode)} />)}
+                      </div>
+                    </div>
+
+                    {/* Project Context */}
+                    {selectedProject && (
+                      <section className="ms-context-card">
+                        <div className="ms-context-top">
+                          <span className="ms-context-mark">{selectedProject.name.slice(0, 1).toUpperCase()}</span>
+                          <div>
+                            <strong>{selectedProject.name}</strong>
+                            <small>{selectedProject.project_type} · project context added automatically</small>
+                          </div>
+                          <button type="button" onClick={() => setEditContext(v => !v)}>
+                            {editContext ? <><X size={12} /> Close editor</> : <><Pencil size={12} /> Edit context</>}
+                          </button>
+                        </div>
+                        {!editContext ? (
+                          <div className="ms-context-summary">
+                            <p>{selectedProject.description || selectedProject.idea || 'No project description added yet.'}</p>
+                            <div>
+                              {(selectedProject.repository?.detected_technologies || []).slice(0, 5).map(item => (
+                                <span key={item.name || item}>{item.name || item}</span>
+                              ))}
+                              <small>{summary.milestones.length} milestones · {summary.completed} completed · {summary.verified} verified</small>
+                            </div>
+                          </div>
+                        ) : (
+                          <label className="ms-context-edit">
+                            Add, correct or remove details for this generation
+                            <textarea
+                              rows="5"
+                              maxLength="7000"
+                              value={inputs.context_override}
+                              onChange={e => setField('context_override', e.target.value)}
+                              placeholder="Correct the project summary or add confirmed details. Avoid adding claims you cannot support."
+                            />
+                          </label>
+                        )}
+                        <p className="ms-context-footnote">
+                          Planned features remain plans. A task marked complete is user-recorded progress; verified claims require saved check evidence.
+                        </p>
+                      </section>
+                    )}
+
+                    {/* Main Form */}
+                    <form className="ms-form" onSubmit={generate}>
+                      <div className="ms-form-grid">
+
+                        {/* Topic / Source */}
+                        <label className="ms-field ms-wide">
+                          <span>
+                            {mode === 'repurpose' ? 'Source content' : mode === 'campaign' ? 'Campaign topic or project' : 'Topic, project or request'}{' '}
+                            <i>*</i>
+                          </span>
+                          <textarea
+                            rows={mode === 'repurpose' ? 5 : 3}
+                            maxLength={8000}
+                            value={mode === 'repurpose' ? inputs.source_content : inputs.topic}
+                            onChange={e => setField(mode === 'repurpose' ? 'source_content' : 'topic', e.target.value)}
+                            placeholder={
+                              mode === 'repurpose'
+                                ? 'Paste the text or rough notes to transform…'
+                                : selectedProject
+                                  ? 'For example: introduce the current booking flow in a portfolio post…'
+                                  : 'For example: write a friendly introduction for my design portfolio…'
+                            }
+                          />
+                        </label>
+
+                        <div className="ms-brief-divider ms-wide"><span><Zap size={12} /> Brief essentials</span><small>Required strategy inputs</small></div>
+
+                        {/* Goal + Audience */}
+                        {mode !== 'repurpose' && <>
+                          <label className="ms-field">
+                            <span>Marketing objective <i>*</i></span>
+                            <select value={inputs.objective} onChange={e => setField('objective', e.target.value)}>
+                              {['awareness', 'leads', 'pilot users', 'signups', 'sales', 'retention'].map(v => (
+                                <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="ms-field">
+                            <span>Target audience / ideal customer <i>*</i></span>
+                            <input value={inputs.audience} onChange={e => setField('audience', e.target.value)} placeholder={selectedProject ? 'Use project audience' : 'Who should this reach?'} />
+                          </label>
+                          <label className="ms-field">
+                            <span>Customer problem <i>*</i></span>
+                            <textarea rows="2" value={inputs.customer_problem} onChange={e => setField('customer_problem', e.target.value)} placeholder="What problem does this audience face?" />
+                          </label>
+                          <label className="ms-field">
+                            <span>Value proposition <i>*</i></span>
+                            <textarea rows="2" value={inputs.value_proposition} onChange={e => setField('value_proposition', e.target.value)} placeholder="Why is this useful to them?" />
+                          </label>
+                        </>}
+
+                        {/* Mode-specific fields */}
+                        {mode === 'showcase' && (
+                          <label className="ms-field">
+                            <span>Showcase type</span>
+                            <select value={inputs.showcase_type} onChange={e => setField('showcase_type', e.target.value)}>
+                              {showcaseTypes.map(v => <option key={v}>{v}</option>)}
+                            </select>
+                          </label>
+                        )}
+                        {mode === 'tool' && (
+                          <label className="ms-field">
+                            <span>Template</span>
+                            <select value={inputs.template} onChange={e => setField('template', e.target.value)}>
+                              {toolTypes.map(v => <option key={v}>{v}</option>)}
+                            </select>
+                          </label>
+                        )}
+                        {mode === 'repurpose' && (
+                          <div className="ms-field ms-wide">
+                            <span>Target formats</span>
+                            <div className="ms-format-list">
+                              {formats.map(format => (
+                                <label key={format}>
+                                  <input type="checkbox" checked={inputs.formats.includes(format)} onChange={() => toggleFormat(format)} />
+                                  {format}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {mode === 'email' && <>
+                          <label className="ms-field">
+                            <span>Recipient type <i>*</i></span>
+                            <input value={inputs.recipient_type} onChange={e => setField('recipient_type', e.target.value)} placeholder="Early adopters, leads, customers…" />
+                          </label>
+                          <label className="ms-field">
+                            <span>Desired next action <i>*</i></span>
+                            <input value={inputs.desired_next_action} onChange={e => setField('desired_next_action', e.target.value)} placeholder="Book a pilot call, reply, activate…" />
+                          </label>
+                        </>}
+                        {mode === 'launch' && (
+                          <label className="ms-field">
+                            <span>Launch status <i>*</i></span>
+                            <select value={inputs.launch_status} onChange={e => setField('launch_status', e.target.value)}>
+                              <option>Not confirmed</option><option>Pre-launch</option><option>Ready to announce</option><option>Launched</option>
+                            </select>
+                          </label>
+                        )}
+                        {(mode === 'social' || mode === 'email' || mode === 'launch') && (
+                          <label className="ms-field">
+                            <span>Platform / destination</span>
+                            <select value={inputs.platform} onChange={e => setField('platform', e.target.value)}>
+                              {platforms.map(v => <option key={v}>{v}</option>)}
+                            </select>
+                          </label>
+                        )}
+                        {mode === 'campaign' && <>
+                          <label className="ms-field">
+                            <span>Duration</span>
+                            <select value={inputs.campaign_days} onChange={e => setField('campaign_days', Number(e.target.value))}>
+                              <option value={7}>7-day launch plan</option>
+                              <option value={14}>14-day campaign</option>
+                              <option value={30}>30-day calendar</option>
+                            </select>
+                          </label>
+                          <label className="ms-field">
+                            <span>Primary platform</span>
+                            <select value={inputs.campaign_platform} onChange={e => setField('campaign_platform', e.target.value)}>
+                              {platforms.map(v => <option key={v}>{v}</option>)}
+                            </select>
+                          </label>
+                        </>}
+
+                        <div className="ms-wide ms-brief-more">
+                          <button type="button" className="ms-brief-toggle" onClick={() => setAdvancedBriefOpen(value => !value)}>
+                            <ChevronDown size={14} className={advancedBriefOpen ? 'is-open' : ''} />
+                            {advancedBriefOpen ? 'Hide optional brief details' : 'Add optional brief details'}
+                          </button>
+                          <small>Budget, brand voice, references and campaign goals are optional.</small>
+                        </div>
+                        {advancedBriefOpen && <div className="ms-advanced-brief ms-wide">
+                          <label className="ms-field"><span>Brand voice <small>optional</small></span><textarea rows="2" maxLength="800" value={inputs.brand_voice} onChange={e => setField('brand_voice', e.target.value)} placeholder="Words to sound like, and words to avoid" /></label>
+                          <label className="ms-field"><span>Budget <small>optional</small></span><input value={inputs.budget} onChange={e => setField('budget', e.target.value)} placeholder="INR 10,000 or organic only" /></label>
+                          <label className="ms-field"><span>Competitor / reference links <small>one per line</small></span><textarea rows="2" value={inputs.competitor_links.join('\n')} onChange={e => setField('competitor_links', e.target.value.split('\n').map(v => v.trim()).filter(Boolean))} placeholder="https://example.com" /></label>
+                          <label className="ms-field"><span>Measurable goals <small>planned targets only</small></span><textarea rows="2" maxLength="1000" value={inputs.measurable_goals} onChange={e => setField('measurable_goals', e.target.value)} placeholder="20 pilot conversations; targets are not results" /></label>
+                          {mode === 'campaign' && <label className="ms-field ms-wide"><span>Campaign channels</span><div className="ms-format-list">{platforms.map(channel => <label key={channel}><input type="checkbox" checked={inputs.channels.includes(channel)} onChange={() => setField('channels', inputs.channels.includes(channel) ? inputs.channels.filter(value => value !== channel) : [...inputs.channels, channel])} />{channel}</label>)}</div></label>}
+                        </div>}
+
+                        {/* Common fields */}
+                        {mode !== 'repurpose' && mode !== 'campaign' && (
+                          <label className="ms-field">
+                            <span>Tone</span>
+                            <select value={inputs.tone} onChange={e => setField('tone', e.target.value)}>
+                              {tones.map(v => <option key={v}>{v}</option>)}
+                            </select>
+                          </label>
+                        )}
+                        {mode !== 'campaign' && mode !== 'repurpose' && (
+                          <label className="ms-field">
+                            <span>Length</span>
+                            <select value={inputs.length} onChange={e => setField('length', e.target.value)}>
+                              {['Short', 'Medium', 'Long'].map(v => <option key={v}>{v}</option>)}
+                            </select>
+                          </label>
+                        )}
+                        {mode !== 'repurpose' && mode !== 'campaign' && (
+                          <label className="ms-field">
+                            <span>Language</span>
+                            <input value={inputs.language} onChange={e => setField('language', e.target.value)} placeholder="English" />
+                          </label>
+                        )}
+                        {mode !== 'repurpose' && mode !== 'campaign' && (
+                          <label className="ms-field">
+                            <span>Key message <small>optional</small></span>
+                            <input value={inputs.key_message} onChange={e => setField('key_message', e.target.value)} placeholder="The one thing to remember" />
+                          </label>
+                        )}
+                        {mode !== 'repurpose' && mode !== 'campaign' && (
+                          <label className="ms-field">
+                            <span>Keywords <small>optional</small></span>
+                            <input value={inputs.keywords} onChange={e => setField('keywords', e.target.value)} placeholder="Terms to include" />
+                          </label>
+                        )}
+                        {mode !== 'repurpose' && (
+                          <label className="ms-field">
+                            <span>Desired call to action <i>*</i></span>
+                            <input value={inputs.cta} onChange={e => setField('cta', e.target.value)} placeholder="What should readers do next?" />
+                          </label>
+                        )}
+                        <label className="ms-field">
+                          <span>Source URL <small>optional</small></span>
+                          <input type="url" maxLength="500" value={inputs.source_url} onChange={e => setField('source_url', e.target.value)} placeholder="https://…" />
+                        </label>
+                        <label className="ms-field ms-wide">
+                          <span>Additional instructions <small>optional</small></span>
+                          <textarea rows="2" maxLength="1800" value={inputs.extra_instructions} onChange={e => setField('extra_instructions', e.target.value)} placeholder="Add confirmed details, phrases to avoid, or a specific creative direction." />
+                        </label>
+                      </div>
+
+                      {/* Form Footer */}
+                      <div className="ms-form-foot">
+                        <span>
+                          <Sparkles size={13} />
+                          {selectedProject
+                            ? 'Uses your saved project details and repository evidence.'
+                            : 'Custom mode — supports any creative request.'}
+                          {' '}No live trend research configured.
+                        </span>
+                        <button className="ms-primary" type="submit" disabled={generationBusy} id="ms-generate-btn">
+                          {generationBusy
+                            ? <><span className="ms-spinner" /> Generating drafts…</>
+                            : <><Sparkles size={15} /> Generate Content <ArrowRight size={15} /></>
+                          }
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+
+                {/* Repurpose hint */}
+                {mode === 'repurpose' && (
+                  <div className="ms-repurpose-hint">
+                    <Sparkles size={13} style={{display:'inline',marginRight:6}} />
+                    Choose the formats above. UDAAN will create one draft for each selected format, preserving the original source meaning.
+                  </div>
+                )}
+
+                {/* Creative Direction */}
+                {approach && results.length > 0 && (
+                  <div className="ms-approach">
+                    <Sparkles size={16} />
+                    <div><b>Creative direction</b><span>{approach}</span></div>
+                  </div>
+                )}
+
+                {campaign && (
+                  <CampaignGallery
+                    campaign={campaign}
+                    onSelect={selectCampaignAsset}
+                    onRetry={retryCampaignAsset}
+                    onError={setError}
+                  />
+                )}
+
+                {/* Results */}
+                {results.length > 0 && (
+                  <section className="ms-results">
+                    <div className="ms-results-heading">
+                      <div>
+                        <span className="ms-eyebrow"><Zap size={12} /> Your Drafts</span>
+                        <h2>Review, edit &amp; save</h2>
+                        <p>{results.length} editable option{results.length === 1 ? '' : 's'} · nothing is published automatically</p>
+                      </div>
+                      <button className="ms-secondary" onClick={generate} disabled={generationBusy}>
+                        <RefreshCw size={13} /> Regenerate all
+                      </button>
+                    </div>
+                    <div className="ms-result-grid">
+                      {results.map((item, index) => (
+                        <ResultCard
+                          key={item.localKey || item.id || index}
+                          item={item}
+                          index={index}
+                          busy={refineBusy}
+                          copying={copying}
+                          tone={inputs.tone}
+                          onChange={(key, value) => setResults(current => current.map(row => row === item ? { ...row, [key]: value } : row))}
+                          onCopy={() => void copyResult(item)}
+                          onExport={() => exportResult(item)}
+                          onSave={() => void (campaign ? saveCampaignCopy(item) : saveResult(item))}
+                          onRefine={action => void refine(item, action)}
+                          onRepurpose={() => repurposeResult(item)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
           </div>
         </main>
       </div>
@@ -279,18 +896,172 @@ export default function MarketingStudio() {
   )
 }
 
-function ContentTypeCard({ item, selected, onClick }) { const Icon = item.icon; return <button type="button" className={`ms-type-card ${selected ? 'selected' : ''}`} onClick={onClick}><span className="ms-type-icon"><Icon size={17} /></span><b>{item.title}</b><small>{item.subtitle}</small></button> }
-function EmptyState({ title, copy }) { return <div className="ms-empty"><span className="ms-empty-icon"><Bookmark size={19} /></span><h3>{title}</h3><p>{copy}</p></div> }
-function ResultCard({ item, index, busy, copying, tone, onChange, onCopy, onSave, onRefine, onRepurpose }) {
-  const key = item.localKey || item.id
-  const refinements = [['improve hook', 'Improve hook'], ['shorten', 'Shorten'], ['expand', 'Expand'], ['change tone', 'Change tone']]
-  return <article className="ms-result-card"><header><div><span className="ms-result-kicker">{item.day ? `DAY ${item.day}` : `OPTION ${index + 1}`}</span><span className="ms-result-platform">{item.platform || item.format}</span></div></header>
-    <label className="ms-result-title"><span>Title / hook</span><input value={item.title || ''} onChange={event => onChange('title', event.target.value)} /></label>
-    {item.objective && <span className="ms-objective">{item.objective}</span>}
-    <label className="ms-result-body"><span>Editable content</span><textarea rows={Math.min(18, Math.max(7, (item.body || '').split('\n').length + 3))} value={item.body || ''} onChange={event => onChange('body', event.target.value)} /></label>
-    {item.rationale && <p className="ms-rationale"><Sparkles size={12} />{item.rationale}</p>}
-    <div className="ms-result-actions"><button onClick={onCopy}><Copy size={13} />{copying === key ? 'Copied' : 'Copy'}</button><button className="ms-save-draft" onClick={onSave}><Bookmark size={13} />{item.id ? 'Save edits' : item.saved ? 'Saved' : 'Save to library'}</button></div>
-    <details className="ms-refine"><summary><WandSparkles size={13} /> Refine this draft</summary><div>{refinements.map(([action, label]) => <button key={action} disabled={busy === `${key}:${action}`} onClick={() => onRefine(action)}>{busy === `${key}:${action}` ? <span className="ms-spinner" /> : <Sparkles size={12} />}{label}</button>)}<button disabled={busy === `${key}:regenerate`} onClick={() => onRefine('regenerate')}><RefreshCw size={12} />Regenerate</button><button onClick={onRepurpose}><ArrowRight size={12} />Repurpose</button></div><small>Change tone uses the selected “{tone}” tone. Original request settings are retained.</small></details>
-  </article>
+/* ────────────────────────────────────────────────
+   Sub-components
+──────────────────────────────────────────────── */
+
+function ContentTypeCard({ item, selected, onClick }) {
+  const Icon = item.icon
+  return (
+    <button type="button" className={`ms-type-card ${selected ? 'selected' : ''}`} onClick={onClick}>
+      <span className="ms-type-icon"><Icon size={16} /></span>
+      <b>{item.title}</b>
+      <small>{item.subtitle}</small>
+    </button>
+  )
 }
-function SavedCard({ item, onOpen, onDuplicate, onDelete }) { return <article className="ms-saved-card"><div className="ms-saved-meta"><span>{item.content_type || 'Draft'}</span><span>{item.platform || 'Custom format'}</span></div><h3>{item.title}</h3><p>{item.body}</p><div className="ms-saved-foot"><span>{item.project_name || 'Custom content'} · {dateLabel(item.updated_at)}</span><div><button title="Open and edit" onClick={() => onOpen(item)}><Pencil size={13} /></button><button title="Duplicate" onClick={() => onDuplicate(item)}><Copy size={13} /></button><button title="Delete" onClick={() => onDelete(item)}><X size={14} /></button></div></div></article> }
+
+function EmptyState({ title, copy }) {
+  return (
+    <div className="ms-empty">
+      <span className="ms-empty-icon"><Bookmark size={20} /></span>
+      <h3>{title}</h3>
+      <p>{copy}</p>
+    </div>
+  )
+}
+
+function ResultCard({ item, index, busy, copying, tone, onChange, onCopy, onExport, onSave, onRefine, onRepurpose }) {
+  const key = item.localKey || item.id
+  const refinements = [
+    ['improve hook', 'Improve hook'],
+    ['shorten', 'Shorten'],
+    ['expand', 'Expand'],
+    ['change tone', 'Change tone'],
+  ]
+  return (
+    <article className="ms-result-card">
+      <header>
+        <div>
+          <span className="ms-result-kicker">{item.day ? `Day ${item.day}` : `Option ${index + 1}`}</span>
+          {(item.platform || item.format) && <span className="ms-result-platform">{item.platform || item.format}</span>}
+        </div>
+      </header>
+
+      <label className="ms-result-title">
+        <span>Title / hook</span>
+        <input value={item.title || ''} onChange={e => onChange('title', e.target.value)} placeholder="Add a title…" />
+      </label>
+
+      {item.objective && <span className="ms-objective">{item.objective}</span>}
+
+      <label className="ms-result-body">
+        <span>Editable content</span>
+        <textarea
+          rows={Math.min(18, Math.max(7, (item.body || '').split('\n').length + 3))}
+          value={item.body || ''}
+          onChange={e => onChange('body', e.target.value)}
+        />
+      </label>
+
+      {item.rationale && (
+        <p className="ms-rationale"><Sparkles size={12} />{item.rationale}</p>
+      )}
+
+      <div className="ms-result-actions">
+        <button onClick={onCopy}>
+          <Copy size={13} />{copying === key ? 'Copied!' : 'Copy'}
+        </button>
+        <button onClick={onExport}><Download size={13} />Export</button>
+        <button className="ms-save-draft" onClick={onSave}>
+          <Bookmark size={13} />{item.id ? 'Save edits' : item.saved ? 'Saved ✓' : 'Save to library'}
+        </button>
+      </div>
+
+      <details className="ms-refine">
+        <summary><WandSparkles size={13} /> Refine this draft</summary>
+        <div>
+          {refinements.map(([action, label]) => (
+            <button key={action} disabled={busy === `${key}:${action}`} onClick={() => onRefine(action)}>
+              {busy === `${key}:${action}` ? <span className="ms-spinner" /> : <Sparkles size={11} />}
+              {label}
+            </button>
+          ))}
+          <button disabled={busy === `${key}:regenerate`} onClick={() => onRefine('regenerate')}>
+            <RefreshCw size={11} />Regenerate
+          </button>
+          <button onClick={onRepurpose}><ArrowRight size={11} />Repurpose</button>
+        </div>
+        <small>Change tone uses the selected "{tone}" tone. Original request settings are retained.</small>
+      </details>
+    </article>
+  )
+}
+
+function CampaignGallery({ campaign, onSelect, onRetry, onError }) {
+  const [failedImages, setFailedImages] = useState(() => new Set())
+  const assets = campaign.assets || []
+  useEffect(() => {
+    setFailedImages(new Set())
+  }, [campaign.id])
+  const retry = async index => {
+    setFailedImages(current => {
+      const next = new Set(current)
+      next.delete(index)
+      return next
+    })
+    await onRetry(index)
+  }
+  return (
+    <section className="ms-campaign-gallery">
+      <div className="ms-results-heading">
+        <div>
+          <span className="ms-eyebrow"><Sparkles size={12} /> AI Creative Gallery</span>
+          <h2>Choose your campaign image</h2>
+          <p>{assets.length} distinct concepts generated for {campaign.platform || campaign.content_type}.</p>
+        </div>
+      </div>
+      <div className="ms-campaign-assets">
+        {assets.map((asset, index) => (
+          <article className={`ms-campaign-asset ${campaign.selected_asset === index ? 'selected' : ''}`} key={asset.url || index}>
+            {asset.url && asset.status !== 'failed' && !failedImages.has(index)
+              ? <img
+                  src={asset.url}
+                  alt={`${campaign.content_type} concept ${index + 1}`}
+                  loading="lazy"
+                  onError={() => {
+                    setFailedImages(current => new Set(current).add(index))
+                    onError?.(`Creative ${index + 1} could not be loaded. Retry generation for this variation.`)
+                  }}
+                />
+              : <div className="ms-campaign-asset-failed">
+                  <strong>Creative unavailable</strong>
+                  <span>{asset.error || 'The saved image could not be loaded.'}</span>
+                </div>}
+            <div>
+              {asset.url && asset.status !== 'failed' && !failedImages.has(index) && <button type="button" onClick={() => void onSelect(index)}>{campaign.selected_asset === index ? 'Selected campaign image' : 'Select image'}</button>}
+              {asset.url && asset.status !== 'failed' && !failedImages.has(index) && <a href={asset.url} download={`campaign-concept-${index + 1}.svg`}>Download</a>}
+              <button type="button" onClick={() => void retry(index)}>Retry variation</button>
+            </div>
+            <details><summary>View image prompt</summary><p>{asset.prompt}</p></details>
+            {asset.error && <p className="ms-error">{asset.error}</p>}
+          </article>
+        ))}
+      </div>
+      {!assets.length && <p className="ms-error">No image assets were returned. Retry the campaign generation.</p>}
+      {onError && null}
+    </section>
+  )
+}
+
+function SavedCard({ item, onOpen, onDuplicate, onDelete }) {
+  return (
+    <article className="ms-saved-card">
+      <div className="ms-saved-meta">
+        <span>{item.content_type || 'Draft'}</span>
+        {(item.platform) && <span>{item.platform}</span>}
+        {item.isCampaign && <span>{item.assets?.length || 0} AI images</span>}
+      </div>
+      <h3>{item.title}</h3>
+      <p>{item.body}</p>
+      <div className="ms-saved-foot">
+        <span>{item.project_name || 'Custom content'} · {dateLabel(item.updated_at)}</span>
+        <div>
+          <button title="Open and edit" onClick={() => onOpen(item)}><Pencil size={13} /></button>
+          <button title="Duplicate" onClick={() => onDuplicate(item)}><Copy size={13} /></button>
+          <button title="Delete" onClick={() => onDelete(item)}><X size={14} /></button>
+        </div>
+      </div>
+    </article>
+  )
+}
