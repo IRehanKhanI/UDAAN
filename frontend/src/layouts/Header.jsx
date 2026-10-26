@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { readSavedProjects } from '../services/projectStorage.js'
+import { getTeamWorkspace } from '../services/teamService.js'
+import { useAuth } from '../app/AuthContext.jsx'
+import InviteMakerModal from '../components/modals/InviteMakerModal.jsx'
 
 export default function Header({
   currentProject: propCurrentProject,
@@ -12,6 +15,9 @@ export default function Header({
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [allProjects, setAllProjects] = useState([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
+  const [teamMembers, setTeamMembers] = useState([])
+  const [internalInviteOpen, setInternalInviteOpen] = useState(false)
+  const { auth } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -26,6 +32,54 @@ export default function Header({
     name: 'My Workspace Project',
     category: 'Creative Launchpad',
   }
+
+  useEffect(() => {
+    if (!currentProject?.id || currentProject.id === 'starter') {
+      if (auth.authenticated && auth.user) {
+        setTeamMembers([{
+          id: 'me',
+          name: auth.user.name,
+          role: auth.profile?.preferred_roles?.[0] || 'Project Lead',
+          avatar_url: auth.profile?.avatar_url,
+          is_creator: true
+        }])
+      } else {
+        setTeamMembers([])
+      }
+      return
+    }
+
+    let active = true
+    getTeamWorkspace(currentProject.id)
+      .then(data => {
+        if (!active) return
+        if (data?.members?.length) {
+          setTeamMembers(data.members)
+        } else if (auth.authenticated && auth.user) {
+          setTeamMembers([{
+            id: 'me',
+            name: auth.user.name,
+            role: auth.profile?.preferred_roles?.[0] || 'Project Lead',
+            avatar_url: auth.profile?.avatar_url,
+            is_creator: true
+          }])
+        }
+      })
+      .catch(() => {
+        if (!active) return
+        if (auth.authenticated && auth.user) {
+          setTeamMembers([{
+            id: 'me',
+            name: auth.user.name,
+            role: auth.profile?.preferred_roles?.[0] || 'Project Lead',
+            avatar_url: auth.profile?.avatar_url,
+            is_creator: true
+          }])
+        }
+      })
+
+    return () => { active = false }
+  }, [currentProject?.id, auth.authenticated, auth.user, auth.profile])
 
   const handleSelectProject = (proj) => {
     localStorage.setItem('udaan:selected-project', proj.id)
@@ -125,28 +179,74 @@ export default function Header({
 
       {/* Right items: Collaborators avatars + Notifications + New Idea */}
       <div className="flex items-center gap-2 sm:gap-4">
-        {/* Collaborators Avatar Stack */}
-        <button
-          onClick={() => {
-            if (onInviteClick) onInviteClick()
-            else navigate('/team')
-          }}
-          className="hidden md:flex items-center -space-x-2 cursor-pointer hover:opacity-90 transition-opacity"
-          title="Collaborators - View Team Workspace"
-        >
-          <div className="w-7 h-7 rounded-full bg-[#f0dedb] text-[#8e4b49] flex items-center justify-center text-[11px] font-bold ring-2 ring-[#FFF8F3]">
-            AK
+        {/* Real Collaborators Avatar Stack */}
+        <div className="hidden md:flex items-center gap-1.5">
+          <div
+            onClick={() => {
+              if (onInviteClick) onInviteClick()
+              else navigate('/team')
+            }}
+            className="flex items-center -space-x-2 cursor-pointer hover:opacity-90 transition-opacity"
+            title="Project Team Members - Click to View Team Workspace"
+          >
+            {teamMembers.length > 0 ? (
+              teamMembers.slice(0, 4).map((member, idx) => {
+                const initials = (member.name || member.display_name || member.role || 'M')
+                  .split(/\s+/)
+                  .map((p) => p[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase()
+                const colors = [
+                  'bg-[#f0dedb] text-[#8e4b49]',
+                  'bg-[#FBE191] text-[#766320]',
+                  'bg-[#FFAAA6] text-[#7A3C3A]',
+                  'bg-[#E7E1DC] text-[#534342]',
+                ]
+                return (
+                  <div
+                    key={member.id || idx}
+                    className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-[#FFF8F3] overflow-hidden ${
+                      colors[idx % colors.length]
+                    }`}
+                    title={`${member.name || member.display_name || 'Member'} (${member.role || 'Contributor'})`}
+                  >
+                    {member.avatar_url ? (
+                      <img src={member.avatar_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      initials
+                    )}
+                  </div>
+                )
+              })
+            ) : (
+              <div
+                className="w-7 h-7 rounded-full bg-[#f0dedb] text-[#8e4b49] flex items-center justify-center text-[10px] font-bold ring-2 ring-[#FFF8F3]"
+                title="You (Project Lead)"
+              >
+                {auth.user?.name ? auth.user.name.slice(0, 2).toUpperCase() : 'ME'}
+              </div>
+            )}
+            {teamMembers.length > 4 && (
+              <div className="w-7 h-7 rounded-full bg-[#E7E1DC] text-[#534342] flex items-center justify-center text-[10px] font-semibold ring-2 ring-[#FFF8F3]">
+                +{teamMembers.length - 4}
+              </div>
+            )}
           </div>
-          <div className="w-7 h-7 rounded-full bg-[#FBE191] text-[#766320] flex items-center justify-center text-[11px] font-bold ring-2 ring-[#FFF8F3]">
-            MR
-          </div>
-          <div className="w-7 h-7 rounded-full bg-[#FFAAA6] text-[#7A3C3A] flex items-center justify-center text-[11px] font-bold ring-2 ring-[#FFF8F3]">
-            ER
-          </div>
-          <div className="w-7 h-7 rounded-full bg-[#E7E1DC] text-[#534342] flex items-center justify-center text-[11px] font-semibold ring-2 ring-[#FFF8F3]">
-            +3
-          </div>
-        </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onInviteClick) onInviteClick()
+              else setInternalInviteOpen(true)
+            }}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F9F2ED] hover:bg-[#EDE7E2] text-[#8E4B49] text-[11px] font-bold border border-[#EFEAE4] transition-colors cursor-pointer"
+            title="Invite new collaborator to this project"
+          >
+            <span className="material-symbols-outlined text-[13px]">person_add</span>
+            <span>Invite</span>
+          </button>
+        </div>
 
         {/* Notification Bell */}
         <div className="relative">
@@ -195,6 +295,19 @@ export default function Header({
           <span>New Idea</span>
         </Link>
       </div>
+
+      <InviteMakerModal
+        isOpen={internalInviteOpen}
+        onClose={() => setInternalInviteOpen(false)}
+        projectId={currentProject?.id}
+        onInviteSent={() => {
+          if (currentProject?.id && currentProject.id !== 'starter') {
+            getTeamWorkspace(currentProject.id).then(d => {
+              if (d?.members) setTeamMembers(d.members)
+            }).catch(() => {})
+          }
+        }}
+      />
     </header>
   )
 }

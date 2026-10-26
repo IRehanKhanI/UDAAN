@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react'
 import {
   ArrowRight, Bolt, Check, ChevronDown, CircleCheck, GraduationCap,
-  Grid2X2, List, MoreHorizontal, Plus, Rocket, Search, Sparkles, Trash2
+  Grid2X2, List, MoreHorizontal, Plus, Rocket, Search, Settings, Sparkles, Trash2, Users
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
-import { readSavedProjects, removeSavedProject } from '../services/projectStorage.js'
+import { readSavedProjects, removeSavedProject, syncBackendProjects } from '../services/projectStorage.js'
 import { deleteProject } from '../services/projectService.js'
+import { fetchWorkspaceProjects } from '../services/ideaWorkflowService.js'
+import { useEffect } from 'react'
 
 const tabs = [
   { id: 'all', label: 'All' },
@@ -44,7 +46,7 @@ function ProjectCard({ project, menuOpen, deleting, onOptions, onDelete, onSelec
   }[project.tone] || 'bg-[#8E4B49]'
 
   return (
-    <article className="group bg-white rounded-3xl p-5 md:p-6 border border-[#EFEAE4] shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-4">
+    <article className="group bg-white rounded-3xl p-5 md:p-6 border border-[#EFEAE4] shadow-xs hover:shadow-xl hover:-translate-y-1 hover:-rotate-0.5 transition-all duration-300 flex flex-col justify-between gap-4">
       <div className="space-y-3">
         {/* Top Badges */}
         <div className="flex items-center justify-between">
@@ -70,6 +72,14 @@ function ProjectCard({ project, menuOpen, deleting, onOptions, onDelete, onSelec
             </button>
             {menuOpen && (
               <div className="mp-project-menu" role="menu" aria-label={`${project.name} options`}>
+                <Link to={`/projects/${encodeURIComponent(project.id)}/settings`} role="menuitem" onClick={() => onSelect(project)}>
+                  <Settings size={14} />
+                  <span>Edit project & team</span>
+                </Link>
+                <Link to={`/team?project=${encodeURIComponent(project.id)}`} role="menuitem" onClick={() => onSelect(project)}>
+                  <Users size={14} />
+                  <span>Open Team Workspace</span>
+                </Link>
                 <button type="button" role="menuitem" onClick={() => onDelete(project)} disabled={deleting}>
                   <Trash2 size={14} />
                   <span>{deleting ? 'Deleting…' : 'Delete project'}</span>
@@ -133,14 +143,25 @@ function ProjectCard({ project, menuOpen, deleting, onOptions, onDelete, onSelec
           <span className="text-[11px] text-[#7C766F] ml-3">{project.updated}</span>
         </div>
 
-        <Link
-          to={`/flight-plan?project=${encodeURIComponent(project.id)}`}
-          onClick={() => onSelect(project)}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shadow-xs group-hover:scale-105 no-underline"
-        >
-          <span>Open Plan</span>
-          <ArrowRight size={13} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/team?project=${encodeURIComponent(project.id)}`}
+            onClick={() => onSelect(project)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FFF4F0] hover:bg-[#FFE8E0] text-[#8E4B49] text-xs font-bold transition-all border border-[#F3D7CC] no-underline"
+            title="Manage Team for this project"
+          >
+            <Users size={13} />
+            <span>Team</span>
+          </Link>
+          <Link
+            to={`/flight-plan?project=${encodeURIComponent(project.id)}`}
+            onClick={() => onSelect(project)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shadow-xs group-hover:scale-105 no-underline"
+          >
+            <span>Open Plan</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
       </div>
     </article>
   )
@@ -158,6 +179,15 @@ export default function MyProjects() {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
+
+  useEffect(() => {
+    fetchWorkspaceProjects().then(data => {
+      if (data?.results?.length) {
+        const synced = syncBackendProjects(data.results)
+        setProjects(synced)
+      }
+    }).catch(() => { })
+  }, [])
 
   const counts = useMemo(() => ({
     all: projects.length,
@@ -223,10 +253,7 @@ export default function MyProjects() {
           {/* Top Eyebrow & Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFFFFF] text-[#8E4B49] text-xs font-bold tracking-wide border border-[#EFEAE4] shadow-xs mb-2">
-                <span className="w-2 h-2 rounded-full bg-[#FFAAA6]"></span>
-                <span>STUDIO WORKSPACES</span>
-              </div>
+
               <h1 className="text-3xl sm:text-4xl font-extrabold text-[#1D1B18] tracking-tight leading-tight font-['Plus_Jakarta_Sans']">
                 My Projects
               </h1>
@@ -246,18 +273,7 @@ export default function MyProjects() {
             </div>
           </div>
 
-          {/* Summary Badges Bar */}
-          <div className="flex items-center gap-4 text-xs font-semibold text-[#534342] bg-white p-3.5 rounded-2xl border border-[#EFEAE4] shadow-xs">
-            <span className="flex items-center gap-1.5">
-              <Rocket size={15} className="text-[#8E4B49]" />
-              <strong>{counts['in-progress'] + counts.planning}</strong> active projects
-            </span>
-            <span className="w-1 h-1 rounded-full bg-[#D8C1C0]" />
-            <span className="flex items-center gap-1.5">
-              <Check size={15} className="text-[#8e4b49]" />
-              <strong>{counts.completed + counts.archived}</strong> finished or live
-            </span>
-          </div>
+
 
           {/* Controls: Search, Filters, Sorters, Grid/List */}
           <div className="bg-white p-4 rounded-3xl border border-[#EFEAE4] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -307,9 +323,8 @@ export default function MyProjects() {
                 <button
                   type="button"
                   onClick={() => setView('grid')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    view === 'grid' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
-                  }`}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${view === 'grid' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
+                    }`}
                   aria-label="Grid view"
                 >
                   <Grid2X2 size={16} />
@@ -317,9 +332,8 @@ export default function MyProjects() {
                 <button
                   type="button"
                   onClick={() => setView('list')}
-                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-                    view === 'list' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
-                  }`}
+                  className={`p-1.5 rounded-lg transition-all cursor-pointer ${view === 'list' ? 'bg-white shadow-xs text-[#1D1B18]' : 'text-[#7C766F] hover:text-[#1D1B18]'
+                    }`}
                   aria-label="List view"
                 >
                   <List size={16} />
@@ -337,11 +351,10 @@ export default function MyProjects() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-[#FFAAA6] text-[#7A3C3A] shadow-xs'
-                      : 'text-[#534342] hover:bg-[#F3EDE7]'
-                  }`}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${isActive
+                    ? 'bg-[#FFAAA6] text-[#7A3C3A] shadow-xs'
+                    : 'text-[#534342] hover:bg-[#F3EDE7]'
+                    }`}
                 >
                   <span>{tab.label}</span>
                   <span className={`px-2 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-white/70 text-[#7A3C3A]' : 'bg-[#E7E1DC] text-[#534342]'}`}>

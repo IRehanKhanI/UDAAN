@@ -1,232 +1,327 @@
-import { useEffect, useRef, useState } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
-import {
-  BriefcaseBusiness, ChevronRight, Copy, GraduationCap,
-  Github, Lightbulb, Paperclip, Plus, Rocket, Send, Sparkles, X
-} from 'lucide-react'
-import { createPortal } from 'react-dom'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState, useMemo } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
 import InviteMakerModal from '../components/modals/InviteMakerModal.jsx'
-import AddTaskModal from '../components/modals/AddTaskModal.jsx'
-import { saveProjectDraft } from '../services/ideaWorkflowService.js'
-import { useAuth } from '../app/AuthContext.jsx'
-import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
+import Interactive3DCharacter from '../components/mascot/Interactive3DCharacter.jsx'
+import { fetchWorkspaceProjects } from '../services/ideaWorkflowService.js'
+import { readSavedProjects, syncBackendProjects, updateSavedProject } from '../services/projectStorage.js'
 
-const draftKey = 'udaan:idea-draft'
-const paletteKey = 'udaan:studio-palette'
-const defaultPalette = ['#FFAA8A', '#FBE191', '#FFF1ED', '#EAE4F8']
+// ── Icons ────────────────────────────────────────────────────────────
+const IconBulb = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M9 18h6M10 21h4M12 3a6 6 0 0 1 6 6c0 2.22-1.2 4.16-3 5.2V16H9v-1.8A6.002 6.002 0 0 1 6 9a6 6 0 0 1 6-6Z" />
+  </svg>
+)
 
-function readPalette() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(paletteKey) || 'null')
-    if (Array.isArray(saved)) {
-      const colors = saved.filter(color => typeof color === 'string' && /^#[\da-f]{6}$/i.test(color))
-      if (colors.length) return colors
-    }
-  } catch {
-    // Fall back to the default palette when saved preferences cannot be read.
-  }
-  return defaultPalette
-}
+const IconBlueprint = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 9h18M9 21V9M15 15h3M15 12h3M6 15h3M6 12h3" />
+  </svg>
+)
 
-function newUuid() {
-  return globalThis.crypto?.randomUUID?.() || 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, char => {
-    const random = Math.random() * 16 | 0
-    return (char === 'x' ? random : (random & 3 | 8)).toString(16)
-  })
-}
+const IconCode = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="16 18 22 12 16 6" />
+    <polyline points="8 6 2 12 8 18" />
+  </svg>
+)
 
-function readDraft() {
-  try { return JSON.parse(sessionStorage.getItem(draftKey) || localStorage.getItem(draftKey) || 'null') } catch { return null }
-}
+const IconFlask = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M9 3h6M9 3v6l-4 9a1 1 0 0 0 .9 1.45h12.2A1 1 0 0 0 21 18l-4-9V3" />
+    <path d="M8 13h8" />
+  </svg>
+)
 
-function flightGeometry(origin, width, height) {
-  const destination = { x: width * 0.86, y: Math.max(48, height * 0.12) }
-  const dx = destination.x - origin.x
-  const dy = destination.y - origin.y
-  const control1 = { x: origin.x + dx * 0.28, y: origin.y + dy * 0.12 - 52 }
-  const control2 = { x: origin.x + dx * 0.72, y: destination.y + (origin.y - destination.y) * 0.18 - 35 }
-  const pointAt = t => {
-    const u = 1 - t
-    return {
-      x: u ** 3 * origin.x + 3 * u ** 2 * t * control1.x + 3 * u * t ** 2 * control2.x + t ** 3 * destination.x,
-      y: u ** 3 * origin.y + 3 * u ** 2 * t * control1.y + 3 * u * t ** 2 * control2.y + t ** 3 * destination.y,
-    }
-  }
-  const points = [0, 0.32, 0.68, 1].map(pointAt)
-  const rotations = points.map((point, index) => {
-    const next = points[Math.min(index + 1, points.length - 1)]
-    const previous = points[Math.max(index - 1, 0)]
-    return Math.atan2(next.y - previous.y, next.x - previous.x) * 180 / Math.PI + 45
-  })
-  return {
-    width, height, origin, destination,
-    path: `M ${origin.x} ${origin.y} C ${control1.x} ${control1.y}, ${control2.x} ${control2.y}, ${destination.x} ${destination.y}`,
-    x: points.map(point => point.x - origin.x),
-    y: points.map(point => point.y - origin.y),
-    rotate: rotations,
-  }
-}
+const IconRocket = ({ size = 18, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09Z" />
+    <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2Z" />
+    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+    <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+  </svg>
+)
+
+const IconCheck = ({ size = 16, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="20 6 9 17 4 12" />
+  </svg>
+)
+
+const IconPlus = ({ size = 15, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
+
+const IconCalendar = ({ size = 13, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+)
+
+const IconClock = ({ size = 13, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+)
+
+const IconPaperclip = ({ size = 13, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l7.88-7.88" />
+  </svg>
+)
+
+const IconPlay = ({ size = 14, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className}>
+    <polygon points="5 3 19 12 5 21 5 3" />
+  </svg>
+)
+
+const IconPause = ({ size = 14, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className}>
+    <rect x="6" y="4" width="4" height="16" rx="1" />
+    <rect x="14" y="4" width="4" height="16" rx="1" />
+  </svg>
+)
+
+const IconMoreVertical = ({ size = 16, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="12" cy="5" r="1" />
+    <circle cx="12" cy="19" r="1" />
+  </svg>
+)
+
+const IconChevronRight = ({ size = 14, className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
+
+const JOURNEY_STEPS = [
+  { label: 'Idea & Research', key: 'understanding', Icon: IconBulb, path: '/launch' },
+  { label: 'Architecture', key: 'feasibility', Icon: IconBlueprint, path: '/launch' },
+  { label: 'MVP Build', key: 'mvp', Icon: IconCode, path: '/flight-plan' },
+  { label: 'Testing', key: 'testing', Icon: IconFlask, path: '/flight-plan' },
+  { label: 'Launch', key: 'launch', Icon: IconRocket, path: '/flight-plan' },
+]
 
 export default function MainDashboard() {
   const navigate = useNavigate()
-  const { auth } = useAuth()
-  const prefersReducedMotion = useReducedMotion()
+  const [searchParams] = useSearchParams()
   const [menuOpen, setMenuOpen] = useState(false)
   const [inviteModalOpen, setInviteModalOpen] = useState(false)
-  const [addTaskModalOpen, setAddTaskModalOpen] = useState(false)
-
-  const [savedDraft] = useState(readDraft)
-  const [idea, setIdea] = useState(savedDraft?.idea ?? '')
-  const [intent, setIntent] = useState(savedDraft?.projectType ?? 'Startup')
-  const [attachment, setAttachment] = useState(savedDraft?.attachment ?? null)
-  const [attachmentNotice, setAttachmentNotice] = useState('')
-  const [submission, setSubmission] = useState({ phase: 'idle', message: '', payload: null, geometry: null })
-  const fileInput = useRef(null)
-  const launchButton = useRef(null)
-  const flightGuard = useRef(false)
-  const flightPayload = useRef(null)
-  const launching = submission.phase === 'flying'
-
-  const [taskFilter, setTaskFilter] = useState('all')
-  const [paletteColors, setPaletteColors] = useState(readPalette)
-
-  // Saved projects
   const [projects, setProjects] = useState([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
+
+  // Live Stopwatch for session time tracking
+  const [isTracking, setIsTracking] = useState(false)
+  const [trackedSeconds, setTrackedSeconds] = useState(4965) // ~1h 22m 45s default
+
+  // New task inline composer
+  const [isAddingTask, setIsAddingTask] = useState(false)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskHours, setNewTaskHours] = useState('2')
+
+  useEffect(() => {
+    let interval = null
+    if (isTracking) {
+      interval = setInterval(() => {
+        setTrackedSeconds(s => s + 1)
+      }, 1000)
+    }
+    return () => clearInterval(interval)
+  }, [isTracking])
+
+  const formatTimer = (totalSeconds) => {
+    const hrs = Math.floor(totalSeconds / 3600)
+    const mins = Math.floor((totalSeconds % 3600) / 60)
+    const secs = totalSeconds % 60
+    return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  }
 
   useEffect(() => {
     const list = readSavedProjects()
     setProjects(list)
-    const stored = localStorage.getItem('udaan:selected-project') || list[0]?.id || ''
+    const urlProj = searchParams.get('project')
+    const stored = urlProj || localStorage.getItem('udaan:selected-project') || list[0]?.id || ''
     setSelectedProjectId(stored)
-  }, [])
-
-  useEffect(() => () => { flightGuard.current = false; flightPayload.current = null }, [])
-
-  const currentProject = projects.find(p => p.id === selectedProjectId) || projects[0] || {
-    id: 'starter',
-    name: 'Ceramic Studio Pre-Orders',
-    category: 'E-Commerce / Craft',
-    description: '12 bespoke stoneware vases collection',
-  }
-
-  const completedTasks = currentProject.flightPlanProgress || currentProject.workflow?.flightPlanProgress || []
-  const workbenchTasks = (currentProject.workflow?.flight_plan?.milestones || []).flatMap((milestone, milestoneIndex) =>
-    (milestone.tasks || []).map((task, taskIndex) => ({
-      ...task,
-      id: `${milestoneIndex}-${taskIndex}`,
-      title: typeof task === 'string' ? task : task.title,
-      milestone: milestone.title,
-      dueToday: typeof task === 'object' && Boolean(task.due_today),
-      done: completedTasks.includes(`${milestoneIndex}-${taskIndex}`),
-    }))
-  )
-  const displayedTasks = workbenchTasks.filter(task => {
-    if (taskFilter === 'due_today') return task.dueToday
-    if (taskFilter === 'unassigned') return !task.lead
-    return true
-  })
-
-  const addWorkbenchTask = partial => {
-    const project = projects.find(item => String(item.id) === String(currentProject.id))
-    if (!project) return
-    const plan = project.workflow?.flight_plan || { milestones: [] }
-    const milestones = [...(plan.milestones || [])]
-    if (!milestones.length) {
-      milestones.push({
-        title: 'Workbench',
-        category: 'Milestone',
-        outcome: '',
-        start_date: '',
-        target_date: '',
-        tasks: [],
-      })
-    }
-    const firstMilestone = milestones[0]
-    const newTask = {
-      title: partial.title,
-      category: partial.category,
-      estimated_minutes: partial.estimatedMinutes || 25,
-      lead: partial.lead || 'TS',
-      due_today: partial.dueToday ?? true,
-      difficulty: 'medium',
-      subtasks: [],
-    }
-    const updatedPlan = {
-      ...plan,
-      milestones: milestones.map((milestone, index) =>
-        index === 0 ? { ...firstMilestone, tasks: [...(firstMilestone.tasks || []), newTask] } : milestone
-      ),
-    }
-    updateSavedProject(project.id, current => ({
-      ...current,
-      workflow: { ...current.workflow, flight_plan: updatedPlan },
-    }))
-    setProjects(readSavedProjects())
-  }
+  }, [searchParams])
 
   useEffect(() => {
-    localStorage.setItem(paletteKey, JSON.stringify(paletteColors))
-  }, [paletteColors])
+    fetchWorkspaceProjects().then(data => {
+      if (data?.results?.length) {
+        const synced = syncBackendProjects(data.results)
+        setProjects(synced)
+      }
+    }).catch(() => { })
+  }, [])
 
-  const updatePaletteColor = (index, hex) => {
-    setPaletteColors(colors => colors.map((color, colorIndex) => colorIndex === index ? hex.toUpperCase() : color))
+  const currentProject = projects.find(p => String(p.id) === String(selectedProjectId)) || projects[0] || {
+    id: 'starter',
+    name: 'StudentBudgetPlanner',
+    category: 'Fintech & Student Tools',
+    description: 'Smart student budget manager with automated expense tracking and meal splits.',
+    progress: 45,
   }
 
-  async function addAttachment(event) {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-    if (!/\.(txt|md)$/i.test(file.name) || file.size > 256 * 1024) {
-      setAttachmentNotice('Attach a .txt or .md file smaller than 256 KB.')
+  const completedTasks = currentProject.flightPlanProgress || []
+  const flightMilestones = currentProject.workflow?.flight_plan?.milestones || []
+
+  // Extract all tasks from project milestones, or provide realistic initial tasks
+  const rawMilestoneTasks = flightMilestones.flatMap((m, mIdx) =>
+    (m.tasks || []).map((t, tIdx) => {
+      const id = t._fpId || `${mIdx}-${tIdx}`
+      const isDone = completedTasks.includes(id)
+      return {
+        id,
+        title: typeof t === 'string' ? t : t.title,
+        projectName: currentProject.name,
+        time: t.effort_estimate || '2 hrs',
+        attachments: 2,
+        status: isDone ? 'Done' : (tIdx === 0 ? 'In progress' : 'New'),
+        done: isDone,
+        milestoneIndex: mIdx,
+      }
+    })
+  )
+
+  const defaultStarterTasks = [
+    {
+      id: 'default-1',
+      title: 'UI design_moodboard creation',
+      projectName: currentProject.name,
+      time: '2 hrs',
+      attachments: 2,
+      status: 'In progress',
+      done: false,
+    },
+    {
+      id: 'default-2',
+      title: 'UI design_design layouts & assets',
+      projectName: currentProject.name,
+      time: '6 hrs',
+      attachments: 8,
+      status: 'In progress',
+      done: false,
+    },
+    {
+      id: 'default-3',
+      title: 'UI design_presentation & user testing',
+      projectName: currentProject.name,
+      time: '1 hrs',
+      attachments: 2,
+      status: 'Done',
+      done: true,
+    },
+  ]
+
+  const customDaily = currentProject.customDailyTasks || []
+  const allDisplayTasks = rawMilestoneTasks.length > 0
+    ? [...customDaily, ...rawMilestoneTasks]
+    : [...customDaily, ...defaultStarterTasks]
+
+  const totalTasks = allDisplayTasks.length
+  const doneCount = allDisplayTasks.filter(t => t.done).length
+  const inProgressCount = allDisplayTasks.filter(t => !t.done && t.status === 'In progress').length
+  const progressPercent = totalTasks > 0 ? Math.round((doneCount / totalTasks) * 100) : (currentProject.progress || 0)
+
+  // Toggle task completed state
+  const handleToggleTask = (taskId) => {
+    const isCustom = customDaily.some(t => t.id === taskId)
+    if (isCustom) {
+      const updatedCustom = customDaily.map(t =>
+        t.id === taskId ? { ...t, done: !t.done, status: !t.done ? 'Done' : 'New' } : t
+      )
+      const updated = updateSavedProject(currentProject.id, cur => ({
+        ...cur,
+        customDailyTasks: updatedCustom,
+      }))
+      if (updated) {
+        setProjects(readSavedProjects())
+      }
       return
     }
-    try {
-      const text = await file.text()
-      setAttachment({ name: file.name, text: text.slice(0, 20000) })
-      setAttachmentNotice('')
-    } catch {
-      setAttachmentNotice('This file could not be read. Try another text or Markdown file.')
+
+    // Toggle in flightPlanProgress
+    const alreadyDone = completedTasks.includes(taskId)
+    const nextCompleted = alreadyDone
+      ? completedTasks.filter(id => id !== taskId)
+      : [...completedTasks, taskId]
+
+    const nextPct = rawMilestoneTasks.length > 0
+      ? Math.round((nextCompleted.length / rawMilestoneTasks.length) * 100)
+      : Math.min(100, Math.max(0, (currentProject.progress || 0) + (alreadyDone ? -15 : 15)))
+
+    const updated = updateSavedProject(currentProject.id, cur => ({
+      ...cur,
+      flightPlanProgress: nextCompleted,
+      progress: nextPct,
+    }))
+
+    if (updated) {
+      setProjects(readSavedProjects())
     }
   }
 
-  function launch(event) {
-    event.preventDefault()
-    if (flightGuard.current || launching) return
-    if (!idea.trim()) {
-      setSubmission({ phase: 'error', message: 'Add a few words about your idea to get started.', payload: null, geometry: null })
-      document.getElementById('idea-input-field')?.focus()
-      return
+  // Add new task
+  const handleCreateNewTask = (e) => {
+    e.preventDefault()
+    if (!newTaskTitle.trim()) return
+    const newTask = {
+      id: `task-${Date.now()}`,
+      title: newTaskTitle.trim(),
+      projectName: currentProject.name,
+      time: `${newTaskHours || 2} hrs`,
+      attachments: 1,
+      status: 'New',
+      done: false,
     }
-    setSubmission({ phase: 'idle', message: '', payload: null, geometry: null })
-    const rect = launchButton.current?.getBoundingClientRect()
-    const origin = rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: window.innerWidth * .72, y: window.innerHeight * .8 }
-    const projectId = savedDraft?.projectId || newUuid()
-    const payload = { ...savedDraft, projectId, idea: idea.trim(), projectType: intent, attachment }
-    flightGuard.current = true
-    flightPayload.current = payload
-    sessionStorage.setItem(draftKey, JSON.stringify(payload))
-    localStorage.setItem(draftKey, JSON.stringify(payload))
-    saveProjectDraft(payload, savedDraft?.understanding || { project_name: '', problem_statement: '', target_users: '', expected_outcome: '' }, savedDraft?.workflow || {}, 'understanding').catch(() => {})
-    setSubmission({ phase: 'flying', message: '', payload, geometry: flightGeometry(origin, window.innerWidth, window.innerHeight) })
+    const updatedCustom = [newTask, ...customDaily]
+    const updated = updateSavedProject(currentProject.id, cur => ({
+      ...cur,
+      customDailyTasks: updatedCustom,
+    }))
+    if (updated) {
+      setProjects(readSavedProjects())
+    }
+    setNewTaskTitle('')
+    setIsAddingTask(false)
   }
 
-  function completeFlight() {
-    const payload = flightPayload.current
-    if (!flightGuard.current || !payload) return
-    flightGuard.current = false
-    sessionStorage.setItem(draftKey, JSON.stringify(payload))
-    localStorage.setItem(draftKey, JSON.stringify(payload))
-    navigate('/projects/new/setup', { state: { projectId: payload.projectId, idea: payload.idea, projectType: payload.projectType } })
+  // Active step calculation
+  const activeJourneyIndex = Math.min(
+    Math.floor((progressPercent / 100) * JOURNEY_STEPS.length),
+    JOURNEY_STEPS.length - 1
+  )
+
+  // Today formatted date
+  const todayStr = useMemo(() => {
+    const d = new Date()
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'long' })
+  }, [])
+
+  // Second project for recent projects card
+  const otherProjects = projects.filter(p => String(p.id) !== String(currentProject.id))
+  const secondaryProject = otherProjects[0] || {
+    id: 'starter-2',
+    name: 'WorkCraft – Freelance Task Hub',
+    category: 'Freelance & Marketplace',
+    progress: 80,
   }
 
   return (
-    <div className={`min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] ${launching ? 'is-launching' : ''}`}>
+    <div className="min-h-screen bg-[#FDFBF9] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] antialiased">
       <Sidebar open={menuOpen} onClose={() => setMenuOpen(false)} />
-      
+
       <div className="lg:pl-80 flex-1 flex flex-col min-w-0">
         <Header
           currentProject={currentProject}
@@ -238,366 +333,467 @@ export default function MainDashboard() {
           }}
         />
 
-        <main className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-7 animate-fadeIn">
-          {/* GitHub Onboarding Banner if not authenticated */}
-          {!auth.loading && !auth.authenticated && (
-            <div className="bg-[#FFFFFF] border border-[#EFEAE4] rounded-2xl p-3.5 flex items-center justify-between shadow-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-[#F9F2ED] flex items-center justify-center text-[#1D1B18]">
-                  <Github size={18} />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-[#1D1B18]">Personalize your workshop team</span>
-                  <span className="text-[11px] text-[#534342]">Connect GitHub to save your developer profile and get evidence-aware task suggestions.</span>
-                </div>
-              </div>
-              <Link to="/profile" className="px-3.5 py-1.5 rounded-full bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors no-underline">
-                Connect GitHub
-              </Link>
+        <main className="pt-24 pb-20 px-4 sm:px-6 lg:px-10 max-w-7xl mx-auto w-full space-y-7">
+
+          {/* ── Top Bar / Date ─────────────────────────────────────────── */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-semibold text-[#8C847E] tracking-wider uppercase">Home</span>
+              <h1 className="text-xl sm:text-2xl font-black text-[#1D1B18] tracking-tight">Today, {todayStr}</h1>
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate('/launch')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shadow-sm cursor-pointer"
+              >
+                <IconPlus size={14} />
+                <span>New Project</span>
+              </button>
+            </div>
+          </div>
 
-          {/* Main Workshop Area */}
-          <div className="space-y-6">
-              {/* Interactive Idea Launcher Card */}
-              <div className="bg-[#FFFFFF] rounded-3xl p-6 border border-[#EFEAE4] shadow-[0_2px_12px_-2px_rgba(31,29,26,0.04)] space-y-4">
-                <div className="flex items-center justify-between pb-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-[#FFAAA6] text-[#7A3C3A] flex items-center justify-center">
-                      <Sparkles size={15} />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-bold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
-                        What are you dreaming of building?
-                      </h2>
-                      <p className="text-[11px] text-[#7C766F]">
-                        Describe your idea in plain English. UDAAN will generate a flight plan with real milestones.
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#FBE191] text-[#766320]">
-                    AI-Powered
-                  </span>
-                </div>
+          {/* ── Welcome Banner Card (Warm Pastel Mint with Brush Strokes) ─ */}
+          <div className="relative rounded-3xl bg-gradient-to-r from-[#EBF7EE] via-[#F4F9EA] to-[#FDF4EA] border border-[#D5EAD9] p-6 sm:p-8 overflow-hidden shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            {/* Playful abstract brush strokes in background */}
+            <div className="absolute right-0 top-0 bottom-0 w-1/2 pointer-events-none opacity-80 hidden sm:block">
+              <svg viewBox="0 0 400 160" fill="none" className="w-full h-full object-cover">
+                {/* Pink brush stroke */}
+                <path d="M 40 80 Q 90 20 180 70 T 320 40" stroke="#FF6584" strokeWidth="18" strokeLinecap="round" opacity="0.85" />
+                {/* Yellow/Amber brush stroke */}
+                <path d="M 120 130 Q 200 100 280 140 T 380 90" stroke="#FBBF24" strokeWidth="22" strokeLinecap="round" opacity="0.6" />
+                {/* Warm illustrated hand / flower doodle */}
+                <circle cx="340" cy="50" r="16" fill="#F472B6" opacity="0.3" />
+                <circle cx="290" cy="110" r="12" fill="#FCD34D" opacity="0.4" />
+              </svg>
+            </div>
 
-                <form onSubmit={launch} noValidate className="space-y-3.5">
-                  <label className="sr-only" htmlFor="idea-input-field">Describe your idea</label>
-                  <textarea
-                    id="idea-input-field"
-                    rows={4}
-                    value={idea}
-                    onChange={(e) => {
-                      setIdea(e.target.value)
-                      if (submission.phase === 'error') {
-                        setSubmission({ phase: 'idle', message: '', payload: null, geometry: null })
-                      }
-                    }}
-                    placeholder="I want to build a weekly artisan bakery drop where local food lovers reserve seasonal sourdough loaves & morning cardamom buns..."
-                    disabled={launching}
-                    className="w-full p-4 rounded-2xl bg-[#FFF8F3] border border-[#EFEAE4] text-xs sm:text-sm text-[#1D1B18] placeholder-[#7C766F] focus:outline-none focus:ring-2 focus:ring-[#FFAAA6] transition-all resize-none leading-relaxed"
-                  />
+            <div className="relative z-10 max-w-xl space-y-3">
+              <span className="text-xs sm:text-sm font-semibold text-[#5B8266] tracking-wide">
+                Welcome back to your
+              </span>
+              <h2 className="text-2xl sm:text-4xl font-black text-[#1D1B18] tracking-tight leading-tight">
+                Daily task manager
+              </h2>
+              <p className="text-xs sm:text-sm text-[#5B635A] max-w-md">
+                Keep the momentum going. Track your active flight sprint, verify tasks, and stay on schedule for launch.
+              </p>
 
-                  {/* Project Type Selector Pills */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-bold text-[#534342] uppercase tracking-wider mr-1">Project Type:</span>
-                    {['Startup', 'Hackathon', 'College Project', 'Personal Project'].map((type, index) => {
-                      const Icon = [BriefcaseBusiness, Rocket, GraduationCap, Lightbulb][index]
-                      const isSelected = intent === type
-                      return (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setIntent(type)}
-                          disabled={launching}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                            isSelected
-                              ? 'bg-[#FFAAA6] text-[#7A3C3A] font-bold shadow-xs'
-                              : 'bg-[#F9F2ED] text-[#534342] hover:bg-[#EDE7E2]'
-                          }`}
-                        >
-                          <Icon size={13} />
-                          <span>{type}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  {/* Attachment + Submit Bar */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-[#EFEAE4]">
-                    <div className="flex items-center gap-2">
-                      <input
-                        className="sr-only"
-                        ref={fileInput}
-                        type="file"
-                        accept=".txt,.md,text/plain,text/markdown"
-                        onChange={addAttachment}
-                        disabled={launching}
-                      />
-                      {attachment ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#fff8f3] text-[#8e4b49] text-xs font-semibold">
-                          <Paperclip size={13} />
-                          <span className="truncate max-w-[140px]">{attachment.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => setAttachment(null)}
-                            disabled={launching}
-                            className="text-[#8E4B49] hover:text-black ml-1"
-                          >
-                            <X size={13} />
-                          </button>
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => fileInput.current?.click()}
-                          disabled={launching}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#F9F2ED] hover:bg-[#EDE7E2] text-xs text-[#534342] font-semibold transition-colors cursor-pointer"
-                        >
-                          <Paperclip size={13} />
-                          <span>Attach .txt or .md</span>
-                        </button>
-                      )}
-                    </div>
-
-                    <button
-                      ref={launchButton}
-                      type="submit"
-                      disabled={launching}
-                      className="px-6 py-2.5 rounded-full bg-[#1D1B18] hover:bg-black text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-md hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
-                    >
-                      {launching ? (
-                        <>
-                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                          <span>Taking off...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>Launch My Idea</span>
-                          <Send size={14} />
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {submission.phase === 'error' && (
-                    <p className="text-xs text-[#8E4B49] bg-[#FFAAA6]/30 px-3 py-2 rounded-xl font-semibold" role="alert">
-                      {submission.message}
-                    </p>
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsTracking(!isTracking)}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${isTracking
+                    ? 'bg-[#10B981] text-white hover:bg-[#059669]'
+                    : 'bg-[#1D1B18] text-white hover:bg-black'
+                    }`}
+                >
+                  {isTracking ? <IconPause size={13} /> : <IconPlay size={13} />}
+                  <span>{isTracking ? 'Pause tracking' : 'Start tracking'}</span>
+                  {isTracking && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/20 font-mono text-[11px]">
+                      {formatTimer(trackedSeconds)}
+                    </span>
                   )}
-                  {attachmentNotice && (
-                    <p className="text-xs text-[#705D1B] bg-[#FBE191]/30 px-3 py-2 rounded-xl font-semibold">
-                      {attachmentNotice}
-                    </p>
-                  )}
-                </form>
+                </button>
 
+                <Link
+                  to="/flight-plan"
+                  className="inline-flex items-center gap-1 px-4 py-2.5 rounded-xl bg-white/80 hover:bg-white text-[#1D1B18] text-xs font-bold border border-[#D5EAD9] transition-all no-underline shadow-xs cursor-pointer"
+                >
+                  <span>Flight Plan Roadmap</span>
+                  <IconChevronRight size={13} />
+                </Link>
+              </div>
+            </div>
+
+            {/* Interactive 3D Companion Copilot (Clean, Large, Bubble-Free) */}
+            <div className="relative z-10 hidden sm:flex flex-col items-center select-none shrink-0 self-center">
+              <Interactive3DCharacter size="overview" showBubble={false} modelIndex={0} phase={activeJourneyIndex} />
+            </div>
+          </div>
+
+          {/* ── Metric Strip (Time tracker, Tasks in progress, Finished, Team) ── */}
+
+
+          {/* ── Main Two-Column Split (Recent Projects vs Daily Tasks) ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 items-start">
+
+            {/* ── LEFT COLUMN (5 Cols): Recent Projects + Quote + Boards ── */}
+            <div className="lg:col-span-5 space-y-6">
+
+              {/* Recent projects header */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-[#1D1B18] tracking-tight">Recent projects</h3>
+                <Link to="/projects" className="text-xs font-bold text-[#8C847E] hover:text-[#1D1B18] no-underline transition-colors">
+                  View all
+                </Link>
               </div>
 
-              {/* Workbench tasks come from the selected project's saved flight plan. */}
-              <div className="bg-[#FFFFFF] rounded-3xl p-6 border border-[#EFEAE4] shadow-[0_2px_12px_-2px_rgba(31,29,26,0.04)] space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-[#1D1B18] font-['Plus_Jakarta_Sans']">
-                      Workbench Task
-                    </h2>
-                    <span className="w-5 h-5 rounded-full bg-[#E7E1DC] text-[#1D1B18] text-xs font-bold flex items-center justify-center">
-                      {displayedTasks.length}
+              {/* Projects Card Grid (Berry Pink + Golden Amber) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+
+                {/* Card 1: Active Project (Berry Pink Gradient) */}
+                <div
+                  onClick={() => {
+                    localStorage.setItem('udaan:selected-project', currentProject.id)
+                    navigate(`/flight-plan?project=${encodeURIComponent(currentProject.id)}`)
+                  }}
+                  className="rounded-3xl bg-gradient-to-br from-[#FF6384] to-[#F04368] p-5 text-white shadow-md flex flex-col justify-between min-h-[190px] cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all relative overflow-hidden group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex -space-x-1.5">
+                      <span className="w-5 h-5 rounded-full bg-white/30 backdrop-blur text-[9px] font-bold flex items-center justify-center ring-1 ring-white/50">
+                        +7
+                      </span>
+                      <span className="w-5 h-5 rounded-full bg-white/40 text-[9px] font-bold flex items-center justify-center ring-1 ring-white/50">
+                        ●
+                      </span>
+                    </div>
+                    <span className="p-1 rounded-full hover:bg-white/20 transition-colors">
+                      <IconMoreVertical size={14} className="text-white/80" />
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <div className="inline-flex p-1 bg-[#F3EDE7] rounded-full gap-1">
-                      {['all', 'due_today', 'unassigned'].map((f) => (
-                        <button
-                          key={f}
-                          type="button"
-                          onClick={() => setTaskFilter(f)}
-                          className={`px-3 py-1 text-xs font-bold rounded-full transition-all capitalize cursor-pointer ${
-                            taskFilter === f
-                              ? 'bg-[#FFFFFF] text-[#1D1B18] shadow-xs'
-                              : 'text-[#7C766F] hover:text-[#1D1B18]'
-                          }`}
-                        >
-                          {f.replace('_', ' ')}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="space-y-1 my-3">
+                    <h4 className="text-lg font-black tracking-tight leading-snug line-clamp-2">
+                      {currentProject.name}
+                    </h4>
+                    <p className="text-[11px] font-medium text-white/80 line-clamp-1">
+                      {currentProject.category || 'Startup · Active Sprint'}
+                    </p>
+                  </div>
 
-                    <Link
-                      to="/flight-plan"
-                      className="px-3 py-1.5 rounded-full bg-[#1D1B18] text-white text-xs font-bold no-underline hover:bg-black"
-                    >
-                      Open Flight Plan
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => setAddTaskModalOpen(true)}
-                      disabled={!projects.length}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#8E4B49] text-white text-xs font-bold hover:bg-[#723B39] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Plus size={14} />
-                      Add task
-                    </button>
+                  {/* Progress bar */}
+                  <div className="space-y-1.5 pt-2">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-white/90">
+                      <span>{doneCount}/{totalTasks} Tasks</span>
+                      <span>{progressPercent}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-white rounded-full transition-all duration-500"
+                        style={{ width: `${Math.max(5, progressPercent)}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  {displayedTasks.length ? displayedTasks.map(task => (
-                    <Link
-                      key={task.id}
-                      to={`/flight-plan?project=${encodeURIComponent(currentProject.id)}&task=${encodeURIComponent(task.id)}`}
-                      className="flex items-start justify-between gap-3 p-3.5 sm:p-4 rounded-2xl border border-[#EFEAE4] bg-[#FFF8F3]/60 hover:bg-[#FFF8F3] no-underline"
-                    >
-                      <span className="min-w-0">
-                        <span className="flex items-center gap-2 flex-wrap">
-                          {task.milestone && (
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#7C766F]">
-                              {task.milestone}
-                            </span>
-                          )}
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${task.done ? 'bg-[#E7E1DC] text-[#534342]' : 'bg-[#FBE191] text-[#705D1B]'}`}>
-                            {task.done ? 'Done' : 'Planned'}
-                          </span>
-                        </span>
-                        <span className={`block mt-1.5 text-xs font-bold leading-snug ${task.done ? 'line-through text-[#7C766F]' : 'text-[#1D1B18]'}`}>
-                          {task.title}
-                        </span>
-                        {(task.lead || task.effort_estimate) && (
-                          <span className="block mt-1 text-[11px] text-[#7C766F] font-semibold">
-                            {[task.lead && `Lead: ${task.lead}`, task.effort_estimate].filter(Boolean).join(' · ')}
-                          </span>
-                        )}
+                {/* Card 2: Secondary / Next Project (Warm Golden Amber) */}
+                <div
+                  onClick={() => {
+                    if (secondaryProject.id !== 'starter-2') {
+                      setSelectedProjectId(secondaryProject.id)
+                      localStorage.setItem('udaan:selected-project', secondaryProject.id)
+                      navigate(`/flight-plan?project=${encodeURIComponent(secondaryProject.id)}`)
+                    } else {
+                      navigate('/launch')
+                    }
+                  }}
+                  className="rounded-3xl bg-gradient-to-br from-[#FBBF24] to-[#F59E0B] p-5 text-white shadow-md flex flex-col justify-between min-h-[190px] cursor-pointer hover:shadow-lg hover:-translate-y-0.5 hover:rotate-0 rotate-1 transition-all relative overflow-hidden group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex -space-x-1.5">
+                      <span className="w-5 h-5 rounded-full bg-white/30 backdrop-blur text-[9px] font-bold flex items-center justify-center ring-1 ring-white/50">
+                        +3
                       </span>
-                      <ChevronRight size={16} className="mt-1 shrink-0 text-[#7C766F]" />
-                    </Link>
-                  )) : (
-                    <div className="rounded-2xl border border-dashed border-[#D8C1C0] bg-[#FFF8F3]/60 px-4 py-6 text-center">
-                      <p className="text-sm font-bold text-[#1D1B18]">
-                        {workbenchTasks.length ? 'No tasks match this filter.' : 'No roadmap tasks yet.'}
-                      </p>
-                      <p className="mt-1 text-xs text-[#7C766F]">
-                        {workbenchTasks.length
-                          ? 'Choose another filter to see this project’s tasks.'
-                          : 'Create tasks in this project’s Flight Plan to see them here.'}
-                      </p>
                     </div>
-                  )}
+                    <span className="p-1 rounded-full hover:bg-white/20 transition-colors">
+                      <IconMoreVertical size={14} className="text-white/80" />
+                    </span>
+                  </div>
+
+                  <div className="space-y-1 my-3">
+                    <h4 className="text-lg font-black tracking-tight leading-snug line-clamp-2">
+                      {secondaryProject.name}
+                    </h4>
+                    <p className="text-[11px] font-medium text-white/80 line-clamp-1">
+                      {secondaryProject.category || 'Fintech / Task Engine'}
+                    </p>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="space-y-1.5 pt-2">
+                    <div className="flex items-center justify-between text-[10px] font-bold text-white/90">
+                      <span>240 hours</span>
+                      <span>{secondaryProject.progress || 80}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-black/20 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-white rounded-full transition-all duration-500"
+                        style={{ width: `${secondaryProject.progress || 80}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Color Swatch Palette Bar */}
-              <div className="bg-[#FFFFFF] rounded-2xl p-4 border border-[#EFEAE4] shadow-xs flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#7C766F] text-[18px]">palette</span>
-                  <span className="text-xs font-bold text-[#1D1B18]">Studio Color Swatches:</span>
-                </div>
+              {/* Motivational Founder Quote Sticky Note Card */}
+              <div className="rounded-2xl bg-white border border-[#E8E2D9] p-5 relative shadow-xs">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-[#1D1B18] italic leading-relaxed">
+                      "Until we can manage time, we can manage nothing else."
+                    </p>
+                    <span className="text-xs font-bold text-[#8C847E] block">
+                      Peter Drucker
+                    </span>
+                  </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  {paletteColors.map((color, index) => (
+                  {/* Ink squiggle / doodle SVG */}
+                  <svg width="48" height="24" viewBox="0 0 54 26" fill="none" className="shrink-0 text-[#1D1B18]">
+                    <path d="M2 14C12 8 20 20 30 10C38 2 46 16 52 14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                  </svg>
+                </div>
+              </div>
+
+              {/* Workspace Board Quick Cards (Creative brief, Architecture, Google Calendar) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Link
+                  to="/flight-plan"
+                  className="rounded-2xl bg-white border border-[#E8E2D9] p-3.5 flex flex-col justify-between hover:border-[#8E4B49] transition-all no-underline group shadow-xs"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-[#F3E8FF] text-[#9333EA] flex items-center justify-center font-bold text-xs mb-2 group-hover:scale-105 transition-transform">
+                    ★
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-[#1D1B18] block group-hover:text-[#9333EA] transition-colors">Creative brief</span>
+                    <span className="text-[11px] text-[#8C847E]">14 cards</span>
+                  </div>
+                </Link>
+
+                <Link
+                  to="/launch"
+                  className="rounded-2xl bg-white border border-[#E8E2D9] p-3.5 flex flex-col justify-between hover:border-[#8E4B49] transition-all no-underline group shadow-xs"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-[#ECFDF5] text-[#10B981] flex items-center justify-center font-bold text-xs mb-2 group-hover:scale-105 transition-transform">
+                    ⚡
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-[#1D1B18] block group-hover:text-[#10B981] transition-colors">Tech Architecture</span>
+                    <span className="text-[11px] text-[#8C847E]">3 boards</span>
+                  </div>
+                </Link>
+
+                <Link
+                  to="/developer-profile"
+                  className="rounded-2xl bg-white border border-[#E8E2D9] p-3.5 flex flex-col justify-between hover:border-[#8E4B49] transition-all no-underline group shadow-xs"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-[#EFF6FF] text-[#3B82F6] flex items-center justify-center font-bold text-xs mb-2 group-hover:scale-105 transition-transform">
+                    📅
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-[#1D1B18] block group-hover:text-[#3B82F6] transition-colors">Calendar Sync</span>
+                    <span className="text-[11px] text-[#8C847E]">Google Cal</span>
+                  </div>
+                </Link>
+              </div>
+
+            </div>
+
+            {/* ── RIGHT COLUMN (7 Cols): Daily Tasks Checklist ────────── */}
+            <div className="lg:col-span-7 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-black text-[#1D1B18] tracking-tight">
+                  Daily tasks ({allDisplayTasks.length})
+                </h3>
+                <span className="text-xs text-[#8C847E] font-medium">
+                  {doneCount} of {allDisplayTasks.length} completed
+                </span>
+              </div>
+
+              {/* Tasks List */}
+              <div className="space-y-3">
+                {allDisplayTasks.map((task) => {
+                  return (
                     <div
-                      key={index}
-                      className="inline-flex items-center rounded-full border border-[#EFEAE4] hover:border-[#8E4B49] transition-colors"
+                      key={task.id}
+                      className={`rounded-2xl bg-white border transition-all p-4.5 flex items-start justify-between gap-3 shadow-xs hover:border-[#D5CFC7] ${task.done ? 'bg-[#FAF8F5] border-[#EAE4DC] opacity-75' : 'border-[#E8E2D9]'
+                        }`}
                     >
-                      <label
-                        className="relative inline-flex items-center gap-1.5 pl-2.5 py-1 text-[11px] font-mono font-semibold cursor-pointer"
-                        title={`Change color ${color}`}
-                      >
-                        <span className="w-3 h-3 rounded-full border border-black/10 shrink-0" style={{ backgroundColor: color }}></span>
-                        <span>{color}</span>
-                        <input
-                          type="color"
-                          value={color}
-                          onChange={event => updatePaletteColor(index, event.target.value)}
-                          aria-label={`Choose color ${index + 1}`}
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setPaletteColors(colors => colors.filter((_, colorIndex) => colorIndex !== index))}
-                        className="inline-flex items-center justify-center w-7 h-7 mr-0.5 rounded-full text-[#7C766F] hover:bg-[#FFAAA6]/25 hover:text-[#8E4B49] cursor-pointer"
-                        aria-label={`Delete color ${color}`}
-                        title={`Delete ${color}`}
-                      >
-                        <X size={13} />
-                      </button>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <span className="text-[11px] font-semibold text-[#8C847E] block">
+                          Project: {task.projectName}
+                        </span>
+
+                        <h4 className={`text-sm font-bold text-[#1D1B18] tracking-tight leading-snug ${task.done ? 'line-through text-[#8C847E]' : ''
+                          }`}>
+                          {task.title}
+                        </h4>
+
+                        <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-[#8C847E] font-medium">
+                          <span className="inline-flex items-center gap-1">
+                            <IconClock size={12} />
+                            {task.time}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <IconPaperclip size={12} />
+                            {task.attachments} attachments
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right side: Status Tag + Checkbox */}
+                      <div className="flex items-center gap-3 shrink-0 pt-0.5">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${task.done
+                          ? 'bg-[#F0ECE6] text-[#6B7280]'
+                          : task.status === 'In progress'
+                            ? 'bg-[#ECFDF5] text-[#059669]'
+                            : 'bg-[#FFFBEB] text-[#D97706]'
+                          }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${task.done
+                            ? 'bg-[#9CA3AF]'
+                            : task.status === 'In progress'
+                              ? 'bg-[#10B981]'
+                              : 'bg-[#F59E0B]'
+                            }`} />
+                          {task.done ? 'Done' : task.status}
+                        </span>
+
+                        {/* Interactive Checkbox */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleTask(task.id)}
+                          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all cursor-pointer ${task.done
+                            ? 'bg-[#1D1B18] border-[#1D1B18] text-white shadow-xs'
+                            : 'bg-white border-[#D1CAC0] hover:border-[#1D1B18]'
+                            }`}
+                          title={task.done ? 'Mark incomplete' : 'Mark complete'}
+                        >
+                          {task.done && <IconCheck size={12} />}
+                        </button>
+                      </div>
                     </div>
-                  ))}
+                  )
+                })}
+
+                {/* Add new task button / inline form */}
+                {isAddingTask ? (
+                  <form onSubmit={handleCreateNewTask} className="rounded-2xl bg-white border border-[#1D1B18] p-4 space-y-3 shadow-sm">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={newTaskTitle}
+                      onChange={e => setNewTaskTitle(e.target.value)}
+                      placeholder="e.g. Design responsive landing hero"
+                      className="w-full text-xs font-bold text-[#1D1B18] placeholder-[#9B9590] outline-none border-b border-[#E8E2D9] pb-2"
+                    />
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <div className="flex items-center gap-1.5 text-xs text-[#8C847E]">
+                        <IconClock size={12} />
+                        <input
+                          type="number"
+                          min="1"
+                          max="40"
+                          value={newTaskHours}
+                          onChange={e => setNewTaskHours(e.target.value)}
+                          className="w-12 px-1.5 py-0.5 rounded border border-[#E8E2D9] text-xs font-bold text-center"
+                        />
+                        <span>hours</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingTask(false)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-[#8C847E] hover:text-[#1D1B18]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-1.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black"
+                        >
+                          Add Task
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => setPaletteColors(colors => [...colors, defaultPalette[colors.length % defaultPalette.length]])}
-                    className="inline-flex items-center justify-center w-8 h-8 rounded-full border border-dashed border-[#D8C1C0] text-[#8E4B49] hover:bg-[#FFAAA6]/20 transition-colors cursor-pointer"
-                    aria-label="Add color swatch"
-                    title="Add color"
+                    onClick={() => setIsAddingTask(true)}
+                    className="w-full py-3.5 rounded-2xl border-2 border-dashed border-[#E5DFD7] hover:border-[#1D1B18] hover:bg-white text-[#8C847E] hover:text-[#1D1B18] text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                   >
-                    <Plus size={16} />
+                    <IconPlus size={14} />
+                    <span>Add a new task</span>
                   </button>
-                </div>
+                )}
               </div>
             </div>
+
+          </div>
+
+          {/* ── "Your Journey" Milestones Track (Polished Footer Strip) ─── */}
+          <div className="bg-white rounded-3xl border border-[#E8E2D9] shadow-xs p-6 sm:p-7 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-xl bg-[#FEF3C7] text-[#92400E] flex items-center justify-center font-bold text-xs">
+                  🎯
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-[#1D1B18]">Your Journey · Product Flight Path</h3>
+                  <span className="text-[11px] text-[#8C847E]">Stage {activeJourneyIndex + 1} of 5: {JOURNEY_STEPS[activeJourneyIndex]?.label}</span>
+                </div>
+              </div>
+              <Link
+                to="/flight-plan"
+                className="text-xs font-bold text-[#8E4B49] hover:underline flex items-center gap-0.5 no-underline"
+              >
+                Full Plan
+                <IconChevronRight size={13} />
+              </Link>
+            </div>
+
+            {/* Stepper with connector line */}
+            <div className="relative px-3 sm:px-6">
+              {/* Connector line */}
+              <div className="absolute left-10 right-10 top-5 h-0.5 bg-[#EFEBE4] z-0">
+                <div
+                  className="h-full bg-gradient-to-r from-[#FF6384] via-[#FBBF24] to-[#10B981] rounded-full transition-all duration-700"
+                  style={{ width: `${Math.max(5, progressPercent)}%` }}
+                />
+              </div>
+
+              <div className="relative z-10 flex items-start justify-between">
+                {JOURNEY_STEPS.map((step, i) => {
+                  const done = i < activeJourneyIndex
+                  const active = i === activeJourneyIndex
+                  const { Icon } = step
+                  return (
+                    <div
+                      key={step.key}
+                      onClick={() => navigate(step.path)}
+                      className="flex flex-col items-center gap-2 cursor-pointer group"
+                      style={{ flex: '1 1 0' }}
+                    >
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border-2 transition-all duration-200 group-hover:scale-105 ${done
+                        ? 'bg-[#10B981] border-[#10B981] shadow-xs text-white'
+                        : active
+                          ? 'bg-white border-[#FF6384] shadow-md ring-4 ring-[#FF6384]/15'
+                          : 'bg-white border-[#E8E2D9] text-[#9B9590]'
+                        }`}>
+                        {done
+                          ? <IconCheck size={16} />
+                          : <Icon size={16} className={active ? 'text-[#FF6384]' : 'text-[#9B9590]'} />
+                        }
+                      </div>
+                      <span className={`text-[11px] font-bold text-center leading-tight max-w-[70px] ${done ? 'text-[#10B981]' : active ? 'text-[#1D1B18]' : 'text-[#8C847E]'
+                        }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
 
         </main>
       </div>
 
-      {/* Flight Takeoff Overlay Animation */}
-      {launching && submission.geometry && createPortal(
-        <motion.div
-          className="fixed inset-0 pointer-events-none z-50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: prefersReducedMotion ? 0.08 : 0.2 }}
-          aria-hidden="true"
-        >
-          {!prefersReducedMotion && (
-            <svg className="w-full h-full" viewBox={`0 0 ${submission.geometry.width} ${submission.geometry.height}`} preserveAspectRatio="none">
-              <motion.path
-                d={submission.geometry.path}
-                fill="none"
-                stroke="#8E4B49"
-                strokeWidth="3"
-                strokeDasharray="6 6"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: [0, 0.7, 0.22, 0] }}
-                transition={{ duration: 0.96, ease: [0.4, 0, 0.2, 1], opacity: { duration: 0.96, times: [0, 0.3, 0.72, 1] } }}
-              />
-            </svg>
-          )}
-          <motion.span
-            className="fixed text-[#8E4B49]"
-            style={{ left: submission.geometry.origin.x - 20, top: submission.geometry.origin.y - 20 }}
-            initial={{ x: 0, y: 0, opacity: 1, scale: 0.86, rotate: submission.geometry.rotate[0] }}
-            animate={prefersReducedMotion ? { opacity: 0, scale: 0.96 } : {
-              x: submission.geometry.x,
-              y: submission.geometry.y,
-              rotate: submission.geometry.rotate,
-              opacity: [1, 1, 0.9, 0],
-              scale: [0.86, 1, 0.98, 0.88],
-            }}
-            transition={{
-              duration: prefersReducedMotion ? 0.15 : 0.98,
-              ease: [0.4, 0, 0.2, 1],
-              opacity: { duration: prefersReducedMotion ? 0.15 : 0.98, times: [0, 0.34, 0.76, 1] },
-              scale: { duration: prefersReducedMotion ? 0.15 : 0.98, times: [0, 0.22, 0.72, 1] },
-            }}
-            onAnimationComplete={completeFlight}
-          >
-            <Send size={32} strokeWidth={2} />
-          </motion.span>
-        </motion.div>,
-        document.body
-      )}
-
-      {/* Global Modals */}
       <InviteMakerModal
         isOpen={inviteModalOpen}
         onClose={() => setInviteModalOpen(false)}
-      />
-
-      <AddTaskModal
-        isOpen={addTaskModalOpen}
-        onClose={() => setAddTaskModalOpen(false)}
-        onAddTask={addWorkbenchTask}
-        projectName={currentProject.name}
       />
     </div>
   )

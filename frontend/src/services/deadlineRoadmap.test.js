@@ -9,7 +9,10 @@ import {
 
 test('getDaysRemaining returns correct calculations for upcoming, today, and overdue deadlines', () => {
   const today = new Date()
-  const todayStr = today.toISOString().slice(0, 10)
+  const y = today.getFullYear()
+  const m = String(today.getMonth() + 1).padStart(2, '0')
+  const d = String(today.getDate()).padStart(2, '0')
+  const todayStr = `${y}-${m}-${d}`
 
   const dueToday = getDaysRemaining(todayStr)
   assert.equal(dueToday.days, 0)
@@ -18,16 +21,22 @@ test('getDaysRemaining returns correct calculations for upcoming, today, and ove
   assert.equal(dueToday.label, 'Due today')
 
   // Future deadline: +10 days
-  const future = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)
-  const futureStr = future.toISOString().slice(0, 10)
+  const future = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 10)
+  const fy = future.getFullYear()
+  const fm = String(future.getMonth() + 1).padStart(2, '0')
+  const fd = String(future.getDate()).padStart(2, '0')
+  const futureStr = `${fy}-${fm}-${fd}`
   const futureRes = getDaysRemaining(futureStr)
   assert.ok(futureRes.days >= 9 && futureRes.days <= 11)
   assert.equal(futureRes.isOverdue, false)
   assert.ok(futureRes.label.includes('remaining'))
 
   // Past deadline: -5 days
-  const past = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
-  const pastStr = past.toISOString().slice(0, 10)
+  const past = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 5)
+  const py = past.getFullYear()
+  const pm = String(past.getMonth() + 1).padStart(2, '0')
+  const pd = String(past.getDate()).padStart(2, '0')
+  const pastStr = `${py}-${pm}-${pd}`
   const pastRes = getDaysRemaining(pastStr)
   assert.ok(pastRes.days <= -4 && pastRes.days >= -6)
   assert.equal(pastRes.isOverdue, true)

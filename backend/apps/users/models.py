@@ -20,6 +20,25 @@ class DeveloperProfile(models.Model):
     analysis_status = models.CharField(max_length=16, choices=ANALYSIS_STATES, default='not_started')
     analyzed_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # GitHub OAuth token or Personal Access Token (PAT / secret key) for repo creation
+    github_access_token = models.CharField(max_length=255, blank=True, default='')
+    # Google Calendar integration
+    google_calendar_connected = models.BooleanField(default=False)
+    google_calendar_email = models.CharField(max_length=255, blank=True, default='')
+    google_calendar_synced_at = models.DateTimeField(null=True, blank=True)
+
+
+class UserTechHistory(models.Model):
+    """Per-user record of known and learning tech stacks."""
+    CONFIDENCE = [('beginner', 'Beginner'), ('comfortable', 'Comfortable'), ('expert', 'Expert')]
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='tech_history')
+    # [{"name": "React", "confidence": "comfortable", "years": 2, "source": "self"}]
+    known_stacks = models.JSONField(default=list, blank=True)
+    # [{"name": "Next.js", "added_at": "...", "project_context": "..."}]
+    learning_stacks = models.JSONField(default=list, blank=True)
+    # [{"project_id": ..., "recommended": [...], "chosen": [...], "at": "..."}]
+    recommendation_history = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class TaskAllocationProposal(models.Model):

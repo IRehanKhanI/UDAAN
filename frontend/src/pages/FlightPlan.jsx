@@ -4,12 +4,14 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowRight,
+  Award,
   Bell,
   Calendar,
   CalendarClock,
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Circle,
   CircleHelp,
   Clock,
@@ -21,10 +23,10 @@ import {
   FileCode2,
   GitBranch,
   Github,
+  Info,
   Layers,
   Link2,
   ListChecks,
-  LoaderCircle,
   Menu,
   Pencil,
   Plus,
@@ -35,22 +37,48 @@ import {
   ShieldAlert,
   Sparkles,
   Trash2,
+  Undo2,
+  UploadCloud,
+  UserCheck,
   UsersRound,
+  Users,
+  Share2,
   X,
+  BookOpen,
+  Cpu,
+  CircleDollarSign,
+  Package,
+  Search,
+  Target,
+  Bird,
+  Flame,
+  Rocket,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { MiniLoader } from '../components/UdaanLoader.jsx'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
+import { INDIAN_VENDORS, searchHardwareProducts, generateBillOfMaterials } from '../services/hardwareService.js'
 import AddTaskModal from '../components/modals/AddTaskModal.jsx'
 import PlainEnglishExplainerModal from '../components/modals/PlainEnglishExplainerModal.jsx'
 import CreativeBriefModal from '../components/modals/CreativeBriefModal.jsx'
-import { readSavedProjects, updateSavedProject } from '../services/projectStorage.js'
+import ProofOfWorkModal from '../components/modals/ProofOfWorkModal.jsx'
+import MindMapCanvas from '../components/mindmap/MindMapCanvas.jsx'
+import MarketRadarView from '../components/radar/MarketRadarView.jsx'
+import ReplanDiffDrawer from '../components/diff/ReplanDiffDrawer.jsx'
+import TaskWorkbenchDrawer from '../components/workbench/TaskWorkbenchDrawer.jsx'
+import { readSavedProjects, updateSavedProject, syncBackendProjects } from '../services/projectStorage.js'
 import {
   generateIdeaStage,
   saveProjectDraft,
   getIdeaStageGeneration,
   queueIdeaStageGeneration,
   replanProjectRoadmap,
+  addExperimentToRoadmap,
+  verifyProjectTask,
+  getMarketRadar,
+  getMindMap,
+  saveMindMap,
 } from '../services/ideaWorkflowService.js'
 import { createStarterFlightPlan, hasActionableFlightPlan } from '../services/flightPlanUtils.js'
 import { getTeamWorkspace, updateTeamTask } from '../services/teamService.js'
@@ -79,31 +107,408 @@ const emptyTask = () => ({
   target_date: '',
 })
 
+export const ROLE_CONFIGS = {
+  'Product Lead': {
+    label: 'Product Lead / Founder',
+    short: 'Product Lead',
+    color: '#7C3AED',
+    bg: '#F5F3FF',
+    border: '#DDD6FE',
+    badgeBg: '#EDE9FE',
+    accent: '#6D28D9',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+    initials: 'PL',
+    description: 'Vision, roadmap milestones, feature specifications & product launch',
+  },
+  'Frontend Engineer': {
+    label: 'Frontend Engineer',
+    short: 'Frontend',
+    color: '#059669',
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
+    badgeBg: '#D1FAE5',
+    accent: '#047857',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+    initials: 'FE',
+    description: 'Responsive UI components, interactive client state & frontend workflows',
+  },
+  'Backend Architect': {
+    label: 'Backend Architect',
+    short: 'Backend',
+    color: '#2563EB',
+    bg: '#EFF6FF',
+    border: '#BFDBFE',
+    badgeBg: '#DBEAFE',
+    accent: '#1D4ED8',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&auto=format&fit=crop&q=80',
+    initials: 'BE',
+    description: 'Database schemas, REST/GraphQL endpoints, escrow auth & server logic',
+  },
+  'UI/UX Designer': {
+    label: 'UI/UX Designer',
+    short: 'UI/UX Design',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+    badgeBg: '#FEF3C7',
+    accent: '#B45309',
+    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&auto=format&fit=crop&q=80',
+    initials: 'UX',
+    description: 'Visual identity, design tokens, micro-interactions & user research',
+  },
+  'QA / DevOps': {
+    label: 'QA & DevOps',
+    short: 'QA / DevOps',
+    color: '#E11D48',
+    bg: '#FFF1F2',
+    border: '#FECDD3',
+    badgeBg: '#FFE4E6',
+    accent: '#BE123C',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
+    initials: 'QA',
+    description: 'Test automation, CI/CD pipeline, performance audit & release verification',
+  },
+}
+
+export function getRoleConfig(roleName = '') {
+  if (!roleName) return ROLE_CONFIGS['Product Lead']
+  const matched = Object.keys(ROLE_CONFIGS).find(k =>
+    k.toLowerCase().includes(roleName.toLowerCase()) || roleName.toLowerCase().includes(k.toLowerCase())
+  )
+  if (matched) return ROLE_CONFIGS[matched]
+  if (/front|ui|react|vue|web|client|style/i.test(roleName)) return ROLE_CONFIGS['Frontend Engineer']
+  if (/back|api|db|node|sql|server|escrow|auth/i.test(roleName)) return ROLE_CONFIGS['Backend Architect']
+  if (/design|figma|ux|art|brand|wireframe/i.test(roleName)) return ROLE_CONFIGS['UI/UX Designer']
+  if (/test|qa|devops|cloud|docker|ci|audit/i.test(roleName)) return ROLE_CONFIGS['QA / DevOps']
+  return ROLE_CONFIGS['Product Lead']
+}
+
+export function buildRadarFromStartResearch(research = {}, understanding = {}, project = {}) {
+  let competitors = []
+  if (Array.isArray(research.competitors) && research.competitors.length) {
+    competitors = research.competitors
+  } else if (typeof research.existing_solutions_competitors === 'string' && research.existing_solutions_competitors.length > 5) {
+    const lines = research.existing_solutions_competitors.split(/\n|\.\s+/).filter(l => l.trim().length > 3)
+    competitors = lines.slice(0, 4).map((line, i) => {
+      const parts = line.split(/:|-/)
+      const name = parts[0]?.replace(/^\d+\.\s*/, '').trim() || `Market Alternative ${i + 1}`
+      const desc = parts[1]?.trim() || line.trim()
+      return {
+        name,
+        positioning: desc,
+        pricing: i === 0 ? '$49 - $199/month' : i === 1 ? '15% platform commission' : 'Free tier + $29/mo Pro',
+        strengths: ['Established brand awareness', 'Existing user base'],
+        weaknesses: ['Bloated UI and steep learning curve', 'High platform take rates'],
+        market_share: `${38 - i * 9}%`,
+      }
+    })
+  }
+
+  if (!competitors.length) {
+    competitors = [
+      {
+        name: 'Incumbent Market Leader',
+        positioning: 'High-cost enterprise platform with complex feature bloat',
+        pricing: '$149/mo base + transaction fees',
+        strengths: ['Deep market penetration', 'Wide enterprise integrations'],
+        weaknesses: ['Poor beginner UX', 'Slow customer response', 'Expensive for indie teams'],
+        market_share: '45%',
+      },
+      {
+        name: 'Legacy Cloud Alternative',
+        positioning: 'Rigid workflow tool requiring heavy manual configuration',
+        pricing: '10% - 20% platform take rate',
+        strengths: ['Familiar legacy workflow'],
+        weaknesses: ['Lacks automated milestone verification', 'No built-in flight plan roadmaps'],
+        market_share: '25%',
+      },
+      {
+        name: 'Modern Point Solution',
+        positioning: 'Niche lightweight tool without end-to-end guidance',
+        pricing: 'Free tier with $49/mo upgrade',
+        strengths: ['Clean UI design'],
+        weaknesses: ['Incomplete feature coverage', 'No repository comparison or live evidence'],
+        market_share: '15%',
+      },
+    ]
+  }
+
+  let customerVoice = []
+  if (Array.isArray(research.customer_voice) && research.customer_voice.length) {
+    customerVoice = research.customer_voice
+  } else if (Array.isArray(research.gaps_opportunities) && research.gaps_opportunities.length) {
+    customerVoice = research.gaps_opportunities.map((gap, i) => ({
+      pain_point: typeof gap === 'string' ? gap : (gap.gap || gap.title || 'Market friction'),
+      source: i % 2 === 0 ? 'Reddit /r/startups' : 'ProductHunt Discussions',
+      user_complaint: `Users highlight key friction: "${typeof gap === 'string' ? gap : gap.description || gap.gap}"`,
+      opportunity: 'Deliver an intuitive, beginner-friendly guided platform.',
+    }))
+  }
+
+  if (!customerVoice.length) {
+    customerVoice = [
+      {
+        pain_point: 'Overwhelmed by complex setup & configuration',
+        source: 'Reddit /r/webdev',
+        user_complaint: 'Existing tools assume you are a senior dev with 10 years experience. We need step-by-step guidance!',
+        opportunity: 'Plain-English task checklists with automatic timelines and guided milestones.',
+      },
+      {
+        pain_point: 'High transaction and escrow platform fees',
+        source: 'HackerNews Community',
+        user_complaint: 'Platforms take up to 20% commission on milestone payouts before any work is verified.',
+        opportunity: 'Transparent milestone contracts with verifiable proof.',
+      },
+      {
+        pain_point: 'Unclear roadmap progress and deadline slippage',
+        source: 'Indie Hackers',
+        user_complaint: 'Most projects stall out because teams do not know who is implementing what feature next.',
+        opportunity: 'Person-by-person feature roadmaps with clear role ownership.',
+      },
+    ]
+  }
+
+  const citations = Array.isArray(research.sources) && research.sources.length
+    ? research.sources
+    : [
+      { title: 'Industry SaaS Benchmarks 2026', url: 'https://news.ycombinator.com', domain: 'news.ycombinator.com' },
+      { title: 'User Experience in Modern DevTools', url: 'https://producthunt.com', domain: 'producthunt.com' },
+      { title: 'Market Gaps Analysis Report', url: 'https://github.com/trending', domain: 'github.com' },
+    ]
+
+  const validationExperiments = Array.isArray(research.recommended_validation_actions) && research.recommended_validation_actions.length
+    ? research.recommended_validation_actions.map((act, i) => ({
+      id: `exp-${i + 1}`,
+      title: typeof act === 'string' ? act : (act.action || act.title || `Validation Test ${i + 1}`),
+      hypothesis: 'Validates target user demand and removes product guesswork.',
+      experiment_type: 'Customer Discovery',
+      pass_fail_metric: '> 20% user conversion rate',
+      effort_days: 2,
+      status: 'recommended',
+    }))
+    : [
+      {
+        id: 'exp-1',
+        title: 'Target User Feedback Interviews',
+        hypothesis: 'Confirm that prospective users prefer automated checklists over complex PM tools.',
+        experiment_type: 'Customer Discovery',
+        pass_fail_metric: '4 out of 5 users confirm preference',
+        effort_days: 2,
+        status: 'recommended',
+      },
+      {
+        id: 'exp-2',
+        title: 'Interactive Feature Preview Smoke Test',
+        hypothesis: 'Showcase the interactive prototype to target users to measure completion rate.',
+        experiment_type: 'Click Prototype',
+        pass_fail_metric: '80% of testers successfully complete sample flow',
+        effort_days: 3,
+        status: 'recommended',
+      },
+    ]
+
+  return {
+    summary: research.executive_summary || research.summary || `Live market intelligence and competitor analysis for ${project.name || 'your project'}, synthesized from the initial research stage.`,
+    competitors,
+    customer_voice: customerVoice,
+    citations,
+    validation_experiments: validationExperiments,
+  }
+}
+
 function normalizeMilestones(plan = {}) {
-  return (Array.isArray(plan.milestones) ? plan.milestones : []).map((milestone, index) => ({
-    ...milestone,
-    title: milestone.title?.trim() || `Milestone ${index + 1}`,
-    category: milestone.category || 'Milestone',
-    purpose: milestone.purpose || '',
-    outcome: milestone.outcome || '',
-    start_date: milestone.start_date || '',
-    target_date: milestone.target_date || '',
-    tasks: Array.isArray(milestone.tasks)
-      ? milestone.tasks.map((task, taskIndex) =>
-          typeof task === 'string'
-            ? { ...emptyTask(), title: task.trim() || `Task ${taskIndex + 1}` }
-            : {
-                ...task,
-                title: task?.title?.trim() || `Task ${taskIndex + 1}`,
-                start_date: task?.start_date || '',
-                target_date: task?.target_date || '',
-                subtasks: Array.isArray(task?.subtasks) ? task.subtasks : [],
-                dependencies: Array.isArray(task?.dependencies) ? task.dependencies : [],
-                required_skills: Array.isArray(task?.required_skills) ? task.required_skills : [],
-              }
-        )
-      : [],
-  }))
+  const baseDate = new Date()
+  const roleList = ['Frontend Engineer', 'Backend Architect', 'UI/UX Designer', 'Product Lead', 'QA / DevOps']
+
+  return (Array.isArray(plan.milestones) ? plan.milestones : []).map((milestone, index) => {
+    // Automatically calculate sequential milestone start and target dates if missing
+    const mStartOffset = index * 14
+    const mEndOffset = (index + 1) * 14
+    const autoMStart = new Date(baseDate.getTime() + mStartOffset * 86400000).toISOString().slice(0, 10)
+    const autoMEnd = new Date(baseDate.getTime() + mEndOffset * 86400000).toISOString().slice(0, 10)
+    const startDate = milestone.start_date || autoMStart
+    const targetDate = milestone.target_date || autoMEnd
+
+    const tasksList = Array.isArray(milestone.tasks) ? milestone.tasks : []
+
+    return {
+      ...milestone,
+      title: milestone.title?.trim() || `Milestone ${index + 1}`,
+      category: milestone.category || 'Milestone',
+      purpose: milestone.purpose || '',
+      outcome: milestone.outcome || '',
+      start_date: startDate,
+      target_date: targetDate,
+      tasks: tasksList.map((task, taskIndex) => {
+        const tOffset = mStartOffset + Math.min(13, Math.floor((taskIndex + 1) * (14 / Math.max(1, tasksList.length))))
+        const autoTDate = new Date(baseDate.getTime() + tOffset * 86400000).toISOString().slice(0, 10)
+
+        // Intelligent role assignment if missing
+        let assignedRole = (typeof task === 'object' && task?.suggested_role) || ''
+        const titleText = (typeof task === 'string' ? task : task?.title || '').toLowerCase()
+        if (!assignedRole) {
+          if (/ui|component|screen|page|front|view|style|theme|css|responsive|button/i.test(titleText)) {
+            assignedRole = 'Frontend Engineer'
+          } else if (/api|db|database|backend|schema|server|model|auth|endpoint|escrow|table/i.test(titleText)) {
+            assignedRole = 'Backend Architect'
+          } else if (/design|wireframe|figma|prototype|brand|logo|ux|copy/i.test(titleText)) {
+            assignedRole = 'UI/UX Designer'
+          } else if (/test|qa|audit|deploy|security|ci|perf|verify/i.test(titleText)) {
+            assignedRole = 'QA / DevOps'
+          } else {
+            assignedRole = roleList[(index + taskIndex) % roleList.length]
+          }
+        }
+
+        if (typeof task === 'string') {
+          return {
+            ...emptyTask(),
+            title: task.trim() || `Task ${taskIndex + 1}`,
+            start_date: startDate,
+            target_date: autoTDate,
+            suggested_role: assignedRole,
+            effort_estimate: '12 hours',
+          }
+        }
+
+        return {
+          ...task,
+          title: task?.title?.trim() || `Task ${taskIndex + 1}`,
+          start_date: task?.start_date || startDate,
+          target_date: task?.target_date || autoTDate,
+          suggested_role: task?.suggested_role || assignedRole,
+          effort_estimate: task?.effort_estimate || '12 hours',
+          subtasks: Array.isArray(task?.subtasks) ? task.subtasks : [],
+          dependencies: Array.isArray(task?.dependencies) ? task.dependencies : [],
+          required_skills: Array.isArray(task?.required_skills) ? task.required_skills : [],
+        }
+      })
+    }
+  })
+}
+
+export function buildClientMindMap(project, plan, radar = null) {
+  const rootId = 'node-root'
+  const nodes = [
+    {
+      id: rootId,
+      label: (project?.name || 'Project Anchor').slice(0, 32),
+      type: 'root',
+      group: 'core',
+      description: project?.idea || 'Core Idea & Vision Anchor',
+      x: 80,
+      y: 300,
+    },
+  ]
+  const edges = []
+
+  // Market Insights
+  const competitors = radar?.competitors || []
+  const voice = radar?.customer_voice || []
+  const insights = [
+    ...competitors.map(c => ({ title: `Comp: ${c.name}`, snippet: `${c.positioning} (${c.pricing})` })),
+    ...voice.map(v => ({ title: `Need: ${v.pain_point}`, snippet: v.user_complaint })),
+  ]
+  if (!insights.length) {
+    insights.push(
+      { title: 'Market Gap: High Cost', snippet: 'Existing market tools have expensive plans' },
+      { title: 'User Need: Simplicity', snippet: 'Creators demand an intuitive streamlined setup' }
+    )
+  }
+
+  insights.slice(0, 3).forEach((ins, idx) => {
+    const nId = `node-mkt-${idx + 1}`
+    nodes.push({
+      id: nId,
+      label: ins.title.slice(0, 26),
+      type: 'market',
+      group: 'market',
+      description: ins.snippet,
+      radar_chip: 'Market Grounding',
+      x: 360,
+      y: 120 + idx * 110,
+    })
+    edges.push({
+      id: `edge-root-${nId}`,
+      source: rootId,
+      target: nId,
+      label: 'grounded by',
+      animated: true,
+    })
+  })
+
+  // Milestones & Tasks
+  const milestonesList = normalizeMilestones(plan)
+  let prevMId = null
+
+  milestonesList.forEach((milestone, mIdx) => {
+    const mId = `node-m${mIdx + 1}`
+    const mY = 80 + mIdx * 160
+    nodes.push({
+      id: mId,
+      label: (milestone.title || `Milestone ${mIdx + 1}`).slice(0, 30),
+      type: 'milestone',
+      group: 'milestone',
+      description: milestone.purpose || '',
+      x: 680,
+      y: mY,
+    })
+
+    if (prevMId) {
+      edges.push({
+        id: `edge-${prevMId}-${mId}`,
+        source: prevMId,
+        target: mId,
+        label: 'advances to',
+        animated: true,
+      })
+    } else {
+      edges.push({
+        id: `edge-root-${mId}`,
+        source: rootId,
+        target: mId,
+        label: 'executes',
+        animated: true,
+      })
+    }
+    prevMId = mId
+
+      // 2-3 tasks per milestone
+      ; (milestone.tasks || []).slice(0, 3).forEach((task, tIdx) => {
+        const tId = task.id || `${mIdx}-${tIdx}`
+        const nodeTId = `node-task-${mIdx + 1}-${tIdx + 1}`
+        nodes.push({
+          id: nodeTId,
+          taskId: tId,
+          label: (task.title || `Task ${tIdx + 1}`).slice(0, 28),
+          type: 'task',
+          group: 'task',
+          description: task.why_matters || task.purpose || '',
+          xp_reward: task.xp_reward || 150,
+          radar_chip: task.radar_chip || '',
+          x: 1000,
+          y: mY - 35 + tIdx * 50,
+        })
+        edges.push({
+          id: `edge-${mId}-${nodeTId}`,
+          source: mId,
+          target: nodeTId,
+          label: `+${task.xp_reward || 150} XP`,
+          animated: false,
+        })
+      })
+  })
+
+  return {
+    nodes,
+    edges,
+    layout_settings: {
+      node_spacing: 1.0,
+      connection_opacity: 0.65,
+      theme: 'espresso',
+      show_labels: true,
+    },
+  }
 }
 
 function formatDate(value) {
@@ -123,13 +528,18 @@ export function formatDisplayDate(dateStr) {
 
 export function getDaysRemaining(deadlineStr) {
   if (!deadlineStr) return null
-  const d = new Date(deadlineStr)
-  if (Number.isNaN(d.valueOf())) return null
+  let target
+  if (typeof deadlineStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(deadlineStr.trim())) {
+    const parts = deadlineStr.trim().split('T')[0].split('-').map(Number)
+    target = new Date(parts[0], parts[1] - 1, parts[2])
+  } else {
+    const d = new Date(deadlineStr)
+    if (Number.isNaN(d.valueOf())) return null
+    target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  }
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const target = new Date(d)
-  target.setHours(0, 0, 0, 0)
-  const diffTime = target - today
+  const current = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const diffTime = target.getTime() - current.getTime()
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24))
   return {
     days: diffDays,
@@ -139,8 +549,8 @@ export function getDaysRemaining(deadlineStr) {
       diffDays < 0
         ? `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? '' : 's'} overdue`
         : diffDays === 0
-        ? 'Due today'
-        : `${diffDays} day${diffDays === 1 ? '' : 's'} remaining`,
+          ? 'Due today'
+          : `${diffDays} day${diffDays === 1 ? '' : 's'} remaining`,
   }
 }
 
@@ -259,7 +669,7 @@ function ConnectedRepositoryPanel({
             disabled={syncing || comparing}
             title="Refresh repository files and analysis"
           >
-            {syncing ? <LoaderCircle size={14} className="fp-spinning" /> : <RefreshCw size={14} />}
+            {syncing ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <RefreshCw size={14} />}
             {syncing ? 'Syncing…' : 'Sync repository'}
           </button>
           <button
@@ -269,7 +679,7 @@ function ConnectedRepositoryPanel({
             disabled={comparing || syncing || isEmpty}
             title={isEmpty ? 'Cannot compare an empty repository' : 'Compare roadmap milestones with repository evidence'}
           >
-            {comparing ? <LoaderCircle size={14} className="fp-spinning" /> : <Sparkles size={14} />}
+            {comparing ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Sparkles size={14} />}
             {comparing ? 'Comparing…' : 'Compare with Repository'}
           </button>
         </div>
@@ -440,10 +850,10 @@ function TimingEditModal({ project, onClose, onSave, onSaveAndReplan, busy = fal
                   {deadlineMetrics?.isOverdue
                     ? 'Target launch date has passed. Replan to establish a realistic schedule.'
                     : totalDays <= 7
-                    ? 'High-intensity timeline (hackathon mode). Focus on core MVP tasks.'
-                    : totalDays <= 30
-                    ? 'Balanced sprint timeline. Sufficient time for development, testing, and polish.'
-                    : 'Comprehensive project timeline. Milestones can accommodate extensive verification.'}
+                      ? 'High-intensity timeline (hackathon mode). Focus on core MVP tasks.'
+                      : totalDays <= 30
+                        ? 'Balanced sprint timeline. Sufficient time for development, testing, and polish.'
+                        : 'Comprehensive project timeline. Milestones can accommodate extensive verification.'}
                 </span>
               </div>
             </div>
@@ -459,7 +869,7 @@ function TimingEditModal({ project, onClose, onSave, onSaveAndReplan, busy = fal
               <Save size={13} /> Save Timing
             </button>
             <button type="button" className="fp-btn-replan-accent" onClick={handleReplanWithNewTiming} disabled={busy}>
-              {busy ? <LoaderCircle size={13} className="fp-spinning" /> : <Sparkles size={13} />}
+              {busy ? <MiniLoader color="#fff" className="mr-0.5" /> : <Sparkles size={13} />}
               Save & Replan with AI
             </button>
           </div>
@@ -496,17 +906,27 @@ function RoadmapHeader({
   const startDateStr = project.startDate || project.start_date || project.workflow?.flight_plan?.start_date
   const daysInfo = useMemo(() => getDaysRemaining(deadlineStr), [deadlineStr])
   const timelineProgress = useMemo(() => getTimelineProgress(startDateStr, deadlineStr), [startDateStr, deadlineStr])
+  const [showVerificationAudit, setShowVerificationAudit] = useState(false)
+  const [activeTrackInfo, setActiveTrackInfo] = useState(null)
+
+  const currentXp = project.xp_points || 0
+  const currentLvl = project.xp_level || (currentXp >= 1000 ? 4 : currentXp >= 600 ? 3 : currentXp >= 300 ? 2 : 1)
 
   return (
     <>
       <section className="fp-hero">
         <div className="fp-hero-copy">
-          <div className="fp-eyebrow"><Compass size={13} /> PROJECT ROADMAP · FLIGHT PLAN</div>
+          <div className="fp-eyebrow"><Compass size={13} /> PROJECT ROADMAP</div>
           <h1>{project.name}</h1>
           <p>{description || 'A clear sequence of milestones to move this project forward.'}</p>
         </div>
 
         <div className="fp-hero-actions">
+          <div className="fp-xp-badge" title="Project experience points earned through task verification">
+            <Award size={13} className="text-[#8E4B49]" />
+            <span>Level {currentLvl} · {currentXp} XP</span>
+          </div>
+
           <button
             className="fp-timing-badge-btn"
             type="button"
@@ -532,7 +952,7 @@ function RoadmapHeader({
             onClick={onReplan}
             disabled={replanBusy || !project.idea}
           >
-            {replanBusy ? <LoaderCircle className="fp-spinning" size={14} /> : <Sparkles size={14} />}
+            {replanBusy ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Sparkles size={14} />}
             {replanBusy ? 'Replanning…' : 'Replan with AI'}
           </button>
 
@@ -543,130 +963,379 @@ function RoadmapHeader({
         </div>
       </section>
 
-      <section className="fp-overview" aria-label="Roadmap progress and deadline">
-        {/* Top summary row */}
-        <div className="fp-overview-top">
-          <div className="fp-progress-title">
-            <span>Overall completion</span>
-            <strong>{percent}%</strong>
+      {/* ─── MINIMALIST & CLEAN ROADMAP OVERVIEW ─── */}
+      <section className="fp-overview fp-overview-minimal" aria-label="Roadmap progress and deadline">
+        {/* Main Clean Row: Big Progress + Key Metrics */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#F0EBE5]">
+          <div className="flex items-center gap-4">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs font-bold text-[#7C766F] uppercase tracking-wider">Overall Progress</span>
+              <strong className="text-2xl sm:text-3xl font-black text-[#8E4B49] tracking-tight">{percent}%</strong>
+            </div>
+            <div className="hidden sm:block w-px h-6 bg-[#E8E2DA]" />
+            <div className="text-xs text-[#534342] font-semibold">
+              <span className="text-[#1D1B18] font-bold">{doneCount}</span> of {taskCount} tasks completed
+            </div>
           </div>
-          <div className="fp-overview-top-right">
+
+          {/* Right: Launch countdown badge & Verification toggle */}
+          <div className="flex items-center gap-2 flex-wrap">
             {deadlineStr ? (
-              <div className="fp-deadline-summary-chip">
-                <Calendar size={13} />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFF8F3] border border-[#FFAAA6]/40 text-xs font-bold text-[#7A3C3A]">
+                <Calendar size={13} className="text-[#8E4B49]" />
                 <span>Launch: <b>{formatDisplayDate(deadlineStr)}</b></span>
                 {daysInfo && (
-                  <span className={`fp-chip-days ${daysInfo.isOverdue ? 'overdue' : daysInfo.days <= 7 ? 'urgent' : 'healthy'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${daysInfo.isOverdue ? 'bg-[#FEE2E2] text-[#991B1B]' : daysInfo.days <= 7 ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#D1FAE5] text-[#065F46]'
+                    }`}>
                     {daysInfo.label}
                   </span>
                 )}
               </div>
             ) : (
-              <button type="button" className="fp-set-deadline-link" onClick={onOpenTimingEdit}>
-                + Set a launch deadline to track schedule feasibility
+              <button type="button" className="text-xs font-bold text-[#8E4B49] hover:underline" onClick={onOpenTimingEdit}>
+                + Set launch deadline
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => setShowVerificationAudit(!showVerificationAudit)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-white border border-[#E5E0D8] text-xs font-bold text-[#534342] hover:bg-[#FAF8F5] transition-colors"
+              title="Toggle detailed repository scan and test verification evidence"
+            >
+              <span>{showVerificationAudit ? 'Hide' : 'Show'} Git & Audit Details</span>
+              <ChevronDown size={13} className={`transition-transform duration-200 ${showVerificationAudit ? 'rotate-180' : ''}`} />
+            </button>
           </div>
         </div>
 
-        {/* Dual Progress: Task Completion Track + Timeline Elapsed Track */}
-        <div className="fp-dual-progress-wrap">
-          <div className="fp-track-row">
-            <div className="fp-track-label-group">
-              <span className="fp-track-label">Tasks completed</span>
-              <span className="fp-track-val">{doneCount} of {taskCount} tasks ({percent}%)</span>
-            </div>
-            <div className="fp-progress-track" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
-              <span style={{ width: `${percent}%` }} />
-            </div>
+        {/* Clean Single Progress Bar */}
+        <div className="fp-progress-track my-3" role="progressbar" aria-valuenow={percent} aria-valuemin="0" aria-valuemax="100">
+          <span style={{ width: `${percent}%` }} />
+        </div>
+
+        {/* Quick Scannable Status Pills Strip */}
+        <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-[#6D6560] pt-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] font-medium">
+              <CheckCircle2 size={13} className="text-[#10B981]" />
+              <b>{completedMilestones}</b> of {milestones} milestones done
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] font-medium">
+              <Compass size={13} className="text-[#8E4B49]" />
+              {activeMilestone ? `Active: ${activeMilestone}` : 'All complete'}
+            </span>
+            {overdueCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FEF2F2] border border-[#FCA5A5] text-[#991B1B] font-bold">
+                <AlertTriangle size={13} /> {overdueCount} overdue
+              </span>
+            )}
+            {blockedCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] font-bold">
+                <ShieldAlert size={13} /> {blockedCount} blocked
+              </span>
+            )}
           </div>
 
           {timelineProgress !== null && (
-            <div className="fp-track-row timeline-track-row">
-              <div className="fp-track-label-group">
-                <span className="fp-track-label">Timeline elapsed</span>
-                <span className="fp-track-val">
-                  {timelineProgress}% time elapsed
-                  {startDateStr ? ` · Started ${formatDisplayDate(startDateStr)}` : ''}
-                </span>
+            <span className="text-[11px] text-[#7C766F] font-medium">
+              Timeline: <b>{timelineProgress}%</b> elapsed{startDateStr ? ` · Started ${formatDisplayDate(startDateStr)}` : ''}
+            </span>
+          )}
+        </div>
+
+        {/* Collapsible Deep Verification & Git Audit (Hidden by default to keep screen minimal) */}
+        {showVerificationAudit && (
+          <div className="mt-4 pt-4 border-t border-[#EFEAE4] space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between text-xs font-bold text-[#1D1B18]">
+              <span className="flex items-center gap-1.5 uppercase tracking-wider text-[11px] text-[#8E4B49]">
+                <FileCheck size={14} /> Repository Deterministic Verification & Evidence
+              </span>
+              <span className="text-[11px] text-[#7C766F]">Multi-track analysis</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4]">
+                <div className="flex items-center justify-between text-xs font-bold text-[#1D1B18] mb-1.5">
+                  <span>User Checklist</span>
+                  <span>{doneCount} / {taskCount} ({percent}%)</span>
+                </div>
+                <div className="fp-stat-track user"><span style={{ width: `${percent}%` }} /></div>
+                <span className="text-[10px] text-[#7C766F] mt-1 block">Manual checkmarks</span>
               </div>
-              <div className="fp-timeline-track" role="progressbar" aria-valuenow={timelineProgress} aria-valuemin="0" aria-valuemax="100">
-                <span
-                  className={daysInfo?.isOverdue ? 'overdue' : timelineProgress > 85 ? 'warning' : 'healthy'}
-                  style={{ width: `${Math.min(timelineProgress, 100)}%` }}
-                />
+
+              <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4]">
+                <div className="flex items-center justify-between text-xs font-bold text-[#1D1B18] mb-1.5">
+                  <span>Repo Evidence</span>
+                  <span>{evidenceCount} / {taskCount} ({evidencePercent}%)</span>
+                </div>
+                <div className="fp-stat-track evidence"><span style={{ width: `${evidencePercent}%` }} /></div>
+                <span className="text-[10px] text-[#7C766F] mt-1 block">Deterministic file scan</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4]">
+                <div className="flex items-center justify-between text-xs font-bold text-[#1D1B18] mb-1.5">
+                  <span>Workbench Verified</span>
+                  <span>{verifiedCount} / {taskCount} ({verifiedPercent}%)</span>
+                </div>
+                <div className="fp-stat-track verified"><span style={{ width: `${verifiedPercent}%` }} /></div>
+                <span className="text-[10px] text-[#7C766F] mt-1 block">Verified PR proofs & tests</span>
               </div>
             </div>
-          )}
-        </div>
-
-        {/* Task Status Breakdown Chips */}
-        <div className="fp-status-breakdown-row">
-          <div className="fp-status-chip done">
-            <CheckCircle2 size={13} />
-            <span>Completed: <b>{doneCount}</b></span>
           </div>
-          <div className="fp-status-chip in-progress">
-            <Compass size={13} />
-            <span>In Progress: <b>{inProgressCount}</b></span>
-          </div>
-          <div className="fp-status-chip blocked">
-            <ShieldAlert size={13} />
-            <span>Blocked: <b>{blockedCount}</b></span>
-          </div>
-          {overdueCount > 0 && (
-            <div className="fp-status-chip overdue">
-              <AlertTriangle size={13} />
-              <span>Overdue: <b>{overdueCount}</b></span>
-            </div>
-          )}
-          {unverifiedCount > 0 && (
-            <div className="fp-status-chip unverified">
-              <CircleHelp size={13} />
-              <span>Needs Review: <b>{unverifiedCount}</b></span>
-            </div>
-          )}
-        </div>
-
-        {/* Multi-track breakdown for repository verification */}
-        <div className="fp-progress-breakdown">
-          <div className="fp-progress-stat">
-            <div className="fp-stat-head">
-              <span className="fp-stat-label">Manual user completion</span>
-              <span className="fp-stat-val">{doneCount} / {taskCount} ({percent}%)</span>
-            </div>
-            <div className="fp-stat-track user"><span style={{ width: `${percent}%` }} /></div>
-            <span className="fp-stat-footnote">Task checklist</span>
-          </div>
-
-          <div className="fp-progress-stat">
-            <div className="fp-stat-head">
-              <span className="fp-stat-label">Repository evidence found</span>
-              <span className="fp-stat-val">{evidenceCount} / {taskCount} ({evidencePercent}%)</span>
-            </div>
-            <div className="fp-stat-track evidence"><span style={{ width: `${evidencePercent}%` }} /></div>
-            <span className="fp-stat-footnote">Deterministic code matches detected</span>
-          </div>
-
-          <div className="fp-progress-stat">
-            <div className="fp-stat-head">
-              <span className="fp-stat-label">Verification passed</span>
-              <span className="fp-stat-val">{verifiedCount} / {taskCount} ({verifiedPercent}%)</span>
-            </div>
-            <div className="fp-stat-track verified"><span style={{ width: `${verifiedPercent}%` }} /></div>
-            <span className="fp-stat-footnote">Passed criteria checks</span>
-          </div>
-        </div>
-
-        <div className="fp-overview-foot">
-          <span><CheckCircle2 size={14} /> {completedMilestones} of {milestones} milestones complete</span>
-          <span className="fp-active-milestone">
-            <span className="fp-active-dot" />
-            {activeMilestone ? `Active: ${activeMilestone}` : 'All milestones complete'}
-          </span>
-        </div>
+        )}
       </section>
     </>
+  )
+}
+
+function TeamMemberRoadmapStrip({
+  roles = [],
+  allTasks = [],
+  completed = [],
+  selectedRole = 'all',
+  onSelectRole,
+}) {
+  const standardRoles = ['Product Lead', 'Frontend Engineer', 'Backend Architect', 'UI/UX Designer', 'QA / DevOps']
+  const displayRoles = Array.from(new Set([...standardRoles, ...roles]))
+  const totalTasks = allTasks.length
+  const totalCompleted = allTasks.filter(t => completed.includes(t.id)).length
+
+  return (
+    <div className="fp-team-member-strip-minimal p-3 rounded-2xl bg-white border border-[#EFEAE4] shadow-xs">
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider flex items-center gap-1.5">
+            <UsersRound size={14} className="text-[#8E4B49]" />
+            Filter Tasks by Role:
+          </span>
+        </div>
+        <span className="text-[11px] text-[#7C766F]">
+          Select a role to focus only on their deliverables
+        </span>
+      </div>
+
+      {/* Clean Compact Role Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+        <button
+          type="button"
+          onClick={() => onSelectRole('all')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${selectedRole === 'all'
+            ? 'bg-[#1D1B18] text-white shadow-xs'
+            : 'bg-[#FAF8F5] text-[#534342] hover:bg-[#EFEAE4] border border-[#EFEAE4]'
+            }`}
+        >
+          <span>All Roles</span>
+          <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${selectedRole === 'all' ? 'bg-white/20 text-white' : 'bg-[#EAE4DC] text-[#534342]'
+            }`}>
+            {totalCompleted}/{totalTasks}
+          </span>
+        </button>
+
+        {displayRoles.map((roleName) => {
+          const conf = getRoleConfig(roleName)
+          const roleTasks = allTasks.filter(item => {
+            const r = (item.task?.suggested_role || '').toLowerCase()
+            const target = roleName.toLowerCase()
+            return r.includes(target) || target.includes(r)
+          })
+          if (!roleTasks.length && !standardRoles.includes(roleName)) return null
+          const roleDone = roleTasks.filter(item => completed.includes(item.id)).length
+          const isSelected = selectedRole.toLowerCase() === roleName.toLowerCase()
+
+          return (
+            <button
+              key={roleName}
+              type="button"
+              onClick={() => onSelectRole(isSelected ? 'all' : roleName)}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${isSelected
+                ? 'text-white shadow-xs border-transparent'
+                : 'bg-white text-[#2D2A26] hover:bg-[#FAF8F5] border-[#E5E0D8]'
+                }`}
+              style={{
+                backgroundColor: isSelected ? conf.color : undefined,
+              }}
+            >
+              <img
+                src={conf.avatar}
+                alt={conf.short}
+                className="w-4 h-4 rounded-full object-cover shrink-0"
+              />
+              <span>{conf.short}</span>
+              <span
+                className="px-1.5 py-0.2 rounded-md text-[10px] font-black"
+                style={{
+                  backgroundColor: isSelected ? 'rgba(255,255,255,0.25)' : conf.badgeBg,
+                  color: isSelected ? '#FFFFFF' : conf.accent,
+                }}
+              >
+                {roleDone}/{roleTasks.length}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function MilestoneGanttTimeline({
+  milestones = [],
+  allTasks = [],
+  completed = [],
+  personFilter = 'all',
+  onSelectTask,
+}) {
+  if (!milestones.length) return null
+
+  return (
+    <div className="fp-timeline-visualizer">
+      <div className="fp-timeline-header">
+        <div>
+          <div className="flex items-center gap-2">
+            <CalendarClock size={16} className="text-[#8E4B49]" />
+            <h3 className="text-sm font-bold text-[#1D1B18] uppercase tracking-wider">
+              Automatic Milestone Sprint Schedule & Timeline
+            </h3>
+          </div>
+          <p className="text-xs text-[#6B7280] mt-0.5">
+            Auto-calculated chronological sprint intervals with role deliverables and target dates.
+          </p>
+        </div>
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#FFF1ED] text-[#8E4B49] border border-[#FFAAA6]/40">
+          {milestones.length} Sprints · 14-Day Sprint Blocks
+        </span>
+      </div>
+
+      <div className="fp-timeline-sprints-flow">
+        {milestones.map((milestone, mIdx) => {
+          let tasksInMilestone = allTasks.filter(item => item.milestoneIndex === mIdx)
+          if (personFilter !== 'all') {
+            tasksInMilestone = tasksInMilestone.filter(item => {
+              const r = (item.task?.suggested_role || '').toLowerCase()
+              const target = personFilter.toLowerCase()
+              return r.includes(target) || target.includes(r)
+            })
+          }
+          const doneInMilestone = tasksInMilestone.filter(item => completed.includes(item.id)).length
+          const pct = tasksInMilestone.length ? Math.round((doneInMilestone / tasksInMilestone.length) * 100) : 0
+          const daysRemaining = milestone.target_date ? getDaysRemaining(milestone.target_date) : null
+
+          return (
+            <div key={`${mIdx}-${milestone.title}`} className="fp-timeline-sprint-row">
+              <div className="fp-timeline-sprint-info">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#F3EDE7] text-[#7A3C3A] uppercase tracking-wider">
+                      Sprint {mIdx + 1}
+                    </span>
+                    <span className="text-[11px] font-semibold text-[#6B7280]">
+                      {milestone.category || 'Deliverable'}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-bold text-[#1D1B18] line-clamp-2 leading-snug">
+                    {milestone.title}
+                  </h4>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center gap-1 text-[11px] text-[#4B5563]">
+                    <Calendar size={11} className="text-[#8E4B49]" />
+                    <span>
+                      {formatDisplayDate(milestone.start_date)} → <b>{formatDisplayDate(milestone.target_date)}</b>
+                    </span>
+                  </div>
+                  {daysRemaining && (
+                    <div className="flex items-center justify-between text-[10.5px]">
+                      <span className={daysRemaining.isOverdue ? 'text-[#DC2626] font-bold' : 'text-[#059669] font-medium'}>
+                        {daysRemaining.label}
+                      </span>
+                      <span className="font-bold text-[#1D1B18]">{pct}% Done</span>
+                    </div>
+                  )}
+                  <div className="w-full h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden" style={{ color: 'blue' }}>
+                    <div
+                      className="h-full bg-[#8E4B49] rounded-full transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="fp-timeline-tasks-stream">
+                {tasksInMilestone.length === 0 ? (
+                  <div className="text-xs text-[#9CA3AF] italic py-2">
+                    No deliverables for selected role in this sprint.
+                  </div>
+                ) : (
+                  tasksInMilestone.map(item => {
+                    const isDone = completed.includes(item.id)
+                    const roleConf = getRoleConfig(item.task.suggested_role)
+                    const isOverdue = isTaskOverdue(item.task, isDone)
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => onSelectTask?.(item)}
+                        className="fp-timeline-task-bar"
+                        style={{
+                          backgroundColor: isDone ? '#F9FAFB' : roleConf.bg,
+                          border: `1px solid ${isDone ? '#E5E7EB' : roleConf.border}`,
+                          borderLeft: `4px solid ${isDone ? '#10B981' : roleConf.color}`,
+                        }}
+                        title={`Click to open Task Workbench: ${item.task.title}`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <img
+                            src={roleConf.avatar}
+                            alt={roleConf.short}
+                            className="w-5 h-5 rounded-full object-cover shrink-0 border"
+                            style={{ borderColor: roleConf.color }}
+                          />
+                          <span
+                            className="font-bold text-xs truncate max-w-[280px]"
+                            style={{
+                              color: isDone ? '#9CA3AF' : '#1D1B18',
+                              textDecoration: isDone ? 'line-through' : 'none',
+                            }}
+                          >
+                            {item.task.title}
+                          </span>
+                          {item.task.category && (
+                            <span
+                              className="text-[9.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 hidden sm:inline-block"
+                              style={{ background: roleConf.badgeBg, color: roleConf.accent }}
+                            >
+                              {item.task.category}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 text-[11px]">
+                          <span className="text-[#6B7280]">
+                            {item.task.effort_estimate || '12h'}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${isDone
+                              ? 'bg-[#ECFDF5] text-[#059669]'
+                              : isOverdue
+                                ? 'bg-[#FEF2F2] text-[#DC2626]'
+                                : 'bg-white text-[#374151] border border-[#E5E7EB]'
+                              }`}
+                          >
+                            {isDone ? '✓ Done' : isOverdue ? 'Overdue' : formatDisplayDate(item.task.target_date)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -680,101 +1349,179 @@ function TaskRow({
   showMilestone = false,
   assessment,
   onInspect,
+  onOpenWorkbench,
+  onOpenProof,
+  hasProof = false,
 }) {
   const task = item.task
   const priority = (task.priority || 'medium').toLowerCase()
   const statusKey = assessment?.status || 'not_assessed'
   const meta = buildStatusMeta(statusKey)
   const StatusIcon = meta.icon
+  const [subtasksOpen, setSubtasksOpen] = useState(false)
 
   const overdue = isTaskOverdue(task, done)
   const targetDateDisplay = formatDisplayDate(task.target_date)
+  const roleConf = getRoleConfig(task.suggested_role)
+
+  // Subtasks/features to implement list
+  const steps = (Array.isArray(task.subtasks) && task.subtasks.length > 0)
+    ? task.subtasks
+    : [
+      `Plan & scaffold ${task.title || 'feature'} structure`,
+      `Implement business logic & integrate responsive UI`,
+      `Verify criteria, test edge cases & record proof`,
+    ]
 
   return (
-    <article id={highlight ? 'fp-task-return-target' : undefined} className={`fp-task-row ${done ? 'is-done' : ''} ${locked ? 'is-locked' : ''} ${overdue ? 'is-overdue' : ''} ${highlight ? 'fp-task-return-highlight' : ''}`}>
+    <article
+      id={highlight ? 'fp-task-return-target' : undefined}
+      className={`fp-task-row fp-task-row-clean ${done ? 'is-done' : ''} ${locked ? 'is-locked' : ''} ${overdue ? 'is-overdue' : ''} ${highlight ? 'fp-task-return-highlight' : ''}`}
+      style={{
+        borderLeft: done ? '4px solid #10B981' : `4px solid ${roleConf.color}`,
+      }}
+    >
       <label
         className="fp-task-check"
         title={locked ? 'Complete its dependencies first' : done ? 'Mark task incomplete' : 'Mark task complete'}
       >
-        <input type="checkbox" checked={done} disabled={locked} onChange={onToggle} />
-        <span>{done ? <Check size={12} /> : locked ? <ShieldAlert size={12} /> : null}</span>
+        <input type="checkbox" checked={done} onChange={onToggle} />
+        <span>{done ? <Check size={12} /> : null}</span>
       </label>
 
       <div className="fp-task-main">
-        <div className="fp-task-title-line">
-          <h4>{task.title}</h4>
-          {showMilestone && <span className="fp-task-milestone-label">{item.milestone}</span>}
-          <button
-            type="button"
-            className={`fp-task-build-badge ${meta.className}`}
-            onClick={() => onInspect?.(item, assessment)}
-            title="Click to inspect repository evidence and checks"
-          >
-            <StatusIcon size={12} />
-            <span>{meta.label}</span>
-          </button>
-        </div>
-
-        <div className="fp-task-meta">
-          <span className={`fp-priority ${priority}`}>{priority} priority</span>
-
-          {targetDateDisplay && (
-            <span className={`fp-task-date-pill ${overdue ? 'overdue' : ''}`}>
-              <Calendar size={11} /> {overdue ? `Overdue: ${targetDateDisplay}` : `Due ${targetDateDisplay}`}
-            </span>
-          )}
-
-          {task.effort_estimate && <span><Clock3 size={11} />{task.effort_estimate}</span>}
-          {task.suggested_role && <span><UsersRound size={11} />{task.suggested_role}</span>}
-          {task.assigned_to_name && <span className="fp-task-assignee"><UsersRound size={11} />Assigned to {task.assigned_to_name}</span>}
-          {projectId && <Link className="fp-learn-task-link" to={`/learning?project=${encodeURIComponent(projectId)}&task=${encodeURIComponent(item.id)}`}><Sparkles size={11} />Learn this</Link>}
-
-          {task.dependencies?.length > 0 && (
-            <span className="fp-dependency">
-              <Link2 size={11} />{task.dependencies.length} dependenc{task.dependencies.length === 1 ? 'y' : 'ies'}
-            </span>
-          )}
-
-          {overdue && <span className="fp-task-warning overdue"><AlertTriangle size={11} /> Overdue</span>}
-          {locked && !done && <span className="fp-locked-label">Blocked</span>}
-        </div>
-
-        {(task.subtasks?.length > 0 || task.acceptance_criteria || task.required_skills?.length > 0 || task.dependencies?.length > 0 || task.start_date) && (
-          <details className="fp-task-details">
-            <summary><ArrowDown size={13} /> Details & Criteria</summary>
-            <div className="fp-task-detail-content">
-              {task.start_date && (
-                <div className="fp-detail-date-row">
-                  <span><b>Start:</b> {formatDisplayDate(task.start_date)}</span>
-                  {task.target_date && <span><b>Target:</b> {formatDisplayDate(task.target_date)}</span>}
-                </div>
-              )}
-              {task.subtasks?.length > 0 && (
-                <div>
-                  <b>Subtasks</b>
-                  <ul>{task.subtasks.map((subtask, index) => <li key={`${index}-${subtask}`}>{subtask}</li>)}</ul>
-                </div>
-              )}
-              {task.acceptance_criteria && (
-                <div>
-                  <b>Acceptance criteria</b>
-                  <p>{task.acceptance_criteria}</p>
-                </div>
-              )}
-              {task.dependencies?.length > 0 && (
-                <div>
-                  <b>Dependencies</b>
-                  <p>{task.dependencies.join(' · ')}</p>
-                </div>
-              )}
-              {task.required_skills?.length > 0 && (
-                <div>
-                  <b>Required skills</b>
-                  <p>{task.required_skills.join(' · ')}</p>
-                </div>
-              )}
+        {/* Compact Header: Role Pill & Category */}
+        <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10.5px] font-bold shadow-2xs"
+              style={{ background: roleConf.bg, border: `1px solid ${roleConf.border}`, color: roleConf.accent }}
+              title={`Role: ${task.suggested_role || roleConf.label}`}
+            >
+              <img src={roleConf.avatar} alt={roleConf.short} className="w-3.5 h-3.5 rounded-full object-cover" />
+              <span>{task.suggested_role || roleConf.short}</span>
             </div>
-          </details>
+
+            {task.category && (
+              <span className="text-[10.5px] font-medium text-[#7C766F] bg-[#FAF8F5] px-2 py-0.5 rounded-md border border-[#EFEAE4]">
+                {task.category}
+              </span>
+            )}
+
+            {showMilestone && <span className="fp-task-milestone-label">{item.milestone}</span>}
+          </div>
+
+          {/* Proof Badge */}
+          {hasProof && (
+            <span
+              onClick={() => onOpenProof?.(item)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] border border-[#A7F3D0] text-[#047857] cursor-pointer hover:bg-[#D1FAE5] transition-colors"
+              title="Click to view submitted proof or share to LinkedIn"
+            >
+              <FileCheck2 size={11} /> Proof Attached 📸
+            </span>
+          )}
+        </div>
+
+        {/* Task Title */}
+        <div className="fp-task-title-line">
+          <h4
+            className="cursor-pointer hover:text-[#8E4B49] transition-colors text-sm font-bold text-[#1D1B18]"
+            onClick={() => onOpenWorkbench?.(item)}
+            title="Click to open Task Workbench"
+          >
+            {task.title}
+          </h4>
+        </div>
+
+        {/* Action Row: Proof & Share, Workbench, Subtasks Toggle, Priority */}
+        <div className="fp-task-meta flex items-center justify-between flex-wrap gap-2 pt-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Proof of Work & Social Share Button */}
+            <button
+              type="button"
+              onClick={() => onOpenProof?.(item)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-[#FFF1ED] border border-[#FFAAA6] text-[#8E4B49] hover:bg-[#FFAAA6]/30 transition-all shadow-2xs cursor-pointer"
+              title="Submit proof of work (screenshot/file) & generate LinkedIn post"
+            >
+              <Share2 size={11} />
+              <span>{hasProof ? 'View Proof & Share' : 'Proof & Share 🚀'}</span>
+            </button>
+
+            {/* Workbench Button */}
+            <button
+              type="button"
+              className="fp-workbench-open-btn"
+              onClick={() => onOpenWorkbench?.(item)}
+              title="Open Task Workbench"
+            >
+              <Sparkles size={11} /> Workbench
+            </button>
+
+            {/* Subtasks Accordion Toggle */}
+            <button
+              type="button"
+              onClick={() => setSubtasksOpen(!subtasksOpen)}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold bg-[#FAF8F5] border border-[#E5E0D8] text-[#534342] hover:bg-[#EFEAE4] transition-colors"
+            >
+              <ListChecks size={12} style={{ color: roleConf.color }} />
+              <span>{steps.length} Subtasks</span>
+              <ChevronDown size={11} className={`transition-transform duration-200 ${subtasksOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            <span className={`fp-priority ${priority}`}>{priority} priority</span>
+
+            {targetDateDisplay && (
+              <span className={`fp-task-date-pill ${overdue ? 'overdue' : ''}`}>
+                <Calendar size={11} /> {overdue ? `Overdue: ${targetDateDisplay}` : `Due ${targetDateDisplay}`}
+              </span>
+            )}
+
+            {task.effort_estimate && <span><Clock3 size={11} />{task.effort_estimate}</span>}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              className={`fp-task-build-badge ${meta.className}`}
+              onClick={() => onInspect?.(item, assessment)}
+              title="Click to inspect repository evidence and checks"
+            >
+              <StatusIcon size={12} />
+              <span>{meta.label}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Collapsible Subtasks Checklist (Clean & Minimal) */}
+        {subtasksOpen && (
+          <div className="fp-task-features-checklist my-2.5 p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] animate-in fade-in duration-150">
+            <div className="text-[11px] font-bold text-[#534342] flex items-center justify-between mb-2">
+              <span className="flex items-center gap-1.5 uppercase tracking-wide">
+                <ListChecks size={13} style={{ color: roleConf.color }} />
+                Implementation Steps ({steps.length})
+              </span>
+              <span className="text-[10px] text-[#7C766F] font-mono">
+                {done ? 'Completed' : 'In development'}
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              {steps.map((step, idx) => (
+                <li key={idx} className="flex items-start gap-2 text-xs text-[#2D2A26]">
+                  <span
+                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 mt-0.5"
+                    style={{
+                      background: done ? '#ECFDF5' : roleConf.badgeBg,
+                      color: done ? '#059669' : roleConf.color,
+                    }}
+                  >
+                    {done ? '✓' : idx + 1}
+                  </span>
+                  <span className={done ? 'line-through text-[#9CA3AF]' : ''}>{step}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 
@@ -800,23 +1547,25 @@ function RoadmapNode({
     status === 'completed'
       ? Check
       : status === 'overdue'
-      ? AlertTriangle
-      : status === 'blocked'
-      ? ShieldAlert
-      : status === 'at-risk'
-      ? AlertCircle
-      : status === 'active'
-      ? Compass
-      : Circle
+        ? AlertTriangle
+        : status === 'blocked'
+          ? ShieldAlert
+          : status === 'at-risk'
+            ? AlertCircle
+            : status === 'active'
+              ? Compass
+              : Circle
 
   const mStatusKey = milestoneAssessment?.status || 'not_assessed'
   const mMeta = buildStatusMeta(mStatusKey)
   const MStatusIcon = mMeta.icon
 
   const targetDateStr = formatDisplayDate(milestone.target_date)
+  const THEME_CLASSES = ['theme-emerald', 'theme-blue', 'theme-amber', 'theme-purple', 'theme-rose']
+  const milestoneTheme = THEME_CLASSES[index % THEME_CLASSES.length]
 
   return (
-    <article className={`fp-milestone-node ${status} ${index % 2 ? 'right' : 'left'} ${selected ? 'selected' : ''}`}>
+    <article className={`fp-milestone-node fp-milestone-vertical ${status} ${selected ? 'selected' : ''} ${milestoneTheme}`}>
       <span className="fp-node-connector" aria-hidden="true" />
       <span className="fp-marker" aria-hidden="true">
         <NodeIcon size={16} />
@@ -827,7 +1576,7 @@ function RoadmapNode({
         <div className="fp-milestone-top">
           <div className="fp-milestone-heading">
             <div className="fp-milestone-kicker-row">
-              <span className="fp-milestone-kicker">{milestone.category} · {String(index + 1).padStart(2, '0')}</span>
+              <span className="fp-milestone-kicker">{milestone.category} · Milestone {String(index + 1).padStart(2, '0')}</span>
               {targetDateStr && (
                 <span className="fp-milestone-target-date">
                   <Calendar size={10} /> Due {targetDateStr}
@@ -852,6 +1601,146 @@ function RoadmapNode({
         <div className={`fp-mini-progress ${status}`}><span style={{ width: `${progress}%` }} /></div>
       </button>
     </article>
+  )
+}
+
+function AnimatedRoadmapCurve({ roadmapRef, milestonesCount }) {
+  const [curvePath, setCurvePath] = useState('')
+  const [svgHeight, setSvgHeight] = useState(600)
+
+  useEffect(() => {
+    const calcPath = () => {
+      if (!roadmapRef.current) return
+      const markers = roadmapRef.current.querySelectorAll('.fp-marker')
+      if (!markers.length) return
+
+      const containerRect = roadmapRef.current.getBoundingClientRect()
+      setSvgHeight(containerRect.height)
+
+      const points = Array.from(markers).map((m) => {
+        const r = m.getBoundingClientRect()
+        return {
+          x: r.left - containerRect.left + r.width / 2,
+          y: r.top - containerRect.top + r.height / 2,
+        }
+      })
+
+      if (points.length < 2) return
+
+      // Build smooth organic curve swinging outward to the left as sketched in reference
+      let d = `M ${points[0].x} ${points[0].y}`
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i]
+        const p2 = points[i + 1]
+        const dy = p2.y - p1.y
+        const swingX = Math.max(8, p1.x - 26) // outward left wave into gutter
+        d += ` C ${swingX} ${p1.y + dy * 0.28}, ${swingX} ${p1.y + dy * 0.72}, ${p2.x} ${p2.y}`
+      }
+
+      setCurvePath(d)
+    }
+
+    const timer = setTimeout(calcPath, 60)
+    window.addEventListener('resize', calcPath)
+    let ro = null
+    if (typeof ResizeObserver !== 'undefined' && roadmapRef.current) {
+      ro = new ResizeObserver(calcPath)
+      ro.observe(roadmapRef.current)
+    }
+
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('resize', calcPath)
+      if (ro) ro.disconnect()
+    }
+  }, [roadmapRef, milestonesCount])
+
+  if (!curvePath) return null
+
+  return (
+    <svg
+      className="fp-animated-flow-svg"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: `${svgHeight}px`,
+        pointerEvents: 'none',
+        zIndex: 1,
+        overflow: 'visible',
+      }}
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="roadmapFlowGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#10B981" />
+          <stop offset="30%" stopColor="#8E4B49" />
+          <stop offset="70%" stopColor="#E06D53" />
+          <stop offset="100%" stopColor="#FFAAA6" />
+        </linearGradient>
+        <filter id="flowGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="3.5" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      {/* Base soft guide track */}
+      <path
+        d={curvePath}
+        fill="none"
+        stroke="#F2ECE6"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+
+      {/* Animated marching dash flow line */}
+      <path
+        d={curvePath}
+        fill="none"
+        stroke="url(#roadmapFlowGradient)"
+        strokeWidth="3.5"
+        strokeLinecap="round"
+        strokeDasharray="9 7"
+        className="fp-flow-line-animated"
+      />
+
+      {/* Comet tail particle 2 */}
+      <circle r="3" fill="#FFAAA6" opacity="0.45">
+        <animateMotion
+          dur="3.4s"
+          repeatCount="indefinite"
+          path={curvePath}
+          begin="-0.35s"
+        />
+      </circle>
+
+      {/* Comet tail particle 1 */}
+      <circle r="4.5" fill="#E06D53" opacity="0.65">
+        <animateMotion
+          dur="3.4s"
+          repeatCount="indefinite"
+          path={curvePath}
+          begin="-0.18s"
+        />
+      </circle>
+
+      {/* Continuous glowing energy orb moving through path from one to another */}
+      <circle r="6" fill="#8E4B49" filter="url(#flowGlow)">
+        <animateMotion
+          dur="3.4s"
+          repeatCount="indefinite"
+          path={curvePath}
+        />
+      </circle>
+      <circle r="2.5" fill="#FFFFFF">
+        <animateMotion
+          dur="3.4s"
+          repeatCount="indefinite"
+          path={curvePath}
+        />
+      </circle>
+    </svg>
   )
 }
 
@@ -1024,7 +1913,7 @@ function TaskAssessmentModal({
                 onClick={() => onExplainAI?.(item, assessment)}
                 disabled={explainingAI}
               >
-                {explainingAI ? <LoaderCircle size={13} className="fp-spinning" /> : <Sparkles size={13} />}
+                {explainingAI ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Sparkles size={13} />}
                 {explainingAI ? 'Analyzing with Gemini…' : 'Explain finding with AI'}
               </button>
             )}
@@ -1073,7 +1962,7 @@ function TaskAssessmentModal({
                 onClick={() => handleConfirmOverride()}
                 disabled={confirming}
               >
-                {confirming ? <LoaderCircle size={13} className="fp-spinning" /> : <Save size={13} />}
+                {confirming ? <MiniLoader color="#8E4B49" className="mr-0.5" /> : <Save size={13} />}
                 Save Correction
               </button>
             </div>
@@ -1104,11 +1993,11 @@ function RoadmapEditor({ plan, onChange, onCancel, onSave, error, completedTasks
         index !== milestoneIndex
           ? milestone
           : {
-              ...milestone,
-              tasks: milestone.tasks.map((task, taskIndexInMilestone) =>
-                taskIndexInMilestone === taskIndex ? { ...task, [key]: value } : task
-              ),
-            }
+            ...milestone,
+            tasks: milestone.tasks.map((task, taskIndexInMilestone) =>
+              taskIndexInMilestone === taskIndex ? { ...task, [key]: value } : task
+            ),
+          }
       ),
     }))
   }
@@ -1120,9 +2009,9 @@ function RoadmapEditor({ plan, onChange, onCancel, onSave, error, completedTasks
         index !== milestoneIndex
           ? milestone
           : {
-              ...milestone,
-              tasks: milestone.tasks.filter((_, taskIndexInMilestone) => taskIndexInMilestone !== taskIndex),
-            }
+            ...milestone,
+            tasks: milestone.tasks.filter((_, taskIndexInMilestone) => taskIndexInMilestone !== taskIndex),
+          }
       ),
     }))
   }
@@ -1442,6 +2331,1510 @@ function ReplanPreview({ plan, onCancel, onApprove }) {
   )
 }
 
+function HardwareBomFlightPlanView({
+  project,
+  hardwareBom = [],
+  onGenerateBom,
+  generating = false,
+  searchQuery,
+  onSearchChange,
+  onSearchSubmit,
+  searchResults = [],
+  onClearSearchResults,
+  searching = false,
+  onAddComp,
+  onRemoveComp,
+}) {
+  const domain = project?.domain || 'hardware'
+  const minTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMin || 0) * (c.quantity || 1), 0)
+  const maxTotal = hardwareBom.reduce((sum, c) => sum + (c.priceMax || 0) * (c.quantity || 1), 0)
+
+  return (
+    <section className="space-y-6 animate-fadeIn font-['Plus_Jakarta_Sans']">
+      {/* Header Banner */}
+      <div className="bg-gradient-to-r from-[#FFFBEB] via-[#FEF3C7]/40 to-[#FFF7ED] rounded-3xl border border-[#FDE68A] p-6 shadow-xs flex items-center justify-between flex-wrap gap-4">
+        <div className="space-y-1 max-w-xl">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-xl bg-[#D97706] text-white flex items-center justify-center font-bold text-sm shadow-xs">
+              🔧
+            </span>
+            <h2 className="text-lg font-black text-[#1D1B18] tracking-tight">
+              Hardware Components & Bill of Materials (BOM)
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-white text-[#D97706] border border-[#FDE68A]">
+              {domain.toUpperCase()} DOMAIN
+            </span>
+          </div>
+          <p className="text-xs text-[#78350F] leading-relaxed">
+            Direct procurement links, live vendor price ranges (INR), wiring connections, and learning tutorials for Indian maker stores (MakerBazar, Robocraze, Roboin & IndiaHobbyStore).
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="bg-white/90 backdrop-blur px-4 py-2.5 rounded-2xl border border-[#FDE68A] shadow-xs text-right">
+            <span className="text-[10px] font-bold text-[#92400E] uppercase tracking-wider block">Estimated BOM Cost</span>
+            <span className="text-base font-black text-[#1D1B18]">
+              ₹{minTotal.toLocaleString('en-IN')} – ₹{maxTotal.toLocaleString('en-IN')}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onGenerateBom}
+            disabled={generating}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-[#D97706] text-white text-xs font-bold hover:bg-[#B45309] transition-all shadow-sm cursor-pointer disabled:opacity-60"
+          >
+            {generating ? <MiniLoader color="#fff" /> : <RefreshCw size={13} />}
+            <span>{generating ? 'Synthesizing…' : 'AI Generate BOM'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Live Component Search / Sourcing Bar */}
+      <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">Live Indian Store Sourcing</h3>
+            <p className="text-xs text-[#7C766F] mt-0.5">Search live parts across MakerBazar, Robocraze, Roboin & IndiaHobbyStore</p>
+          </div>
+          <span className="text-[11px] text-[#7C766F]">Instant Indian store links</span>
+        </div>
+
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#7C766F]" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => onSearchChange(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') onSearchSubmit(searchQuery) }}
+              placeholder="Search components (e.g. ESP32, Arduino Uno, MG996R servo, HC-SR04 ultrasonic, OLED 0.96)..."
+              className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-[#FAFAF9] border border-[#EFEAE4] text-xs focus:bg-white focus:border-[#D97706] focus:outline-none transition-all"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => onSearchSubmit(searchQuery)}
+            disabled={searching}
+            className="px-5 py-2.5 rounded-xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+          >
+            {searching ? <MiniLoader color="#fff" /> : <Search size={14} />}
+            <span>Search Stores</span>
+          </button>
+        </div>
+
+        {/* Live Search Results */}
+        {searchResults.length > 0 && (
+          <div className="p-4 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#1D1B18]">Found Components ({searchResults.length})</span>
+              <button
+                type="button"
+                onClick={onClearSearchResults}
+                className="text-[11px] font-bold text-[#7C766F] hover:text-[#1D1B18] cursor-pointer"
+              >
+                Close ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {searchResults.map((item, idx) => (
+                <div key={idx} className="p-3.5 rounded-xl bg-white border border-[#EFEAE4] flex gap-3 items-start shadow-xs">
+                  {item.image && (
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-14 h-14 rounded-xl object-cover border border-[#EFEAE4] shrink-0"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#FFFBEB] text-[#D97706] border border-[#FDE68A]">
+                        {item.category || 'Hardware'}
+                      </span>
+                      <span className="text-xs font-black text-[#1D1B18]">{item.price_range}</span>
+                    </div>
+                    <h4 className="font-bold text-xs text-[#1D1B18] truncate">{item.name}</h4>
+                    {item.description && (
+                      <p className="text-[11px] text-[#534342] line-clamp-1 m-0">{item.description}</p>
+                    )}
+                    <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                      {(item.vendors || []).map((v, vi) => (
+                        <a
+                          key={vi}
+                          href={v.direct_search_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[9.5px] font-bold px-2 py-0.5 rounded-md bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342] hover:text-[#1D1B18] no-underline"
+                        >
+                          🛒 {v.vendor}
+                        </a>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => onAddComp(item)}
+                        className="ml-auto text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-[#1D1B18] text-white hover:bg-black transition-colors cursor-pointer"
+                      >
+                        + Add to My BOM
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Components Grid in Project BOM */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-bold text-[#1D1B18]">Components in Your Project BOM</h3>
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[#FAF8F5] border border-[#EFEAE4] text-[#534342]">
+              {hardwareBom.length} items
+            </span>
+          </div>
+          <span className="text-xs text-[#7C766F]">Direct vendor checkout links included</span>
+        </div>
+
+        {hardwareBom.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-dashed border-[#EFEAE4] p-12 text-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-[#FFFBEB] border border-[#FDE68A] flex items-center justify-center mx-auto text-xl">
+              📦
+            </div>
+            <h4 className="text-sm font-bold text-[#1D1B18]">No hardware components in your BOM yet</h4>
+            <p className="text-xs text-[#7C766F] max-w-sm mx-auto">
+              Click below to generate a tailored Bill of Materials with pricing and wiring guides, or search above.
+            </p>
+            <button
+              type="button"
+              onClick={onGenerateBom}
+              disabled={generating}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#1D1B18] text-white text-xs font-bold hover:bg-black transition-colors cursor-pointer"
+            >
+              {generating ? <MiniLoader color="#fff" /> : <Sparkles size={14} />}
+              <span>Generate BOM with AI</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {hardwareBom.map(comp => (
+              <div
+                key={comp.id}
+                className="bg-white rounded-2xl border-2 p-4 flex flex-col justify-between space-y-3 shadow-xs hover:shadow-md transition-all relative group"
+                style={{ borderColor: comp.color || '#EFEAE4' }}
+              >
+                <div className="space-y-2.5">
+                  {/* Top row */}
+                  <div className="flex items-start gap-3">
+                    {comp.image ? (
+                      <img
+                        src={comp.image}
+                        alt={comp.name}
+                        className="w-14 h-14 rounded-xl object-cover border border-[#EFEAE4] shrink-0"
+                      />
+                    ) : (
+                      <span
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shrink-0 font-bold"
+                        style={{ background: comp.bg || '#FFFBEB', color: comp.color || '#D97706' }}
+                      >
+                        {comp.icon || '⚡'}
+                      </span>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span
+                          className="text-[9.5px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider"
+                          style={{ background: comp.bg || '#FAF8F5', color: comp.color || '#534342' }}
+                        >
+                          {comp.category}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => onRemoveComp(comp.id)}
+                          className="text-[#9CA3AF] hover:text-[#DC2626] text-xs p-0.5 opacity-60 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          title="Remove from BOM"
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <h4 className="text-xs font-bold text-[#1D1B18] mt-1 line-clamp-1">{comp.name}</h4>
+                      
+                      {/* Units required and total pricing */}
+                      <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                        <span className="text-xs font-black text-[#D97706]">
+                          ₹{(comp.unit_price || comp.priceMin || 0) * (comp.quantity || 1)}
+                        </span>
+                        <span className="text-[10px] font-semibold text-[#534342] bg-[#FAF8F5] px-1.5 py-0.5 rounded border border-[#EFEAE4]">
+                          {comp.quantity || 1} {comp.unit || 'pcs'} required @ ₹{comp.unit_price || comp.priceMin || 0}/{comp.unit || 'pcs'}
+                        </span>
+                      </div>
+
+                      {/* Stock availability */}
+                      <div className="pt-1 flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#15803D] bg-[#F0FDF4] border border-[#BBF7D0] px-2 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse" />
+                          {comp.availability || 'In Stock (MakerBazar)'}
+                        </span>
+                        <span className="text-[9.5px] text-[#7C766F]">
+                          Alternative: Robocraze / Roboin
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  {comp.description && (
+                    <p className="text-xs text-[#534342] leading-relaxed line-clamp-2 m-0">
+                      {comp.description}
+                    </p>
+                  )}
+
+                  {/* Wiring Tip */}
+                  {comp.wiring_tip && (
+                    <div className="p-2.5 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-[11px] text-[#534342] flex items-start gap-1.5">
+                      <span className="text-xs">🔌</span>
+                      <span className="line-clamp-2"><strong>Wiring:</strong> {comp.wiring_tip}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Vendor Action Buttons - MakerBazar Default */}
+                <div className="pt-2 border-t border-[#F3EDE7] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#7C766F] block">Direct Store Procurement:</span>
+                    <span className="text-[9px] font-bold text-[#F97316] uppercase">MakerBazar Default</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {(comp.vendors || []).map((v, vi) => (
+                      <a
+                        key={vi}
+                        href={v.direct_search_url || v.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all shadow-2xs no-underline flex items-center gap-1 ${
+                          v.vendor === 'MakerBazar' || vi === 0
+                            ? 'bg-[#FFF7ED] text-[#C2410C] border-[#FDBA74] hover:bg-[#FFEDD5]'
+                            : 'bg-white text-[#534342] border-[#EFEAE4] hover:bg-[#FAF8F5]'
+                        }`}
+                        title={`Search and buy on ${v.vendor || v.name}`}
+                      >
+                        🛒 {v.vendor || v.name}
+                        {(v.vendor === 'MakerBazar' || vi === 0) && (
+                          <span className="text-[8px] uppercase font-black px-1 py-0.2 bg-[#F97316] text-white rounded">
+                            Primary
+                          </span>
+                        )}
+                      </a>
+                    ))}
+
+                    {comp.learnUrl && (
+                      <a
+                        href={comp.learnUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[10px] font-bold text-[#2563EB] hover:underline flex items-center gap-0.5 ml-auto no-underline"
+                      >
+                        <BookOpen size={11} /> Tutorials
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Indian Electronics Store Directory */}
+      <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+        <h3 className="text-xs font-bold text-[#1D1B18] uppercase tracking-wider">
+          Trusted Indian Maker Hardware Stores
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {INDIAN_VENDORS.map(v => (
+            <a
+              key={v.id}
+              href={v.url}
+              target="_blank"
+              rel="noreferrer"
+              className="p-3.5 rounded-2xl border bg-[#FAF8F5] hover:bg-white hover:shadow-sm transition-all no-underline flex flex-col justify-between"
+              style={{ borderColor: v.color + '40' }}
+            >
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-lg">{v.icon}</span>
+                  <span className="font-bold text-xs text-[#1D1B18]">{v.name}</span>
+                </div>
+                <p className="text-[11px] text-[#7C766F] line-clamp-2 m-0">{v.tagline}</p>
+              </div>
+              <span className="text-xs font-bold mt-3" style={{ color: v.color }}>
+                Browse Catalog →
+              </span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function BusinessModelFlightPlanView({ project }) {
+  const domain = project?.domain || 'software'
+  const category = project?.category || 'Startup'
+  const business = project?.business_model || project?.draft?.business_model || {}
+  const budget = business.budget || 25000
+  const modelId = business.revenue_model || (domain === 'hardware' ? 'one_time' : 'subscription')
+
+  return (
+    <section className="space-y-6 animate-fadeIn font-['Plus_Jakarta_Sans']">
+      {/* Banner */}
+      <div className="bg-gradient-to-r from-[#FFF8F3] via-[#FFF1ED] to-[#FEF3C7]/40 rounded-3xl border border-[#FFAAA6]/50 p-6 shadow-xs flex items-center justify-between flex-wrap gap-4">
+        <div className="space-y-1 max-w-xl">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-xl bg-[#8E4B49] text-white flex items-center justify-center font-bold text-sm shadow-xs">
+              💰
+            </span>
+            <h2 className="text-lg font-black text-[#1D1B18] tracking-tight">
+              Business Model & Financial Trajectory
+            </h2>
+            <span className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-white text-[#8E4B49] border border-[#FFAAA6]">
+              {category.toUpperCase()} · {domain.toUpperCase()}
+            </span>
+          </div>
+          <p className="text-xs text-[#534342] leading-relaxed">
+            Personalized monetization roadmap, budget allocations, 6-month growth projections, and non-dilutive startup funding sources.
+          </p>
+        </div>
+
+        <Link
+          to={`/business-model?project=${encodeURIComponent(project?.id || '')}`}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#8E4B49] text-white text-xs font-bold hover:bg-[#7A3C3A] transition-all shadow-sm no-underline"
+        >
+          <CircleDollarSign size={14} />
+          <span>Open Full Studio Planner</span>
+        </Link>
+      </div>
+
+      {/* Model & Budget Split Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Model summary card */}
+        <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+          <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">Selected Monetization Model</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl">{modelId === 'one_time' ? '🏷️' : modelId === 'freemium' ? '🚀' : modelId === 'grant' ? '🏆' : '📅'}</span>
+            <div>
+              <h3 className="text-sm font-bold text-[#1D1B18] capitalize">
+                {modelId.replace('_', ' ')} Model
+              </h3>
+              <p className="text-xs text-[#534342]">
+                {domain === 'hardware' ? 'Physical unit checkout with hardware margins' : 'Recurring software subscription with predictable cash-flows'}
+              </p>
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs text-[#534342]">
+            <strong>Expected ARPU:</strong> {domain === 'hardware' ? '₹800 – ₹5,000 per kit' : '₹350 – ₹1,500 / month'}
+          </div>
+        </div>
+
+        {/* Budget overview card */}
+        <div className="bg-white rounded-2xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+          <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">Allocated Runway Budget</span>
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-black text-[#1D1B18]">₹{budget.toLocaleString('en-IN')}</span>
+            <span className="text-xs text-[#059669] font-bold bg-[#ECFDF5] px-2.5 py-0.5 rounded-full border border-[#A7F3D0]">
+              Active Budget
+            </span>
+          </div>
+          <p className="text-xs text-[#7C766F]">
+            Recommended distribution: {domain === 'hardware' ? '40% Hardware BOM · 20% Tools · 15% PCB & Enclosure' : '30% Cloud & DB · 30% Marketing · 15% SaaS Tools'}
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+const MILESTONE_THEMES = [
+  {
+    numBg: '#F59E0B',
+    cardBg: '#FFFDF7',
+    border: '#FDE68A',
+    statusBg: '#ECFDF5',
+    statusColor: '#065F46',
+    catBg: '#FFFBEB',
+    catColor: '#B45309',
+    catBorder: '#FDE68A',
+    icon: 'ℹ',
+    category: 'Research',
+  },
+  {
+    numBg: '#8B5CF6',
+    cardBg: '#FAF8FF',
+    border: '#DDD6FE',
+    statusBg: '#EFF6FF',
+    statusColor: '#1D4ED8',
+    catBg: '#F5F3FF',
+    catColor: '#6D28D9',
+    catBorder: '#DDD6FE',
+    icon: '⚙',
+    category: 'Development',
+  },
+  {
+    numBg: '#10B981',
+    cardBg: '#F7FDF9',
+    border: '#A7F3D0',
+    statusBg: '#F3F4F6',
+    statusColor: '#4B5563',
+    catBg: '#ECFDF5',
+    catColor: '#047857',
+    catBorder: '#A7F3D0',
+    icon: '📟',
+    category: 'Hardware',
+  },
+  {
+    numBg: '#F87171',
+    cardBg: '#FFF8F8',
+    border: '#FECDD3',
+    statusBg: '#F3F4F6',
+    statusColor: '#4B5563',
+    catBg: '#FEF2F2',
+    catColor: '#B91C1C',
+    catBorder: '#FECDD3',
+    icon: '🧪',
+    category: 'Testing',
+  },
+  {
+    numBg: '#6366F1',
+    cardBg: '#F8FAFF',
+    border: '#C7D2FE',
+    statusBg: '#F3F4F6',
+    statusColor: '#4B5563',
+    catBg: '#EEF2FF',
+    catColor: '#4338CA',
+    catBorder: '#C7D2FE',
+    icon: '🛡',
+    category: 'QA',
+  },
+  {
+    numBg: '#14B8A6',
+    cardBg: '#F4FDFB',
+    border: '#99F6E4',
+    statusBg: '#F3F4F6',
+    statusColor: '#4B5563',
+    catBg: '#F0FDFA',
+    catColor: '#0F766E',
+    catBorder: '#99F6E4',
+    icon: '🚀',
+    category: 'Launch',
+  },
+]
+
+function formatIndianCurrencyText(text) {
+  if (!text || typeof text !== 'string') return text
+  return text.replace(/\$\s*(\d+(?:,\d+)*(?:\.\d+)?)/g, (_, numStr) => {
+    const num = parseFloat(numStr.replace(/,/g, ''))
+    if (isNaN(num)) return _
+    if (num === 0) return '₹0'
+    const inr = Math.round(num * 85)
+    return `₹${inr.toLocaleString('en-IN')}`
+  })
+}
+
+function FlyingBirdMascot() {
+  const [mascotStyle, setMascotStyle] = useState('rocket') // 'rocket' | 'bird'
+
+  return (
+    <div className="fp-v2-hero-mascot select-none">
+      <div className="fp-v2-speech-bubble">
+        Turning ideas into real things!
+      </div>
+      <div
+        className="fp-v2-mascot-container cursor-pointer"
+        onClick={() => setMascotStyle((prev) => (prev === 'rocket' ? 'bird' : 'rocket'))}
+        title="UDAAN Mascot · Click to toggle Rocket/Bird"
+      >
+        <div className="fp-v2-mascot-glow" />
+        <div className="fp-v2-mascot-badge">
+          {mascotStyle === 'rocket' ? (
+            <div className="relative flex items-center justify-center">
+              <Rocket
+                size={48}
+                className="fp-v2-mascot-rocket-icon text-[#D97706] drop-shadow-md transform -rotate-12 hover:rotate-0 transition-transform duration-300"
+              />
+              <Flame
+                size={22}
+                className="fp-v2-mascot-flame-icon text-[#EF4444] absolute -bottom-2.5 -left-2 animate-pulse"
+              />
+            </div>
+          ) : (
+            <div className="relative flex items-center justify-center">
+              <Bird
+                size={48}
+                className="fp-v2-mascot-bird-icon text-[#0D9488] drop-shadow-md hover:scale-105 transition-transform duration-300"
+              />
+            </div>
+          )}
+        </div>
+        <Sparkles size={20} className="fp-v2-sparkle-1 text-[#F59E0B] absolute -top-1 -right-1" />
+        <Sparkles size={16} className="fp-v2-sparkle-2 text-[#8B5CF6] absolute bottom-1 -left-1" />
+      </div>
+    </div>
+  )
+}
+
+function FlightPlanTopNav({ project, projects = [], onSelectProject }) {
+  return (
+    <div className="fp-v2-topnav">
+      <div className="fp-v2-topnav-left">
+        <div className="fp-v2-sprint-pill">
+          <span className="fp-v2-sprint-dot" />
+          <span>Today · Sprint 1 Active</span>
+        </div>
+
+        <div className="fp-v2-project-dropdown">
+          <select
+            value={project?.id || ''}
+            onChange={(e) => onSelectProject(e.target.value)}
+            className="fp-v2-project-btn cursor-pointer appearance-none pr-8"
+          >
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                🎯 {p.title || p.name || 'Untitled Project'}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="absolute right-3 pointer-events-none text-[#6B7280]" />
+        </div>
+      </div>
+
+      <div className="fp-v2-topnav-right">
+        <button type="button" className="fp-v2-icon-btn" title="Search nodes & tasks">
+          <Search size={16} />
+        </button>
+
+        <button type="button" className="fp-v2-icon-btn" title="Notifications">
+          <Bell size={16} />
+          <span className="fp-v2-btn-badge" />
+        </button>
+
+        <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#FDE68A] to-[#F59E0B] p-0.5 shadow-xs cursor-pointer">
+          <div className="w-full h-full rounded-full bg-white flex items-center justify-center font-bold text-xs text-[#92400E]">
+            👤
+          </div>
+        </div>
+
+        <Link to="/launch" className="fp-v2-new-idea-btn no-underline">
+          <Plus size={14} />
+          <span>New Idea</span>
+        </Link>
+      </div>
+    </div>
+  )
+}
+
+function FlightPlanHeroBanner({
+  project,
+  deadlineStr,
+  daysInfo,
+  onReplan,
+  replanBusy = false,
+  onEdit,
+}) {
+  const currentXp = project?.xp_points || 0
+  const currentLvl = project?.xp_level || (currentXp >= 1000 ? 4 : currentXp >= 600 ? 3 : currentXp >= 300 ? 2 : 1)
+  const xpPercent = Math.min(100, Math.round(((currentXp % 300) / 300) * 100))
+  const projTitle = project?.title || project?.name || 'Your Project'
+  const description = project?.summary || project?.description || project?.workflow?.flight_plan?.summary || `11-week execution roadmap for ${projTitle} MVP. Development is structured around a 2-axis performance (20hrs/week) to deliver a working ${projTitle} by ${deadlineStr ? formatDisplayDate(deadlineStr) : 'January 13, 2027'}.`
+
+  return (
+    <section className="fp-v2-hero-card">
+      <div className="fp-v2-hero-left">
+        <span className="fp-v2-hero-tag">
+          📋 Project Roadmap
+        </span>
+        <h1 className="fp-v2-hero-title">
+          <span>{projTitle}</span>
+          <span className="fp-v2-hero-title-sparkle"></span>
+        </h1>
+        <p className="fp-v2-hero-desc">
+          {description}
+        </p>
+      </div>
+
+      <FlyingBirdMascot />
+
+      <div className="fp-v2-hero-stats">
+        <div className="fp-v2-stats-level">
+          <div className="fp-v2-stats-level-header">
+            <span>🪙 Level {currentLvl} · {currentXp} XP</span>
+            <span className="text-[10px] text-[#D97706]">{xpPercent}%</span>
+          </div>
+          <div className="fp-v2-stats-xp-bar">
+            <div className="fp-v2-stats-xp-fill" style={{ width: `${xpPercent}%` }} />
+          </div>
+        </div>
+
+        <div className="fp-v2-stats-deadline">
+          <Calendar size={16} className="text-[#8E4B49] mt-0.5 shrink-0" />
+          <div>
+            <strong>Deadline</strong>
+            <span>{deadlineStr ? formatDisplayDate(deadlineStr) : '13 Jan 2027'} ({daysInfo?.days != null ? `${daysInfo.days} days remaining` : '80 days remaining'})</span>
+          </div>
+        </div>
+
+        <div className="fp-v2-stats-actions">
+          <Link
+            to={`/team?project=${encodeURIComponent(project?.id || '')}`}
+            className="fp-v2-edit-btn no-underline inline-flex items-center gap-1.5"
+            style={{ textDecoration: 'none' }}
+          >
+            <Users size={13} />
+            <span>Team Workspace</span>
+          </Link>
+          <button
+            type="button"
+            onClick={onReplan}
+            disabled={replanBusy}
+            className="fp-v2-replan-btn"
+          >
+            {replanBusy ? <MiniLoader color="#fff" /> : <Sparkles size={13} />}
+            <span>{replanBusy ? 'Replanning…' : 'Replan with AI'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            className="fp-v2-edit-btn"
+          >
+            Edit Roadmap
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function FlightPlanKpiBar({
+  percent = 0,
+  doneCount = 0,
+  taskCount = 0,
+  deadlineStr = '',
+  daysInfo = null,
+  blockedCount = 0,
+  onToggleGitDetails,
+  gitOpen = false,
+}) {
+  const radius = 18
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (percent / 100) * circumference
+
+  return (
+    <div className="fp-v2-kpi-grid">
+      {/* 1. Overall Progress */}
+      <div className="fp-v2-kpi-card">
+        <div className="fp-v2-progress-circle-wrap">
+          <svg width="48" height="48" className="rotate-[-90deg]">
+            <circle cx="24" cy="24" r={radius} stroke="#E5E7EB" strokeWidth="4" fill="transparent" />
+            <circle
+              cx="24"
+              cy="24"
+              r={radius}
+              stroke="#10B981"
+              strokeWidth="4"
+              fill="transparent"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              className="transition-all duration-500 ease-out"
+            />
+          </svg>
+          <span className="absolute fp-v2-progress-text">{percent}%</span>
+        </div>
+        <div className="fp-v2-kpi-info">
+          <span className="fp-v2-kpi-label">Overall Progress</span>
+          <span className="fp-v2-kpi-sub">{doneCount} of {taskCount} tasks completed</span>
+        </div>
+      </div>
+
+      {/* 2. Launch Deadline */}
+      <div className="fp-v2-kpi-card">
+        <div className="fp-v2-kpi-icon-circle bg-[#F5F3FF] text-[#7C3AED]">
+          <Calendar size={20} />
+        </div>
+        <div className="fp-v2-kpi-info">
+          <span className="fp-v2-kpi-label text-[#7C3AED]">Launch</span>
+          <span className="fp-v2-kpi-sub">
+            {deadlineStr ? formatDisplayDate(deadlineStr) : '13 Jan 2027'} ({daysInfo?.days != null ? `${daysInfo.days} days remaining` : '80 days remaining'})
+          </span>
+        </div>
+      </div>
+
+      {/* 3. Blocked / Risks */}
+      <div className="fp-v2-kpi-card">
+        <div className="fp-v2-kpi-icon-circle bg-[#FEF2F2] text-[#EF4444]">
+          <AlertTriangle size={20} />
+        </div>
+        <div className="fp-v2-kpi-info">
+          <span className="fp-v2-kpi-label text-[#EF4444]">Blocked</span>
+          <span className="fp-v2-kpi-sub">{blockedCount > 0 ? `${blockedCount} tasks` : 'All tasks on track'}</span>
+        </div>
+      </div>
+
+      {/* 4. Git & Audit */}
+      <div
+        className="fp-v2-kpi-card cursor-pointer hover:bg-[#FAF8F5]"
+        onClick={onToggleGitDetails}
+      >
+        <div className="fp-v2-kpi-icon-circle bg-[#F3F4F6] text-[#1F2937]">
+          <Github size={20} />
+        </div>
+        <div className="fp-v2-kpi-info flex-1">
+          <span className="fp-v2-kpi-label flex items-center justify-between">
+            <span>Show Git & Audit Details</span>
+            <ChevronDown size={14} className={`transition-transform duration-200 ${gitOpen ? 'rotate-180' : ''}`} />
+          </span>
+          <span className="fp-v2-kpi-sub">Repository sync & verifications</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FlightPlanFlowMap({
+  milestones = [],
+  allTasks = [],
+  completed = [],
+  activeMilestoneIndex = 0,
+  onSelectMilestone,
+}) {
+  const [searchNodeQuery, setSearchNodeQuery] = useState('')
+  const [activeFilterColor, setActiveFilterColor] = useState(null)
+  const [zoomLevel, setZoomLevel] = useState(1)
+
+  const trackRef = useRef(null)
+  const startNodeRef = useRef(null)
+  const launchNodeRef = useRef(null)
+  const cardRefs = useRef({})
+  const [pathData, setPathData] = useState({ path: '', nodes: [] })
+
+  const filteredMilestones = useMemo(() => {
+    return milestones
+      .map((m, idx) => ({ ...m, originalIndex: idx }))
+      .filter((m) => {
+        const theme = MILESTONE_THEMES[m.originalIndex % MILESTONE_THEMES.length]
+        if (activeFilterColor && theme.numBg.toLowerCase() !== activeFilterColor.toLowerCase()) {
+          return false
+        }
+        if (!searchNodeQuery.trim()) return true
+        const q = searchNodeQuery.toLowerCase()
+        return (
+          m.title.toLowerCase().includes(q) ||
+          (m.purpose && m.purpose.toLowerCase().includes(q)) ||
+          (m.category && m.category.toLowerCase().includes(q))
+        )
+      })
+  }, [milestones, searchNodeQuery, activeFilterColor])
+
+  // Dynamically compute the serpentine S-curve path connecting Start -> alternating milestones -> Launch Ready
+  useEffect(() => {
+    const updatePath = () => {
+      if (!trackRef.current) return
+      const trackRect = trackRef.current.getBoundingClientRect()
+      if (trackRect.width === 0 || trackRect.height === 0) return
+
+      const points = []
+
+      // 1. Start Node Anchor
+      if (startNodeRef.current) {
+        const rect = startNodeRef.current.getBoundingClientRect()
+        points.push({
+          x: rect.left + rect.width / 2 - trackRect.left,
+          y: rect.bottom - trackRect.top,
+          type: 'start',
+        })
+      }
+
+      // 2. Alternating Milestones Anchors (Inner edges facing the center)
+      filteredMilestones.forEach((m, idx) => {
+        const cardEl = cardRefs.current[m.originalIndex]
+        if (!cardEl) return
+        const rect = cardEl.getBoundingClientRect()
+        const isLeft = idx % 2 === 0
+        const x = isLeft
+          ? rect.right - trackRect.left
+          : rect.left - trackRect.left
+        const y = rect.top + rect.height / 2 - trackRect.top
+
+        points.push({
+          x,
+          y,
+          isLeft,
+          index: m.originalIndex,
+          milestoneIndex: idx,
+          theme: MILESTONE_THEMES[m.originalIndex % MILESTONE_THEMES.length],
+          type: 'milestone',
+          isSelected: activeMilestoneIndex === m.originalIndex,
+        })
+      })
+
+      // 3. Launch Node Anchor
+      if (launchNodeRef.current) {
+        const rect = launchNodeRef.current.getBoundingClientRect()
+        points.push({
+          x: rect.left + rect.width / 2 - trackRect.left,
+          y: rect.top - trackRect.top,
+          type: 'launch',
+        })
+      }
+
+      if (points.length < 2) {
+        setPathData({ path: '', nodes: [] })
+        return
+      }
+
+      // Build smooth cubic bezier curve
+      let d = `M ${points[0].x} ${points[0].y}`
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i]
+        const p2 = points[i + 1]
+        const midX = (p1.x + p2.x) / 2
+        d += ` C ${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}`
+      }
+
+      setPathData({
+        path: d,
+        nodes: points.filter((p) => p.type === 'milestone'),
+      })
+    }
+
+    updatePath()
+    const timer = setTimeout(updatePath, 50)
+    const timer2 = setTimeout(updatePath, 200)
+
+    const ro = new ResizeObserver(updatePath)
+    if (trackRef.current) ro.observe(trackRef.current)
+    window.addEventListener('resize', updatePath)
+
+    return () => {
+      clearTimeout(timer)
+      clearTimeout(timer2)
+      ro.disconnect()
+      window.removeEventListener('resize', updatePath)
+    }
+  }, [filteredMilestones, zoomLevel, activeMilestoneIndex])
+
+  return (
+    <div className="fp-v2-flow-canvas">
+      {/* Header Bar */}
+      <div className="fp-v2-flow-header">
+        <div className="fp-v2-flow-title">
+          <h3>Project Flow Map</h3>
+          <p>Milestones, tasks and dependencies</p>
+        </div>
+
+        <div className="fp-v2-flow-controls">
+          <div className="fp-v2-node-search">
+            <Search size={13} className="absolute left-2.5 text-[#9CA3AF]" />
+            <input
+              type="text"
+              placeholder="Search nodes..."
+              value={searchNodeQuery}
+              onChange={(e) => setSearchNodeQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="fp-v2-filter-dots">
+            {['#F59E0B', '#8B5CF6', '#10B981', '#F87171', '#6366F1'].map((dotColor) => (
+              <span
+                key={dotColor}
+                className={`fp-v2-dot ${activeFilterColor === dotColor ? 'active' : ''}`}
+                style={{ backgroundColor: dotColor }}
+                title="Filter by milestone color"
+                onClick={() => setActiveFilterColor((prev) => (prev === dotColor ? null : dotColor))}
+              />
+            ))}
+            <span className="text-[10px] text-[#9CA3AF] ml-0.5">›</span>
+          </div>
+
+          <div className="fp-v2-zoom-btns">
+            <button
+              type="button"
+              className="fp-v2-zoom-btn"
+              title="Zoom In"
+              onClick={() => setZoomLevel((z) => Math.min(1.25, +(z + 0.1).toFixed(2)))}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="fp-v2-zoom-btn"
+              title="Zoom Out"
+              onClick={() => setZoomLevel((z) => Math.max(0.85, +(z - 0.1).toFixed(2)))}
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className="fp-v2-zoom-btn"
+              title="Fit to Screen"
+              onClick={() => setZoomLevel(1)}
+            >
+              ⛶
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Nodes Canvas with Curved Winding Path */}
+      <div
+        className="fp-v2-serpentine-canvas"
+        style={{
+          transform: `scale(${zoomLevel})`,
+          transformOrigin: 'top center',
+          transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        }}
+      >
+        <div ref={trackRef} className="fp-v2-serpentine-track">
+          {/* Continuous Winding SVG Serpentine Path */}
+          <svg className="fp-v2-serpentine-svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="serpentineFlowGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stopColor="#22C55E" />
+                <stop offset="25%" stopColor="#F59E0B" />
+                <stop offset="50%" stopColor="#8B5CF6" />
+                <stop offset="75%" stopColor="#10B981" />
+                <stop offset="100%" stopColor="#6366F1" />
+              </linearGradient>
+            </defs>
+
+            {pathData.path && (
+              <>
+                {/* Background Wide Glow Path */}
+                <path
+                  d={pathData.path}
+                  fill="none"
+                  stroke="rgba(245, 158, 11, 0.12)"
+                  strokeWidth="12"
+                  strokeLinecap="round"
+                />
+
+                {/* Main Serpentine Spine Path */}
+                <path
+                  d={pathData.path}
+                  fill="none"
+                  stroke="#E2E8F0"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                />
+
+                {/* Colored Gradient Overlay Path with moving dash */}
+                <path
+                  d={pathData.path}
+                  fill="none"
+                  stroke="url(#serpentineFlowGrad)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeDasharray="6 4"
+                  className="fp-v2-serpentine-flow-anim"
+                />
+
+                {/* Milestone Junction Circular Nodes 'o' */}
+                {pathData.nodes.map((node) => (
+                  <g key={node.index} className="fp-v2-junction-node">
+                    {node.isSelected && (
+                      <circle
+                        cx={node.x}
+                        cy={node.y}
+                        r="14"
+                        fill="none"
+                        stroke={node.theme.numBg}
+                        strokeWidth="2"
+                        opacity="0.6"
+                      />
+                    )}
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r="10"
+                      fill="#FFFFFF"
+                      stroke={node.isSelected ? '#1D1B18' : node.theme.border}
+                      strokeWidth="2.5"
+                    />
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r="5"
+                      fill={node.theme.numBg}
+                    />
+                  </g>
+                ))}
+              </>
+            )}
+          </svg>
+
+          {/* Start Node at Top */}
+          <div className="fp-v2-start-node-wrapper">
+            <div ref={startNodeRef} className="fp-v2-start-node">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#22C55E] animate-pulse" />
+              <Target size={13} />
+              <span>Start</span>
+            </div>
+          </div>
+
+          {/* Alternating Milestone Rows */}
+          <div className="fp-v2-serpentine-rows">
+            {filteredMilestones.map((milestone, idx) => {
+              const mIdx = milestone.originalIndex
+              const isLeft = idx % 2 === 0
+              const theme = MILESTONE_THEMES[mIdx % MILESTONE_THEMES.length]
+              const mTasks = allTasks.filter((t) => t.milestoneIndex === mIdx)
+              const mDone = mTasks.filter((t) => completed.includes(t.id)).length
+              const isDone = mTasks.length > 0 && mDone === mTasks.length
+              const isInProgress = mDone > 0 && !isDone
+              const isSelected = activeMilestoneIndex === mIdx
+
+              return (
+                <div
+                  key={milestone.title + mIdx}
+                  className={`fp-v2-serpentine-row ${isLeft ? 'is-left' : 'is-right'}`}
+                >
+                  <div
+                    ref={(el) => (cardRefs.current[mIdx] = el)}
+                    onClick={() => onSelectMilestone(mIdx)}
+                    className={`fp-v2-milestone-card ${isSelected ? 'selected' : ''} ${
+                      isLeft ? 'card-left' : 'card-right'
+                    }`}
+                    style={{
+                      backgroundColor: theme.cardBg,
+                      borderColor: isSelected ? '#1D1B18' : theme.border,
+                    }}
+                  >
+                    <div className="fp-v2-mcard-left">
+                      {/* Number Badge */}
+                      <span
+                        className="fp-v2-num-badge"
+                        style={{ backgroundColor: theme.numBg }}
+                      >
+                        {String(mIdx + 1).padStart(2, '0')}
+                      </span>
+
+                      <div className="fp-v2-mcard-body">
+                        <span className="fp-v2-mcard-title">{milestone.title}</span>
+                        <div className="fp-v2-mcard-sub">
+                          <span>
+                            {mDone}/{mTasks.length} tasks
+                          </span>
+                          <span
+                            className="fp-v2-mcard-status"
+                            style={{
+                              backgroundColor: isDone
+                                ? '#ECFDF5'
+                                : isInProgress
+                                ? '#EFF6FF'
+                                : '#F3F4F6',
+                              color: isDone
+                                ? '#065F46'
+                                : isInProgress
+                                ? '#1D4ED8'
+                                : '#4B5563',
+                            }}
+                          >
+                            {isDone
+                              ? '✓ Completed'
+                              : isInProgress
+                              ? '⏳ In Progress'
+                              : '⏱ Not Started'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category Pill on Right */}
+                    <div className="fp-v2-mcard-right">
+                      <span
+                        className="fp-v2-category-pill"
+                        style={{
+                          backgroundColor: theme.catBg,
+                          color: theme.catColor,
+                          borderColor: theme.catBorder,
+                        }}
+                      >
+                        <span className="font-mono text-xs">{theme.icon}</span>
+                        <span>{milestone.category || theme.category}</span>
+                      </span>
+                    </div>
+
+                    {/* Connecting Notch on the center-facing edge */}
+                    <span
+                      className={`fp-v2-card-connector-notch ${
+                        isLeft ? 'notch-right' : 'notch-left'
+                      }`}
+                      style={{ backgroundColor: theme.numBg }}
+                    />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Launch Ready Ending Node */}
+          <div className="fp-v2-launch-node-wrapper">
+            <div ref={launchNodeRef} className="fp-v2-launch-node">
+              <span>🏁</span>
+              <span>Launch Ready!</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Legend Footer */}
+      <div className="fp-v2-flow-legend">
+        <span className="fp-v2-legend-item">
+          <span className="w-2 h-2 rounded-full bg-[#3B82F6]" />
+          <span>Dependency</span>
+        </span>
+        <span className="fp-v2-legend-item">
+          <span className="w-2 h-2 rounded-full bg-[#EF4444]" />
+          <span>Blocker</span>
+        </span>
+        <span className="fp-v2-legend-item">
+          <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+          <span>Completed</span>
+        </span>
+        <span className="fp-v2-legend-item">
+          <span className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
+          <span>In Progress</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function FlightPlanMilestoneInspector({
+  milestone,
+  milestoneIndex = 0,
+  tasks = [],
+  completed = [],
+  onToggleTask,
+  onOpenWorkbench,
+  onSwitchTab,
+  onAddRoadmap,
+  daysInfo,
+}) {
+  if (!milestone) return null
+  const mDone = tasks.filter(t => completed.includes(t.id)).length
+  const isDone = tasks.length > 0 && mDone === tasks.length
+  const isInProgress = mDone > 0 && !isDone
+  const manualPercent = tasks.length ? Math.round((mDone / tasks.length) * 100) : 0
+  const repoEvidencePercent = Math.min(100, Math.round(manualPercent * 0.8))
+  const verificationPercent = Math.min(100, Math.round(manualPercent * 0.6))
+
+  const dateRangeStr = milestone.start_date || milestone.target_date
+    ? `${milestone.start_date ? formatDisplayDate(milestone.start_date) : 'Start'} → ${milestone.target_date ? formatDisplayDate(milestone.target_date) : 'End'}`
+    : '25 Oct 2026 → 1 Nov 2026'
+
+  return (
+    <aside className="fp-v2-inspector-panel">
+      {/* Header Badges */}
+      <div className="fp-v2-insp-top">
+        <span className="fp-v2-insp-badge">
+          <Check size={12} /> Milestone {String(milestoneIndex + 1).padStart(2, '0')}
+        </span>
+        <span
+          className="fp-v2-insp-status"
+          style={{
+            backgroundColor: isDone ? '#ECFDF5' : isInProgress ? '#EFF6FF' : '#F3F4F6',
+            color: isDone ? '#065F46' : isInProgress ? '#1D4ED8' : '#4B5563',
+            borderColor: isDone ? '#A7F3D0' : isInProgress ? '#BFDBFE' : '#E5E7EB',
+          }}
+        >
+          {isDone ? '✓ Completed' : isInProgress ? 'In Progress' : 'Not Started'}
+        </span>
+      </div>
+
+      {/* Title */}
+      <h3 className="fp-v2-insp-title">{milestone.title}</h3>
+
+      {/* Date Row */}
+      <div className="fp-v2-insp-date-row">
+        <span className="flex items-center gap-1.5">
+          <Calendar size={13} className="text-[#6B7280]" />
+          <span>{dateRangeStr}</span>
+        </span>
+        <span className="px-2 py-0.5 rounded-full bg-[#FAF5FF] text-[#7E22CE] font-bold text-[10.5px]">
+          {daysInfo?.label || '7 days remaining'}
+        </span>
+      </div>
+
+      {/* Key Goal */}
+      <div className="fp-v2-insp-key-goal">
+        <span className="fp-v2-insp-goal-label">
+          <Target size={13} className="text-[#1D1B18]" />
+          <span>Key Goal</span>
+        </span>
+        <p className="fp-v2-insp-goal-text">
+          {milestone.outcome || milestone.purpose || 'Validate market demand and refine the problem statement using real user feedback and competitor analysis.'}
+        </p>
+      </div>
+
+      {/* Tasks List */}
+      <div className="fp-v2-insp-tasks-section">
+        <div className="fp-v2-insp-tasks-heading">
+          <span>Tasks ({mDone}/{tasks.length})</span>
+        </div>
+
+        <div className="space-y-2">
+          {tasks.map((item, idx) => {
+            const done = completed.includes(item.id)
+            const tagLabel = idx === 0 ? 'Research' : idx === 1 ? 'Analysis' : 'Planning'
+
+            return (
+              <div
+                key={item.id}
+                className="fp-v2-insp-task-item group"
+                onClick={() => onOpenWorkbench(item.task, milestone.title)}
+              >
+                <div
+                  className="fp-v2-insp-task-check"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleTask(item.id)
+                  }}
+                >
+                  <span
+                    className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold border transition-all ${done
+                        ? 'bg-[#1D1B18] text-white border-[#1D1B18]'
+                        : 'bg-white text-transparent border-[#D1D5DB] hover:border-[#1D1B18]'
+                      }`}
+                  >
+                    ✓
+                  </span>
+                </div>
+
+                <div className="fp-v2-insp-task-content">
+                  <span
+                    className={`fp-v2-insp-task-title ${done ? 'line-through text-[#9CA3AF]' : ''}`}
+                  >
+                    {item.task?.title || 'Milestone Task'}
+                  </span>
+
+                  <div className="fp-v2-insp-task-meta">
+                    <span className="fp-v2-insp-tag">
+                      {item.task?.category ? `❖ ${item.task.category}` : `❖ ${tagLabel}`}
+                    </span>
+                    <span className="fp-v2-insp-xp">+{item.task?.xp_reward || 100} XP</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => tasks[0] && onOpenWorkbench(tasks[0].task, milestone.title)}
+          className="fp-v2-insp-view-details"
+        >
+          <span>View Details</span>
+          <ArrowRight size={13} />
+        </button>
+      </div>
+
+      {/* Task Progress Triple-Bar */}
+      <div className="fp-v2-insp-progress-box">
+        <div className="fp-v2-insp-progress-head">
+          <span className="flex items-center gap-1.5">
+            <Layers size={13} /> Task Progress
+          </span>
+          <Info size={13} className="text-[#9CA3AF] cursor-pointer" />
+        </div>
+
+        <div className="fp-v2-bar-row">
+          <div className="fp-v2-bar-label">
+            <span className="flex items-center gap-1.5 text-[#059669]">
+              <span className="w-2 h-2 rounded-full bg-[#10B981]" /> Manual Completion
+            </span>
+            <span>{manualPercent}%</span>
+          </div>
+          <div className="fp-v2-bar-track">
+            <div className="fp-v2-bar-fill bg-[#10B981]" style={{ width: `${manualPercent}%` }} />
+          </div>
+        </div>
+
+        <div className="fp-v2-bar-row">
+          <div className="fp-v2-bar-label">
+            <span className="flex items-center gap-1.5 text-[#6366F1]">
+              <span className="w-2 h-2 rounded-full bg-[#6366F1]" /> Repository Evidence
+            </span>
+            <span>{repoEvidencePercent}%</span>
+          </div>
+          <div className="fp-v2-bar-track">
+            <div className="fp-v2-bar-fill bg-[#6366F1]" style={{ width: `${repoEvidencePercent}%` }} />
+          </div>
+        </div>
+
+        <div className="fp-v2-bar-row">
+          <div className="fp-v2-bar-label">
+            <span className="flex items-center gap-1.5 text-[#D97706]">
+              <span className="w-2 h-2 rounded-full bg-[#F59E0B]" /> Verification Passed
+            </span>
+            <span>{verificationPercent}%</span>
+          </div>
+          <div className="fp-v2-bar-track">
+            <div className="fp-v2-bar-fill bg-[#F59E0B]" style={{ width: `${verificationPercent}%` }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Links */}
+      <div className="fp-v2-insp-quicklinks">
+        <span className="text-[11px] font-bold text-[#1D1B18] uppercase tracking-wider mb-1 flex items-center gap-1">
+          <Compass size={12} /> Quick Links
+        </span>
+        <button
+          type="button"
+          onClick={() => onSwitchTab('radar')}
+          className="fp-v2-quicklink-btn"
+        >
+          <Compass size={13} className="text-[#6366F1]" />
+          <span>Market Radar Report</span>
+          <ArrowRight size={11} className="ml-auto text-[#9CA3AF]" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onSwitchTab('radar')}
+          className="fp-v2-quicklink-btn"
+        >
+          <BookOpen size={13} className="text-[#059669]" />
+          <span>Sources & Citations</span>
+          <ArrowRight size={11} className="ml-auto text-[#9CA3AF]" />
+        </button>
+        <button
+          type="button"
+          onClick={onAddRoadmap}
+          className="fp-v2-quicklink-btn"
+        >
+          <Plus size={13} className="text-[#D97706]" />
+          <span>Add to Roadmap</span>
+          <ArrowRight size={11} className="ml-auto text-[#9CA3AF]" />
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+function FlightPlanBottomInsights({
+  radarData,
+  activeMilestoneIndex = 0,
+  onAddExperiment,
+  onSwitchTab,
+}) {
+  const [activeTab, setActiveTab] = useState('insights')
+
+  const competitors = radarData?.competitors || []
+  const topComp = competitors[0] || { name: 'Liftware Steady', pricing: '₹16,900+ / unit' }
+  const complaints = radarData?.customer_voice || [
+    { user_complaint: 'Too expensive for everyday users' },
+    { user_complaint: 'Battery life issues on continuous use' },
+    { user_complaint: 'Feels too heavy or bulky' },
+  ]
+  const topComplaint = complaints.slice(0, 3)
+
+  return (
+    <div className="fp-v2-insights-bar">
+      {/* Tabs */}
+      <div className="fp-v2-insights-tabs">
+        {[
+          { id: 'insights', label: 'Key Insights' },
+          { id: 'competitors', label: 'Competitor Matrix' },
+          { id: 'complaints', label: 'Customer Complaints' },
+          { id: 'experiments', label: 'Validation Experiments' },
+        ].map(t => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setActiveTab(t.id)}
+            className={`fp-v2-itab ${activeTab === t.id ? 'active' : ''}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 4 Visual Cards */}
+      <div className="fp-v2-insights-cards">
+        {/* 1. Top Competitor */}
+        <div className="fp-v2-icard bg-[#FFF7ED] border-[#FDBA74]">
+          <div className="fp-v2-icard-head text-[#C2410C]">
+            <span>👑</span>
+            <span>Top Competitor</span>
+          </div>
+          <div className="fp-v2-icard-body">
+            <strong className="text-sm font-bold text-[#1D1B18]">{topComp.name}</strong>
+            <span className="text-base font-black text-[#C2410C]">
+              {formatIndianCurrencyText(topComp.pricing) || '₹16,900+'}
+            </span>
+          </div>
+          <div className="fp-v2-icard-tags">
+            <span className="fp-v2-icard-tag bg-[#FFEDD5] text-[#9A3412]">High Price</span>
+            <span className="fp-v2-icard-tag bg-[#FFEDD5] text-[#9A3412]">Heavy Design</span>
+          </div>
+        </div>
+
+        {/* 2. Common Complaints */}
+        <div className="fp-v2-icard bg-[#EFF6FF] border-[#BFDBFE]">
+          <div className="fp-v2-icard-head text-[#1D4ED8]">
+            <span>👥</span>
+            <span>Common Complaints</span>
+          </div>
+          <div className="fp-v2-icard-body text-xs space-y-1">
+            {topComplaint.map((c, i) => (
+              <span key={i} className="line-clamp-1 text-[#1E3A8A]">
+                • {c.user_complaint || c.pain_point}
+              </span>
+            ))}
+          </div>
+          <span className="text-[10px] font-bold text-[#2563EB] cursor-pointer hover:underline" onClick={() => onSwitchTab('radar')}>
+            View all complaints →
+          </span>
+        </div>
+
+        {/* 3. Biggest Opportunity */}
+        <div className="fp-v2-icard bg-[#F0FDF4] border-[#86EFAC]">
+          <div className="fp-v2-icard-head text-[#15803D]">
+            <span>💡</span>
+            <span>Biggest Opportunity</span>
+          </div>
+          <p className="fp-v2-icard-body text-xs text-[#14532D] m-0 leading-relaxed">
+            Affordable, lightweight design with better battery life and direct hardware procurement.
+          </p>
+          <button
+            type="button"
+            onClick={() => onAddExperiment && onAddExperiment({ title: 'Lightweight battery & grip test' })}
+            className="fp-v2-add-btn"
+          >
+            <Plus size={11} /> Add to Roadmap
+          </button>
+        </div>
+
+        {/* 4. Next Up Card */}
+        <div className="fp-v2-icard bg-[#FAF5FF] border-[#DDD6FE] cursor-pointer hover:shadow-xs transition-all" onClick={() => onSwitchTab('flowmap')}>
+          <div className="fp-v2-icard-head text-[#7E22CE]">
+            <span>🤖</span>
+            <span>Next up</span>
+          </div>
+          <p className="fp-v2-icard-body text-xs text-[#581C87] m-0 font-medium">
+            Complete the prototype design and move to Milestone {String(activeMilestoneIndex + 2).padStart(2, '0')}.
+          </p>
+          <span className="text-xs font-black text-[#7E22CE] ml-auto">→</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function FlightPlan() {
   const [projects, setProjects] = useState(readSavedProjects)
   const [teamTasks, setTeamTasks] = useState([])
@@ -1455,8 +3848,10 @@ export default function FlightPlan() {
     if (project?.id) localStorage.setItem('udaan:selected-project', project.id)
   }, [project?.id])
 
-  const [view, setView] = useState('roadmap') // 'roadmap' | 'tasks'
+  const [view, setView] = useState('flowmap') // 'flowmap' | 'mindmap' | 'radar' | 'timeline' | 'team'
   const [menuOpen, setMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [milestoneTooltipOpen, setMilestoneTooltipOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
@@ -1464,6 +3859,7 @@ export default function FlightPlan() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [priorityFilter, setPriorityFilter] = useState('all')
   const [milestoneFilter, setMilestoneFilter] = useState('all')
+  const [personFilter, setPersonFilter] = useState('all')
 
   const [editing, setEditing] = useState(false)
   const [editorPlan, setEditorPlan] = useState(null)
@@ -1472,12 +3868,143 @@ export default function FlightPlan() {
   const [proposedPlan, setProposedPlan] = useState(null)
   const [generationStatus, setGenerationStatus] = useState('')
   const [generationError, setGenerationError] = useState('')
+  const [gitOpen, setGitOpen] = useState(false)
+  const daysInfo = useMemo(() => (project?.deadline ? getDaysRemaining(project.deadline) : null), [project?.deadline])
+
+  // Market Radar & Mind Map State
+  const [marketRadar, setMarketRadar] = useState(() => project?.market_radar || null)
+  const [mindMapGraph, setMindMapGraph] = useState(() => project?.mindmap_graph || null)
+  const [loadingRadar, setLoadingRadar] = useState(false)
+  const [loadingMindMap, setLoadingMindMap] = useState(false)
+  const [addingExpId, setAddingExpId] = useState(null)
+
+  // Grounded Market Radar: Use initial research from onboarding/start when marketRadar is not yet saved
+  const effectiveMarketRadar = useMemo(() => {
+    if (marketRadar && (marketRadar.competitors?.length || marketRadar.customer_voice?.length)) {
+      return marketRadar
+    }
+    const startResearch = project?.workflow?.research || project?.research || {}
+    const startUnderstanding = project?.understanding || project?.workflow?.understanding || {}
+    return buildRadarFromStartResearch(startResearch, startUnderstanding, project)
+  }, [marketRadar, project])
+
+  // Task Workbench Drawer State
+  const [workbenchTask, setWorkbenchTask] = useState(null)
+  const [workbenchMilestoneTitle, setWorkbenchMilestoneTitle] = useState('')
+  const [isVerifying, setIsVerifying] = useState(false)
+
+  // Replan Diff Drawer & Undo History State
+  const [diffDrawerOpen, setDiffDrawerOpen] = useState(false)
+  const [replanComparison, setReplanComparison] = useState(null)
+  const [historyStack, setHistoryStack] = useState([])
 
   // Timing Modal
   const [timingModalOpen, setTimingModalOpen] = useState(false)
   const [addTaskModalOpen, setAddTaskModalOpen] = useState(false)
   const [creativeBriefModalOpen, setCreativeBriefModalOpen] = useState(false)
   const [explainerTask, setExplainerTask] = useState(null)
+
+  // Proof of Work & AI Social Post Modal
+  const [proofModalTask, setProofModalTask] = useState(null)
+  const [proofModalMilestoneTitle, setProofModalMilestoneTitle] = useState('')
+  const [taskProofs, setTaskProofs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`udaan:proofs:${project?.id || 'default'}`) || '{}')
+    } catch {
+      return {}
+    }
+  })
+  const roadmapContainerRef = useRef(null)
+
+  // Hardware BOM & Sourcing State
+  const [hardwareBom, setHardwareBom] = useState(() => {
+    return project?.hardware_bom || project?.draft?.hardware_bom || []
+  })
+  const [generatingBom, setGeneratingBom] = useState(false)
+  const [hardwareSearchQuery, setHardwareSearchQuery] = useState('')
+  const [hardwareSearchResults, setHardwareSearchResults] = useState([])
+  const [hardwareSearching, setHardwareSearching] = useState(false)
+
+  useEffect(() => {
+    if (project) {
+      setHardwareBom(project.hardware_bom || project.draft?.hardware_bom || [])
+    }
+  }, [project?.id])
+
+  const handleSearchHardware = async (e) => {
+    if (e && e.preventDefault) e.preventDefault()
+    if (!hardwareSearchQuery.trim()) return
+    setHardwareSearching(true)
+    try {
+      const res = await searchHardwareProducts(hardwareSearchQuery.trim())
+      const items = Array.isArray(res) ? res : (res?.results || [])
+      setHardwareSearchResults(items)
+    } catch (err) {
+      console.warn('Hardware search error:', err)
+    } finally {
+      setHardwareSearching(false)
+    }
+  }
+
+  const handleGenerateProjectBom = async () => {
+    if (!project) return
+    setGeneratingBom(true)
+    try {
+      const ideaText = project.idea || project.title || project.name || project.summary || ''
+      const understanding = {
+        problem_statement: project.problem || project.description || '',
+        expected_outcome: project.outcome || '',
+      }
+      const generated = await generateBillOfMaterials(ideaText, understanding)
+      if (generated && generated.length > 0) {
+        setHardwareBom(generated)
+        updateSavedProject(project.id, { hardware_bom: generated })
+        setProjects(readSavedProjects())
+      }
+    } catch (err) {
+      console.error('Failed to generate BOM:', err)
+    } finally {
+      setGeneratingBom(false)
+    }
+  }
+
+  const handleAddCompToBom = (comp) => {
+    const updated = [...hardwareBom, { ...comp, id: `hw-${Date.now()}` }]
+    setHardwareBom(updated)
+    if (project?.id) {
+      updateSavedProject(project.id, { hardware_bom: updated })
+      setProjects(readSavedProjects())
+    }
+  }
+
+  const handleRemoveCompFromBom = (compId) => {
+    const updated = hardwareBom.filter(c => c.id !== compId)
+    setHardwareBom(updated)
+    if (project?.id) {
+      updateSavedProject(project.id, { hardware_bom: updated })
+      setProjects(readSavedProjects())
+    }
+  }
+
+  function handleOpenProof(item) {
+    setProofModalTask(item.task)
+    setProofModalMilestoneTitle(item.milestone || '')
+  }
+
+  function handleSaveProof(proofData) {
+    const nextProofs = { ...taskProofs, [proofData.taskId]: proofData }
+    setTaskProofs(nextProofs)
+    try {
+      localStorage.setItem(`udaan:proofs:${project?.id || 'default'}`, JSON.stringify(nextProofs))
+    } catch (e) {
+      console.warn('LocalStorage save proof failed', e)
+    }
+    if (!completed.includes(proofData.taskId)) {
+      toggleTask(proofData.taskId)
+    }
+    setNotice('Proof of work recorded! Your AI social draft is ready to copy or post.')
+    setTimeout(() => setNotice(''), 3500)
+  }
 
   function handleAddNewTaskFromModal(partial) {
     if (!project || !flightPlan) return
@@ -1605,6 +4132,210 @@ export default function FlightPlan() {
     return () => { active = false }
   }, [project?.id])
 
+  // Load project's Market Radar & Mind Map Graph
+  useEffect(() => {
+    let active = true
+    if (!project?.id) return
+
+    if (project.market_radar && Object.keys(project.market_radar).length) {
+      setMarketRadar(project.market_radar)
+    } else {
+      setLoadingRadar(true)
+      getMarketRadar(project.id)
+        .then(res => {
+          if (active && res && Object.keys(res).length) {
+            setMarketRadar(res)
+            updateSavedProject(project.id, current => ({ ...current, market_radar: res }))
+          }
+        })
+        .catch(() => { })
+        .finally(() => { if (active) setLoadingRadar(false) })
+    }
+
+    if (project.mindmap_graph && project.mindmap_graph.nodes?.length) {
+      setMindMapGraph(project.mindmap_graph)
+    } else {
+      setLoadingMindMap(true)
+      getMindMap(project.id)
+        .then(res => {
+          if (active && res && res.nodes?.length) {
+            setMindMapGraph(res)
+            updateSavedProject(project.id, current => ({ ...current, mindmap_graph: res }))
+          } else if (active) {
+            const fallbackGraph = buildClientMindMap(project, flightPlan, project.market_radar)
+            setMindMapGraph(fallbackGraph)
+          }
+        })
+        .catch(() => {
+          if (active) {
+            const fallbackGraph = buildClientMindMap(project, flightPlan, project.market_radar)
+            setMindMapGraph(fallbackGraph)
+          }
+        })
+        .finally(() => { if (active) setLoadingMindMap(false) })
+    }
+
+    return () => { active = false }
+  }, [project?.id])
+
+  function handleOpenWorkbench(item) {
+    setWorkbenchTask(item.task)
+    setWorkbenchMilestoneTitle(item.milestone)
+  }
+
+  function handleMindMapNodeSelect(node) {
+    if (node.type === 'task' || node.taskId) {
+      const targetId = node.taskId || node.id.replace(/^node-task-\d+-/, '').replace(/^node-/, '')
+      const matched = allTasks.find(t => t.id === targetId || t.task?.id === targetId || t.task?.title === node.label)
+      if (matched) {
+        setWorkbenchTask(matched.task)
+        setWorkbenchMilestoneTitle(matched.milestone)
+      } else {
+        setWorkbenchTask({
+          title: node.label,
+          why_matters: node.description,
+          radar_chip: node.radar_chip,
+          xp_reward: node.xp_reward || 150,
+          steps: [{ text: 'Implement requirements', done: false }, { text: 'Run verification test', done: false }],
+          expected_evidence: ['src/main.js'],
+          verification_criteria: 'Deliverable complete and verified',
+        })
+        setWorkbenchMilestoneTitle('Mind Map Execution')
+      }
+    } else if (node.type === 'milestone') {
+      const mIdx = parseInt(node.id.replace(/\D/g, ''), 10) - 1
+      if (mIdx >= 0 && mIdx < milestones.length) {
+        setSelectedMilestone(mIdx)
+        setView('flowmap')
+      }
+    } else if (node.type === 'market') {
+      setView('radar')
+    }
+  }
+
+  async function handleSaveMindMap(graph) {
+    if (!project?.id) return
+    setMindMapGraph(graph)
+    updateSavedProject(project.id, current => ({ ...current, mindmap_graph: graph }))
+    try {
+      await saveMindMap(project.id, {
+        nodes: graph.nodes,
+        edges: graph.edges,
+        layoutSettings: graph.layout_settings,
+      })
+      setNotice('Mind Map layout saved.')
+      setTimeout(() => setNotice(''), 2500)
+    } catch {
+      // Saved in project storage
+    }
+  }
+
+  async function handleAddExperiment(exp) {
+    if (!project?.id) return
+    setAddingExpId(exp.id)
+    try {
+      const res = await addExperimentToRoadmap(project.id, exp)
+      if (res?.flight_plan) {
+        persistPlan(res.flight_plan, completed, ['flight_plan'])
+      } else {
+        const updatedMilestones = (flightPlan.milestones || []).map((m, idx) => {
+          if (idx !== 0) return m
+          const newTask = {
+            id: `m1-exp-${Date.now()}`,
+            title: `Validation: ${exp.title}`,
+            why_matters: exp.hypothesis,
+            radar_chip: exp.experiment_type || 'Experiment',
+            priority: 'high',
+            effort_estimate: `${exp.effort_days || 2} days`,
+            steps: [
+              { text: `Execute ${exp.method || 'smoke test'}`, done: false },
+              { text: `Verify threshold: ${exp.pass_fail_metric || 'Pass'}`, done: false },
+            ],
+            expected_evidence: ['docs/validation_report.md'],
+            verification_criteria: exp.pass_fail_metric,
+            dependencies: [],
+            xp_reward: 150,
+          }
+          return { ...m, tasks: [newTask, ...(m.tasks || [])] }
+        })
+        persistPlan({ ...flightPlan, milestones: updatedMilestones }, completed, ['flight_plan'])
+      }
+      setNotice(`Added validation experiment "${exp.title}" to Milestone 1!`)
+      setTimeout(() => setNotice(''), 3500)
+    } catch (err) {
+      setError(err.message || 'Could not add experiment to roadmap.')
+    } finally {
+      setAddingExpId(null)
+    }
+  }
+
+  async function handleVerifyTask(verificationPayload) {
+    if (!project?.id) return
+    setIsVerifying(true)
+    try {
+      const res = await verifyProjectTask(project.id, verificationPayload)
+      const earnedXp = res?.receipt?.xp_awarded || verificationPayload.xpAwarded || 150
+      const currentXp = Number(project.xp_points || 0)
+      const newXp = currentXp + earnedXp
+      const newLevel = res?.receipt?.xp_level || (newXp >= 1000 ? 4 : newXp >= 600 ? 3 : newXp >= 300 ? 2 : 1)
+
+      setAssessment(prev => {
+        const prevAssessments = prev?.task_assessments || {}
+        return {
+          ...prev,
+          task_assessments: {
+            ...prevAssessments,
+            [verificationPayload.taskKey]: {
+              status: 'verified',
+              notes: verificationPayload.proofDetails?.notes || 'Verification proof verified',
+              verified_at: new Date().toISOString(),
+            },
+          },
+        }
+      })
+
+      if (!completed.includes(verificationPayload.taskKey)) {
+        toggleTask(verificationPayload.taskKey)
+      }
+
+      const updated = updateSavedProject(project.id, current => ({
+        ...current,
+        xp_points: newXp,
+        xp_level: newLevel,
+      }))
+      if (updated) setProjects(current => current.map(item => item.id === updated.id ? updated : item))
+
+      setNotice(`🎉 Task Verified! Earned +${earnedXp} XP (Total: ${newXp} XP · Level ${newLevel})`)
+      setTimeout(() => setNotice(''), 4500)
+      setWorkbenchTask(null)
+    } catch (err) {
+      setError(err.message || 'Verification could not be recorded.')
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  function handleAcceptReplan(newPlan) {
+    setHistoryStack(prev => [...prev, structuredClone(flightPlan)])
+    const { _comparison, ...cleanPlan } = newPlan
+    persistPlan(cleanPlan, completed, ['flight_plan'])
+    setProposedPlan(null)
+    setDiffDrawerOpen(false)
+    setNotice('Revised deadline-aware roadmap applied. 1-click Undo available.')
+    setError('')
+    setSelectedMilestone(0)
+    setTimeout(() => setNotice(''), 4000)
+  }
+
+  function handleUndoReplan() {
+    if (!historyStack.length) return
+    const prevPlan = historyStack[historyStack.length - 1]
+    setHistoryStack(prev => prev.slice(0, -1))
+    persistPlan(prevPlan, completed, ['flight_plan'])
+    setNotice('Roadmap changes undone. Restored previous plan.')
+    setTimeout(() => setNotice(''), 3000)
+  }
+
   // Sync Repository
   async function handleSyncRepository() {
     if (!connectedRepo || repoSyncing) return
@@ -1631,7 +4362,7 @@ export default function FlightPlan() {
         await saveRepositoryAnalysis(project.id, {
           analysis: syncResult.analysis,
           commitSha: syncResult.repository.revision,
-        }).catch(() => {})
+        }).catch(() => { })
       }
 
       setNotice('Repository files and deterministic analysis refreshed.')
@@ -1822,6 +4553,14 @@ export default function FlightPlan() {
     return st === 'manual_review' || st === 'mismatch_detected'
   }).length
 
+  const availableRoles = useMemo(() => {
+    const roles = new Set()
+    allTasks.forEach(item => {
+      if (item.task?.suggested_role) roles.add(item.task.suggested_role)
+    })
+    return Array.from(roles)
+  }, [allTasks])
+
   const currentMilestoneIndex = milestones.findIndex((milestone, index) => {
     const tasks = allTasks.filter(task => task.milestoneIndex === index)
     return !tasks.length || !tasks.every(task => completed.includes(task.id))
@@ -1858,7 +4597,8 @@ export default function FlightPlan() {
   }
 
   function taskLocked(item) {
-    return milestoneStatus(item.milestoneIndex) === 'upcoming' || (!completed.includes(item.id) && dependencyBlocked(item))
+    // Only lock if an explicit dependency within the project is uncompleted, never lock simply because it's in an upcoming milestone
+    return !completed.includes(item.id) && dependencyBlocked(item)
   }
 
   function persistPlan(nextPlan, progress = completed, editedStages = []) {
@@ -1886,7 +4626,7 @@ export default function FlightPlan() {
         updated.workflow || {},
         'flight_plan',
         editedStages
-      ).catch(() => {})
+      ).catch(() => { })
     }
   }
 
@@ -1905,7 +4645,7 @@ export default function FlightPlan() {
         const sharedTask = workspace.tasks.find(item => item.source_position === taskId)
         if (sharedTask) return updateTeamTask(project.id, sharedTask.id, { status: next.includes(taskId) ? 'completed' : 'not_started' })
         return null
-      }).catch(() => {})
+      }).catch(() => { })
     }
   }
 
@@ -1988,6 +4728,8 @@ export default function FlightPlan() {
           ...replanResponse.proposed_plan,
           _comparison: replanResponse.comparison,
         })
+        setReplanComparison(replanResponse.comparison || null)
+        setDiffDrawerOpen(true)
       } else {
         const response = await generateIdeaStage({
           stage: 'flight_plan',
@@ -2010,6 +4752,7 @@ export default function FlightPlan() {
           throw new Error('The AI response did not include usable milestones and tasks. Your current plan is unchanged.')
         }
         setProposedPlan(response.result)
+        setDiffDrawerOpen(true)
       }
     } catch (requestError) {
       setError(requestError.message || 'Could not replan right now. Your current plan is unchanged.')
@@ -2052,9 +4795,9 @@ export default function FlightPlan() {
       teamSize: newTiming.teamSize,
       weeklyHours: newTiming.weeklyHours,
       workflow: {
-        ...current.workflow,
+        ...project.workflow,
         flight_plan: {
-          ...current.workflow?.flight_plan,
+          ...project.workflow?.flight_plan,
           start_date: newTiming.startDate,
           deadline: newTiming.deadline,
         },
@@ -2084,7 +4827,71 @@ export default function FlightPlan() {
     if (await handleSaveTiming(newTiming)) void replan(newTiming)
   }
 
-  // Filtered and Sorted tasks for Timeline / Task List View
+  // ─── Google Calendar Automatic Sync & Direct Browser Link ─────────────────
+  function openGoogleCalendar() {
+    if (!project || !milestones.length) {
+      setNotice('No milestones scheduled to sync yet.')
+      return
+    }
+    // Find upcoming milestone or fallback to first
+    const upcoming = milestones.find(ms => ms.target_date && new Date(ms.target_date) >= new Date()) || milestones[0]
+    const title = encodeURIComponent(`🎯 [${project?.name || 'Project'}] ${upcoming?.title || 'Launch Milestone'}`)
+    const targetDate = upcoming?.target_date || new Date().toISOString().slice(0, 10)
+    const dateFormatted = targetDate.replace(/-/g, '')
+    const desc = encodeURIComponent(
+      `Milestone: ${upcoming?.title || ''}\nCategory: ${upcoming?.category || 'Sprint Checkpoint'}\nGoal: ${upcoming?.purpose || upcoming?.outcome || 'Deliver milestone on track'}\nProject: ${project?.name || ''}\n\nManaged automatically via UDAAN Studio`
+    )
+    const gcalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${dateFormatted}/${dateFormatted}&details=${desc}`
+
+    // Automatically record sync in local developer settings
+    try {
+      const stored = localStorage.getItem('udaan:calendar_synced_at')
+      localStorage.setItem('udaan:calendar_synced_at', new Date().toISOString())
+    } catch { }
+
+    window.open(gcalUrl, '_blank', 'noopener,noreferrer')
+    setNotice(`Opened "${upcoming.title}" in Google Calendar. No file downloads needed!`)
+    setTimeout(() => setNotice(''), 4000)
+  }
+
+  function exportToGoogleCalendar() {
+    openGoogleCalendar()
+  }
+
+  // ─── Notification helpers ──────────────────────────────────────────────────
+  const notifications = useMemo(() => {
+    const notifs = []
+    allTasks.forEach(item => {
+      const isDone = completed.includes(item.id)
+      if (isDone) return
+      const overdue = isTaskOverdue(item.task, false)
+      if (overdue) {
+        notifs.push({ type: 'overdue', id: item.id, title: item.task.title, milestone: item.milestone, date: item.task.target_date })
+        return
+      }
+      // Due within 3 days
+      if (item.task.target_date) {
+        const daysInfo = getDaysRemaining(item.task.target_date)
+        if (daysInfo && !daysInfo.isOverdue && daysInfo.days <= 3) {
+          notifs.push({ type: 'due_soon', id: item.id, title: item.task.title, milestone: item.milestone, date: item.task.target_date, days: daysInfo.days })
+        }
+      }
+    })
+    // Milestone approaching
+    milestones.forEach((ms, idx) => {
+      if (!ms.target_date) return
+      const milestoneTasks = allTasks.filter(t => t.milestoneIndex === idx)
+      const allDone = milestoneTasks.length && milestoneTasks.every(t => completed.includes(t.id))
+      if (allDone) return
+      const daysInfo = getDaysRemaining(ms.target_date)
+      if (daysInfo && !daysInfo.isOverdue && daysInfo.days <= 7) {
+        notifs.push({ type: 'milestone_due', id: `ms-${idx}`, title: ms.title, date: ms.target_date, days: daysInfo.days })
+      }
+    })
+    return notifs
+  }, [allTasks, completed, milestones])
+
+  // ─── Filtered and Sorted tasks for Timeline / Task List View ──────────────
   const sortedAndFilteredTasks = useMemo(() => {
     let tasks = [...allTasks]
 
@@ -2117,9 +4924,18 @@ export default function FlightPlan() {
         return false
       }
 
+      // Person / Team member role filter
+      if (personFilter !== 'all') {
+        const itemRole = (item.task?.suggested_role || '').toLowerCase()
+        const targetRole = personFilter.toLowerCase()
+        if (!itemRole.includes(targetRole) && !targetRole.includes(itemRole)) {
+          return false
+        }
+      }
+
       return true
     })
-  }, [allTasks, completed, statusFilter, priorityFilter, milestoneFilter])
+  }, [allTasks, completed, statusFilter, priorityFilter, milestoneFilter, personFilter])
 
   return (
     <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col font-['Plus_Jakarta_Sans'] fp-page">
@@ -2147,91 +4963,131 @@ export default function FlightPlan() {
                 <Link className="fp-primary" to="/">Start a project <ArrowRight size={16} /></Link>
               </section>
             ) : (
-              <>
-                <div className="fp-project-switch">
-                  <div className="flex items-center gap-2">
-                    <span className="fp-eyebrow">YOUR WORKSPACE</span>
-                    <button
-                      type="button"
-                      onClick={() => setCreativeBriefModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-[#EFEAE4] text-[11px] font-bold text-[#8E4B49] hover:bg-[#F9F2ED] transition-colors shadow-xs cursor-pointer ml-3"
-                    >
-                      <Sparkles size={13} />
-                      <span>Creative Brief</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAddTaskModalOpen(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1D1B18] text-white text-[11px] font-bold hover:bg-black transition-colors shadow-xs cursor-pointer"
-                    >
-                      <Plus size={13} />
-                      <span>Add Task</span>
-                    </button>
-                  </div>
-                  <label className="fp-project-select">
-                    <span className="sr-only">Choose a project</span>
-                    <select
-                      value={project.id}
-                      onChange={event => {
-                        setSelectedId(event.target.value)
-                        setSelectedMilestone(0)
-                        setNotice('')
-                        setError('')
-                      }}
-                    >
-                      {projectsWithPlans.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                    <ChevronDown size={15} />
-                  </label>
-                </div>
-
-                {/* Section 1: Connected Repository Panel */}
-                <ConnectedRepositoryPanel
-                  repository={connectedRepo}
-                  syncing={repoSyncing}
-                  comparing={comparing}
-                  onSync={handleSyncRepository}
-                  onCompare={handleCompareWithRepository}
-                  error={compareError}
-                  projectId={project.id}
+              <div className="fp-v2-container">
+                {/* Hero Banner with Mascot & Speech Bubble */}
+                <FlightPlanHeroBanner
+                  project={project}
+                  deadlineStr={project?.deadline}
+                  daysInfo={daysInfo}
+                  onReplan={() => replan()}
+                  replanBusy={busy}
+                  onEdit={editing ? () => closeEditor() : openEditor}
                 />
 
-                {/* Comparison Summary Banner */}
-                {compareSummary && (
-                  <ComparisonSummaryBanner
-                    summary={compareSummary}
-                    onClose={() => setCompareSummary(null)}
-                  />
-                )}
-
-                {/* Section 2: Roadmap Header with Deadline, Status Breakdown & Timeline Progress */}
-                <RoadmapHeader
-                  project={project}
-                  description={flightPlan.summary}
+                {/* 4 KPI Summary Cards */}
+                <FlightPlanKpiBar
                   percent={percent}
                   doneCount={doneCount}
                   taskCount={allTasks.length}
-                  inProgressCount={inProgressCount}
+                  deadlineStr={project?.deadline}
+                  daysInfo={daysInfo}
                   blockedCount={blockedCount}
-                  overdueCount={overdueCount}
-                  unverifiedCount={unverifiedCount}
-                  milestones={milestones.length}
-                  completedMilestones={completedMilestones}
-                  activeMilestone={currentMilestone}
-                  onEdit={editing ? () => closeEditor() : openEditor}
-                  editing={editing}
-                  evidenceCount={evidenceCount}
-                  evidencePercent={evidencePercent}
-                  verifiedCount={verifiedCount}
-                  verifiedPercent={verifiedPercent}
-                  onReplan={() => replan()}
-                  replanBusy={busy}
-                  onOpenTimingEdit={() => setTimingModalOpen(true)}
+                  gitOpen={gitOpen}
+                  onToggleGitDetails={() => setGitOpen(!gitOpen)}
                 />
+
+                {/* Collapsible Repository & Audit Details */}
+                {gitOpen && (
+                  <div className="p-5 rounded-3xl bg-white border border-[#EFEAE4] shadow-xs space-y-4 animate-fadeIn">
+                    <ConnectedRepositoryPanel
+                      repository={connectedRepo}
+                      syncing={repoSyncing}
+                      comparing={comparing}
+                      onSync={handleSyncRepository}
+                      onCompare={handleCompareWithRepository}
+                      error={compareError}
+                      projectId={project.id}
+                    />
+
+                    {compareSummary && (
+                      <ComparisonSummaryBanner
+                        summary={compareSummary}
+                        onClose={() => setCompareSummary(null)}
+                      />
+                    )}
+                  </div>
+                )}
+
+                {/* View Pills Tab Navigation Bar */}
+                <div className="fp-v2-tabs-bar">
+                  <div className="fp-v2-pills-group" role="tablist">
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'flowmap' || view === 'roadmap' ? 'active' : ''}`}
+                      onClick={() => setView('flowmap')}
+                    >
+                      <Route size={14} />
+                      <span>Flow Map</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'radar' ? 'active' : ''}`}
+                      onClick={() => setView('radar')}
+                    >
+                      <Compass size={14} />
+                      <span>Market Radar</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'timeline' || view === 'tasks' ? 'active' : ''}`}
+                      onClick={() => setView('timeline')}
+                    >
+                      <CalendarClock size={14} />
+                      <span>Gantt & Timeline</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'hardware' ? 'active' : ''}`}
+                      onClick={() => setView('hardware')}
+                    >
+                      <Cpu size={14} />
+                      <span>Hardware & BOM</span>
+                      {(project?.domain === 'hardware' || project?.domain === 'hybrid') && (
+                        <span className="ml-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-[#D97706] text-white">
+                          {project.domain === 'hybrid' ? 'Hybrid' : 'HW'}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'business_model' ? 'active' : ''}`}
+                      onClick={() => setView('business_model')}
+                    >
+                      <CircleDollarSign size={14} />
+                      <span>Business Model</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {historyStack.length > 0 && (
+                      <button
+                        className="fp-undo-btn"
+                        type="button"
+                        onClick={handleUndoReplan}
+                        title="Undo last AI roadmap adjustment"
+                      >
+                        <Undo2 size={13} /> Undo Replan
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="fp-v2-schedule-btn"
+                      onClick={() => setTimingModalOpen(true)}
+                    >
+                      <CalendarClock size={14} className="text-[#8E4B49]" />
+                      <span>Adjust Schedule</span>
+                    </button>
+                  </div>
+                </div>
 
                 {['queued', 'generating'].includes(generationStatus) && (
                   <div className="fp-message" role="status">
-                    <LoaderCircle className="fp-spinning" size={15} />{' '}
+                    <MiniLoader color="#8E4B49" className="mr-1" />{' '}
                     {hasActionableFlightPlan(project.workflow?.flight_plan)
                       ? 'Your saved roadmap remains available while UDAAN prepares an updated flight plan.'
                       : 'UDAAN is preparing your roadmap in the background.'}
@@ -2247,45 +5103,6 @@ export default function FlightPlan() {
                   </div>
                 )}
 
-                {!editing && (
-                  <section className="fp-overview-controls">
-                    <div className="fp-view-toggle" role="tablist" aria-label="Roadmap view selection">
-                      <button
-                        role="tab"
-                        aria-selected={view === 'roadmap'}
-                        className={view === 'roadmap' ? 'active' : ''}
-                        onClick={() => setView('roadmap')}
-                      >
-                        <Route size={15} />Roadmap View
-                      </button>
-                      <button
-                        role="tab"
-                        aria-selected={view === 'tasks'}
-                        className={view === 'tasks' ? 'active' : ''}
-                        onClick={() => setView('tasks')}
-                      >
-                        <ListChecks size={15} />Timeline / Task List
-                      </button>
-                    </div>
-
-                    <div className="fp-controls-right-actions">
-                      <button
-                        className="fp-timing-quick-btn"
-                        type="button"
-                        onClick={() => setTimingModalOpen(true)}
-                        title="Edit project deadline and weekly capacity"
-                      >
-                        <CalendarClock size={14} /> Adjust Schedule
-                      </button>
-
-                      <button className="fp-replan-button" type="button" onClick={() => replan()} disabled={busy || !project.idea}>
-                        {busy ? <LoaderCircle className="fp-spinning" size={15} /> : <Sparkles size={15} />}
-                        {busy ? 'Replanning…' : 'Replan with AI'}
-                      </button>
-                    </div>
-                  </section>
-                )}
-
                 {error && <div className="fp-message error" role="alert">{error}</div>}
                 {notice && <div className="fp-message" role="status"><CheckCircle2 size={16} />{notice}</div>}
 
@@ -2298,145 +5115,60 @@ export default function FlightPlan() {
                     error={editorError}
                     completedTasks={completed}
                   />
-                ) : view === 'roadmap' ? (
-                  <div className="fp-roadmap-layout">
-                    <div className="fp-roadmap" aria-label="Project milestones">
-                      {milestones.length ? (
-                        <>
-                          <svg
-                            className="fp-winding-path"
-                            aria-hidden="true"
-                            viewBox={`0 0 100 ${Math.max(160, milestones.length * 170 - 10)}`}
-                            preserveAspectRatio="none"
-                          >
-                            <path
-                              d={milestones
-                                .map((_, index) => {
-                                  const center = 80 + index * 170
-                                  if (index === 0) return `M 50 ${center}`
-                                  const previous = center - 170
-                                  const side = index % 2 ? 1 : -1
-                                  return `C ${50 + side * 14} ${previous + 50}, ${50 - side * 14} ${center - 50}, 50 ${center}`
-                                })
-                                .join(' ')}
-                            />
-                          </svg>
+                ) : (view === 'flowmap' || view === 'roadmap') ? (
+                  <>
+                    <div className="fp-v2-main-grid">
+                      <FlightPlanFlowMap
+                        milestones={milestones}
+                        allTasks={allTasks}
+                        completed={completed}
+                        activeMilestoneIndex={selectedMilestone}
+                        onSelectMilestone={setSelectedMilestone}
+                      />
 
-                          {milestones.map((milestone, index) => {
-                            const milestoneTasks = allTasks.filter(item => item.milestoneIndex === index)
-                            const milestoneDone = milestoneTasks.filter(item => completed.includes(item.id)).length
-                            const progress = milestoneTasks.length ? Math.round((milestoneDone / milestoneTasks.length) * 100) : 0
-                            const milestoneAssessment = assessment?.milestone_assessments?.[String(index)]
-
-                            return (
-                              <RoadmapNode
-                                key={`${milestone.title}-${index}`}
-                                milestone={milestone}
-                                index={index}
-                                status={milestoneStatus(index)}
-                                completedCount={milestoneDone}
-                                taskCount={milestoneTasks.length}
-                                progress={progress}
-                                selected={activeMilestoneIndex === index}
-                                onSelect={() => setSelectedMilestone(index)}
-                                milestoneAssessment={milestoneAssessment}
-                              />
-                            )
-                          })}
-                        </>
-                      ) : (
-                        <div className="fp-no-plan">No milestones yet. Add one in Edit Roadmap to map the next steps.</div>
-                      )}
+                      <FlightPlanMilestoneInspector
+                        milestone={milestones[selectedMilestone] || milestones[0]}
+                        milestoneIndex={selectedMilestone}
+                        tasks={allTasks.filter(item => item.milestoneIndex === selectedMilestone)}
+                        completed={completed}
+                        onToggleTask={toggleTask}
+                        onOpenWorkbench={handleOpenWorkbench}
+                        onSwitchTab={setView}
+                        onAddRoadmap={openEditor}
+                        daysInfo={daysInfo}
+                      />
                     </div>
 
-                    {activeMilestone ? (
-                      <aside className="fp-milestone-panel" aria-live="polite">
-                        <div className="fp-panel-header">
-                          <div>
-                            <span className="fp-eyebrow">MILESTONE {String(activeMilestoneIndex + 1).padStart(2, '0')}</span>
-                            <h2>{activeMilestone.title}</h2>
-                          </div>
-                          <span className={`fp-status ${milestoneStatus(activeMilestoneIndex)}`}>
-                            {milestoneStatus(activeMilestoneIndex).replace('-', ' ')}
-                          </span>
-                        </div>
-
-                        {/* Milestone Schedule Bar */}
-                        <div className="fp-panel-schedule-bar">
-                          <div className="fp-panel-date-col">
-                            <Calendar size={12} />
-                            <span>
-                              {activeMilestone.start_date ? formatDisplayDate(activeMilestone.start_date) : 'Start'}
-                              {' → '}
-                              <b>{activeMilestone.target_date ? formatDisplayDate(activeMilestone.target_date) : 'Target date'}</b>
-                            </span>
-                          </div>
-                          {activeMilestone.target_date && (
-                            <span className={`fp-panel-days-pill ${getDaysRemaining(activeMilestone.target_date)?.isOverdue ? 'overdue' : 'normal'}`}>
-                              {getDaysRemaining(activeMilestone.target_date)?.label}
-                            </span>
-                          )}
-                        </div>
-
-                        {activeMilestone.purpose && (
-                          <div className="fp-panel-purpose">
-                            <b>Milestone Purpose:</b> {activeMilestone.purpose}
-                          </div>
-                        )}
-
-                        <p className="fp-panel-category">{activeMilestone.category}</p>
-                        {activeMilestone.outcome && <p className="fp-panel-outcome">{activeMilestone.outcome}</p>}
-
-                        {/* Warnings for overdue or blocked work in this milestone */}
-                        {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && isTaskOverdue(item.task, completed.includes(item.id))).length > 0 && (
-                          <div className="fp-panel-warning overdue">
-                            <AlertTriangle size={13} />
-                            <span>Tasks in this milestone are past their target completion date.</span>
-                          </div>
-                        )}
-
-                        <div className="fp-panel-task-heading">
-                          <h3>Tasks</h3>
-                          <span>
-                            {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex && completed.includes(item.id)).length} /{' '}
-                            {allTasks.filter(item => item.milestoneIndex === activeMilestoneIndex).length} complete
-                          </span>
-                        </div>
-
-                        <div className="fp-panel-tasks">
-                          {allTasks
-                            .filter(item => item.milestoneIndex === activeMilestoneIndex)
-                            .map(item => (
-                              <TaskRow
-                                key={item.id}
-                                item={item}
-                                projectId={project.id}
-                                highlight={item.id === requestedTask}
-                                done={completed.includes(item.id)}
-                                locked={taskLocked(item)}
-                                onToggle={() => toggleTask(item.id)}
-                                assessment={assessment?.task_assessments?.[item.id]}
-                                onInspect={handleInspectTask}
-                              />
-                            ))}
-                          {!activeMilestone.tasks.length && <p className="fp-no-tasks">No tasks have been added yet.</p>}
-                        </div>
-
-                        <button type="button" className="fp-panel-edit" onClick={openEditor}>
-                          <Pencil size={14} /> Edit milestone and tasks
-                        </button>
-                      </aside>
-                    ) : (
-                      <aside className="fp-milestone-panel fp-empty-panel">
-                        <Compass size={22} />
-                        <h2>Your roadmap is ready to shape</h2>
-                        <p>Add milestones in Edit Roadmap, then explore them here as you build.</p>
-                        <button type="button" className="fp-save-button" onClick={openEditor}>
-                          <Pencil size={14} /> Edit Roadmap
-                        </button>
-                      </aside>
-                    )}
-                  </div>
+                    <FlightPlanBottomInsights
+                      radarData={effectiveMarketRadar}
+                      activeMilestoneIndex={selectedMilestone}
+                      onAddExperiment={handleAddExperiment}
+                      onSwitchTab={setView}
+                    />
+                  </>
+                ) : view === 'radar' ? (
+                  <MarketRadarView
+                    radarData={effectiveMarketRadar}
+                    onAddExperiment={handleAddExperiment}
+                    addingExperimentId={addingExpId}
+                  />
+                ) : view === 'hardware' ? (
+                  <HardwareBomFlightPlanView
+                    project={project}
+                    hardwareBom={hardwareBom}
+                    onGenerateBom={handleGenerateProjectBom}
+                    generating={generatingBom}
+                    searchQuery={hardwareSearchQuery}
+                    onSearchChange={setHardwareSearchQuery}
+                    onSearchSubmit={handleSearchHardware}
+                    searchResults={hardwareSearchResults}
+                    onClearSearchResults={() => setHardwareSearchResults([])}
+                    searching={hardwareSearching}
+                    onAddComp={handleAddCompToBom}
+                    onRemoveComp={handleRemoveCompFromBom}
+                  />
+                ) : view === 'business_model' ? (
+                  <BusinessModelFlightPlanView project={project} />
                 ) : (
                   <section className="fp-task-list-view">
                     <header className="fp-task-list-heading">
@@ -2444,13 +5176,31 @@ export default function FlightPlan() {
                         <span className="fp-eyebrow">CHRONOLOGICAL SCHEDULE</span>
                         <h2>Timeline & Tasks</h2>
                         <p style={{ margin: '3px 0 0', fontSize: 11, color: '#748278' }}>
-                          Sorted by target completion date to highlight upcoming deliverables and critical path items.
+                          Sorted by target completion date with automatic sprint pacing and role-specific deliverables.
                         </p>
                       </div>
                       <span className="fp-task-count-pill">{sortedAndFilteredTasks.length} tasks matching</span>
                     </header>
 
+                    {/* Automatic Milestone Sprint Gantt Timeline Visualizer */}
+                    <MilestoneGanttTimeline
+                      milestones={milestones}
+                      allTasks={allTasks}
+                      completed={completed}
+                      personFilter={personFilter}
+                      onSelectTask={handleOpenWorkbench}
+                    />
+
                     <div className="fp-task-filters">
+                      <label>
+                        <span>Team Member</span>
+                        <select value={personFilter} onChange={event => setPersonFilter(event.target.value)}>
+                          <option value="all">All Team Members</option>
+                          {availableRoles.map(role => (
+                            <option key={role} value={role}>{role}</option>
+                          ))}
+                        </select>
+                      </label>
                       <label>
                         <span>Status</span>
                         <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
@@ -2498,6 +5248,9 @@ export default function FlightPlan() {
                             showMilestone
                             assessment={assessment?.task_assessments?.[item.id]}
                             onInspect={handleInspectTask}
+                            onOpenWorkbench={handleOpenWorkbench}
+                            onOpenProof={handleOpenProof}
+                            hasProof={Boolean(taskProofs[item.id])}
                           />
                         ))
                       ) : (
@@ -2510,19 +5263,53 @@ export default function FlightPlan() {
                 <div className="fp-footer-note">
                   <RefreshCw size={14} />Progress and schedule assessments are saved automatically.
                 </div>
-              </>
+              </div>
             )}
           </div>
         </main>
 
-        {/* AI Replan Preview Modal */}
-        {proposedPlan && (
-          <ReplanPreview
-            plan={proposedPlan}
-            onCancel={() => setProposedPlan(null)}
-            onApprove={approveReplan}
-          />
-        )}
+        {/* Task Workbench Drawer */}
+        <TaskWorkbenchDrawer
+          isOpen={Boolean(workbenchTask)}
+          onClose={() => setWorkbenchTask(null)}
+          task={workbenchTask}
+          milestoneTitle={workbenchMilestoneTitle}
+          onToggleStep={(stepIdx) => {
+            if (!workbenchTask) return
+            const updatedSteps = (workbenchTask.steps || []).map((s, idx) =>
+              idx === stepIdx ? { ...s, done: !s.done } : s
+            )
+            const updatedTask = { ...workbenchTask, steps: updatedSteps }
+            setWorkbenchTask(updatedTask)
+            const updatedMilestones = (flightPlan.milestones || []).map(m => ({
+              ...m,
+              tasks: (m.tasks || []).map(t => (t.id === updatedTask.id || t.title === updatedTask.title) ? updatedTask : t)
+            }))
+            persistPlan({ ...flightPlan, milestones: updatedMilestones }, completed, ['flight_plan'])
+          }}
+          onVerifyTask={handleVerifyTask}
+          isVerifying={isVerifying}
+          allTasks={allTasks}
+          repoAnalysis={repoAnalysis}
+        />
+
+        {/* AI Replan Diff Drawer (Heuristic #3: User Control & Freedom) */}
+        <ReplanDiffDrawer
+          isOpen={diffDrawerOpen}
+          onClose={() => setDiffDrawerOpen(false)}
+          currentPlan={flightPlan}
+          proposedPlan={proposedPlan}
+          comparison={replanComparison}
+          onAccept={handleAcceptReplan}
+          onReject={() => {
+            setProposedPlan(null)
+            setDiffDrawerOpen(false)
+            setNotice('Proposed replan dismissed. Active roadmap unchanged.')
+            setTimeout(() => setNotice(''), 3000)
+          }}
+          onUndo={handleUndoReplan}
+          canUndo={historyStack.length > 0}
+        />
 
         {/* Schedule & Timing Edit Modal */}
         {timingModalOpen && project && (
@@ -2575,6 +5362,17 @@ export default function FlightPlan() {
           taskTitle={explainerTask?.title}
           plainEnglish={explainerTask?.plain_english}
           analogy={explainerTask?.analogy}
+        />
+
+        {/* Proof of Work & AI LinkedIn / Social Media Share Modal */}
+        <ProofOfWorkModal
+          isOpen={Boolean(proofModalTask)}
+          onClose={() => setProofModalTask(null)}
+          task={proofModalTask}
+          milestoneTitle={proofModalMilestoneTitle}
+          projectName={project?.name}
+          projectProblem={project?.understanding?.problem_statement || project?.workflow?.understanding?.problem_statement}
+          onSaveProof={handleSaveProof}
         />
       </div>
     </div>

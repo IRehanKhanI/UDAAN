@@ -1,4 +1,18 @@
-const API_BASE_URL = ((typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_BASE_URL) || (typeof window !== 'undefined' ? window.location.origin : 'http://127.0.0.1:8000')).replace(/\/$/, '')
+const RAW_VITE_API_BASE = (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_BASE_URL) || ''
+
+function resolveApiBaseUrl() {
+  if (typeof window !== 'undefined') {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    // If accessed via WiFi/LAN IP from mobile and VITE_API_BASE_URL points to 127.0.0.1/localhost,
+    // use window.location.origin so requests go through the Vite dev proxy on the host machine.
+    if (!isLocalhost && (!RAW_VITE_API_BASE || /127\.0\.0\.1|localhost/.test(RAW_VITE_API_BASE))) {
+      return window.location.origin
+    }
+  }
+  return RAW_VITE_API_BASE || (typeof window !== 'undefined' ? window.location.origin : (RAW_VITE_API_BASE || 'http://127.0.0.1:8000'))
+}
+
+const API_BASE_URL = resolveApiBaseUrl().replace(/\/$/, '')
 
 let memoryCsrfToken = ''
 

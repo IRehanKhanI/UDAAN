@@ -1,0 +1,43 @@
+/* BusinessModel.css — Professional Investor Studio */
+
+.bm-studio-page {
+  font-family: 'Plus_Jakarta_Sans', system-ui, -apple-system, sans-serif;
+  color: #1D1B18;
+}
+
+/* Aspect ratio utility */
+.aspect-16\/9 {
+  aspect-ratio: 16 / 9;
+}
+
+/* Custom scrollbars */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Input range styling */
+input[type="range"] {
+  height: 6px;
+  border-radius: 9999px;
+  cursor: pointer;
+}
+
+/* Smooth fade in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

@@ -36,7 +36,7 @@ export default function AddTaskModal({ isOpen, onClose, onAddTask, projectName =
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="w-8 h-8 rounded-full bg-[#FFAAA6] text-[#7A3C3A] flex items-center justify-center font-bold">
-              ✨
+
             </span>
             <div>
               <h3 className="text-lg font-bold text-[#1D1B18] font-['Plus_Jakarta_Sans']">

@@ -501,3 +501,58 @@
   background: #000000;
   transform: translateY(-1px);
 }
+
+@media (max-width: 640px) {
+  .ps-main {
+    padding-top: 68px;
+  }
+  .ps-content {
+    padding: 16px 14px 48px;
+    gap: 16px;
+  }
+  .ps-input-row {
+    flex-direction: column;
+  }
+  .ps-inspect-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .ps-idea-recap {
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .ps-card {
+    padding: 16px;
+    border-radius: 18px;
+    gap: 16px;
+  }
+  .ps-connected-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .ps-disconnect-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .ps-action-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ps-connect-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .ps-proceed-row {
+    flex-direction: column-reverse;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .ps-next-btn,
+  .ps-skip-btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}

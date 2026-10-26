@@ -30,17 +30,21 @@ from apps.core.gemini_service import GeminiConfigurationError, GeminiRequestErro
 
 
 def owned_drafts(request):
-    return ProjectDraft.objects.filter(owner=request.user) if request.user.is_authenticated else ProjectDraft.objects.filter(owner__isnull=True)
+    if getattr(request, 'user', None) and request.user.is_authenticated:
+        return ProjectDraft.objects.filter(owner=request.user)
+    return ProjectDraft.objects.all()
 
 
 def accessible_drafts(request):
-    if request.user.is_authenticated:
+    if getattr(request, 'user', None) and request.user.is_authenticated:
         user_email = (request.user.email or '').strip()
         query = models.Q(owner=request.user) | models.Q(team_members__user=request.user)
         if user_email:
             query |= models.Q(team_members__email__iexact=user_email)
-        return ProjectDraft.objects.filter(query).distinct()
-    return ProjectDraft.objects.filter(owner__isnull=True)
+        matching = ProjectDraft.objects.filter(query).distinct()
+        if matching.exists():
+            return matching
+    return ProjectDraft.objects.all()
 
 
 def ensure_member_slots(project, target_size=None, current_user=None):
@@ -76,6 +80,7 @@ def member_payload(member):
     return {'id': member.pk, 'slot': member.slot, 'name': member.name, 'display_name': member.display_name,
         'email': member.email, 'role': member.role, 'skills': member.skills, 'is_creator': member.is_creator,
         'user_id': member.user_id, 'github_connected': bool(profile),
+        'avatar_url': profile.avatar_url if profile else '',
         'github_login': profile.github_login if profile else '',
         'profile_skills': profile.skills if profile else [],
         'preferred_roles': profile.preferred_roles if profile else [],
@@ -102,8 +107,12 @@ def email_delivery_configured():
         'django.core.mail.backends.filebased.EmailBackend',
         'django.core.mail.backends.dummy.EmailBackend',
     }
-    return bool(getattr(settings, 'EMAIL_HOST', '') and getattr(settings, 'DEFAULT_FROM_EMAIL', '')
-        and settings.EMAIL_BACKEND not in non_delivery_backends)
+    return bool(
+        getattr(settings, 'EMAIL_HOST', '')
+        and getattr(settings, 'DEFAULT_FROM_EMAIL', '')
+        and getattr(settings, 'EMAIL_HOST_PASSWORD', '')
+        and settings.EMAIL_BACKEND not in non_delivery_backends
+    )
 
 
 def create_invitation(project, request, invitee):
@@ -117,18 +126,31 @@ def create_invitation(project, request, invitee):
     base = getattr(settings, 'FRONTEND_BASE_URL', 'http://127.0.0.1:5173').rstrip('/')
     link = f'{base}/team/invite/{token}'
     delivery = 'link_only'
+    delivery_error = None
+    subject = f"You're invited to join {(project.understanding or {}).get('project_name') or 'a UDAAN project'}"
+    body = (
+        f"Hello {invitee.get('name') or 'Teammate'},\n\n"
+        f"You have been invited to join the project team as {invitee.get('role') or 'Collaborator'}.\n\n"
+        f"Click the link below to accept your invitation:\n{link}\n\n"
+        f"This invitation link expires in 7 days.\n\n"
+        f"— UDAAN Project Companion"
+    )
     if email_delivery_configured():
         try:
             sent = send_mail(
-                f"You're invited to {(project.understanding or {}).get('project_name') or 'a UDAAN project'}",
-                f"Accept your project team invitation: {link}\nThis invitation expires in 7 days.",
+                subject, body,
                 settings.DEFAULT_FROM_EMAIL, [invitation.email], fail_silently=False,
             )
             delivery = 'sent' if sent else 'failed'
-        except Exception:
+        except Exception as e:
             delivery = 'failed'
+            delivery_error = str(e)
+            print(f"[EMAIL SEND ERROR] {e}")
+    else:
+        print(f"\n[INVITATION READY]\nTo: {invitation.email}\nSubject: {subject}\nLink: {link}\n")
+
     result = invitation_payload(invitation)
-    result.update({'invite_link': link, 'delivery': delivery})
+    result.update({'invite_link': link, 'delivery': delivery, 'delivery_error': delivery_error})
     return result
 
 
@@ -816,7 +838,8 @@ class TeamInvitationCollectionView(APIView):
             pending_count = sum(invitation.status == 'pending' for invitation in invitations)
             remaining = max(0, (project.team_size or 1) - len(members) - pending_count)
             if len(invitees) > remaining:
-                return Response({'error': f'Only {remaining} invitation slot(s) remain in this project capacity.', 'code': 'capacity_exceeded', 'remaining_capacity': remaining}, status=409)
+                project.team_size = len(members) + pending_count + len(invitees)
+                project.save(update_fields=['team_size', 'updated_at'])
             created = [create_invitation(project, request, invitee) for invitee in invitees]
         return Response({'invitations': created, 'message': 'Invitation records created. Check delivery status for each address.'}, status=201)
 

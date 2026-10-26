@@ -20,12 +20,15 @@ class ProjectDraft(models.Model):
     attachment = models.JSONField(null=True, blank=True, default=None)
     understanding = models.JSONField(default=dict, blank=True)
     workflow = models.JSONField(default=dict, blank=True)
+    business_model = models.JSONField(default=dict, blank=True)
     current_stage = models.CharField(max_length=32, default='understanding')
     start_date = models.DateField(null=True, blank=True)
     deadline = models.DateField(null=True, blank=True)
     team_size = models.PositiveIntegerField(null=True, blank=True, default=1)
     weekly_hours = models.PositiveIntegerField(null=True, blank=True, default=20)
     schedule_metadata = models.JSONField(default=dict, blank=True)
+    xp_points = models.PositiveIntegerField(default=0)
+    xp_level = models.CharField(max_length=64, default='Level 1: Idea Shaped')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -178,4 +181,70 @@ class MarketingContentItem(models.Model):
         ordering = ['-updated_at']
         indexes = [models.Index(fields=['owner', 'updated_at'], name='mkt_owner_updated_idx')]
 
+
+class MarketRadarReport(models.Model):
+    """Source-linked market research report containing competitors, pricing, customer complaints, and experiments."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.OneToOneField(ProjectDraft, on_delete=models.CASCADE, related_name='market_radar')
+    summary = models.TextField(blank=True, default='')
+    competitors = models.JSONField(default=list, blank=True)
+    customer_voice = models.JSONField(default=list, blank=True)
+    citations = models.JSONField(default=list, blank=True)
+    validation_experiments = models.JSONField(default=list, blank=True)
+    raw_snapshots = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'MarketRadar for {self.project_id}'
+
+
+class MindMapGraph(models.Model):
+    """Persisted node-link graph for interactive 2D Mind Map and tree visualization."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.OneToOneField(ProjectDraft, on_delete=models.CASCADE, related_name='mindmap_graph')
+    nodes = models.JSONField(default=list, blank=True)
+    edges = models.JSONField(default=list, blank=True)
+    layout_settings = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'MindMap for {self.project_id} ({len(self.nodes)} nodes)'
+
+
+class TaskVerificationReceipt(models.Model):
+    """Audit log of task verifications and XP credits."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(ProjectDraft, on_delete=models.CASCADE, related_name='verification_receipts')
+    task_key = models.CharField(max_length=64, db_index=True)
+    task_title = models.CharField(max_length=240, blank=True, default='')
+    proof_type = models.CharField(max_length=64, default='manual')
+    proof_details = models.JSONField(default=dict, blank=True)
+    xp_awarded = models.PositiveIntegerField(default=150)
+    verified_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-verified_at']
+
+    def __str__(self):
+        return f'{self.project_id} -> {self.task_key} (+{self.xp_awarded} XP)'
+
+
+class BusinessModelRevision(models.Model):
+    """Timestamped snapshot of a project's full business model and financial plan."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(ProjectDraft, on_delete=models.CASCADE, related_name='business_model_revisions')
+    plan_data = models.JSONField(default=dict)
+    summary = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.project_id} revision at {self.created_at}'
 

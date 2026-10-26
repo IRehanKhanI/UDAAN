@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import UdaanLoader from '../components/UdaanLoader.jsx'
 import {
   AlertTriangle, ArrowRight, CheckCircle2, ChevronDown, ChevronRight,
   Circle, ClipboardCheck, ExternalLink, Info, LoaderCircle, Menu,
@@ -377,8 +378,8 @@ export default function Verification() {
           )}
 
           {loading ? (
-            <div className="vr-loading">
-              <LoaderCircle size={22} className="vr-spin" /> Loading verification data…
+            <div className="vr-loading flex justify-center py-8">
+              <UdaanLoader character="tester" size="sm" message="Loading verification data…" />
             </div>
           ) : !projectId ? (
             <div className="vr-empty">

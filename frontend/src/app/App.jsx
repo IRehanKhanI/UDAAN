@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import MainDashboard from '../pages/MainDashboard.jsx'
+import LaunchIdea from '../pages/LaunchIdea.jsx'
 import MyProjects from '../pages/MyProjects.jsx'
 import TeamWorkspace from '../pages/TeamWorkspace.jsx'
 import TeamInvitationAccept from '../pages/TeamInvitationAccept.jsx'
@@ -13,10 +14,15 @@ import DeveloperProfile from '../pages/DeveloperProfile.jsx'
 import Verification from '../pages/Verification.jsx'
 import Glimpse from '../pages/Glimpse.jsx'
 import Docs from '../pages/Docs.jsx'
+import BusinessModel from '../pages/BusinessModel.jsx'
+import ProjectSettings from '../pages/ProjectSettings.jsx'
 
 export default function App() {
   return <Routes>
     <Route path="/" element={<MainDashboard />} />
+    <Route path="/launch" element={<LaunchIdea />} />
+    <Route path="/business-model" element={<BusinessModel />} />
+    <Route path="/projects/:projectId/settings" element={<ProjectSettings />} />
     <Route path="/login" element={<DeveloperProfile />} />
     <Route path="/profile" element={<DeveloperProfile />} />
     <Route path="/projects" element={<MyProjects />} />
@@ -28,7 +34,7 @@ export default function App() {
     <Route path="/docs" element={<Docs />} />
     <Route path="/learning" element={<Learning />} />
     <Route path="/marketing-studio" element={<MarketingStudio />} />
-    <Route path="/glimpse" element={<Glimpse />} />
+    <Route path="/glimpse" element={<Navigate to="/" replace />} />
     <Route path="/issues" element={<Navigate to="/" replace />} />
     <Route path="/verification" element={<Verification />} />
     <Route path="/reports" element={<Navigate to="/marketing-studio" replace />} />

@@ -19,6 +19,9 @@ export function saveIdeaProject({ draft, understanding, workflow }) {
     level: 'Level 1: Idea Shaped', xp: '0 / 1,200 XP', progress: 8,
     milestone: workflow.flight_plan?.milestones?.[0]?.title || 'Ready to begin',
     stack: [], team: ['TS'], updated: 'Created just now', tone: 'forest',
+    domain: draft.domain || 'software',
+    hardwareBom: draft.hardwareBom || null,
+    businessModel: draft.businessModel || null,
     idea: draft.idea, attachment: draft.attachment || null, understanding, workflow,
     startDate: draft.startDate || draft.start_date || new Date().toISOString().split('T')[0],
     deadline: draft.deadline || null,
@@ -53,4 +56,64 @@ export function removeSavedProject(projectId) {
     localStorage.removeItem('udaan:selected-project')
   }
   return true
+}
+
+export function normalizeBackendProject(bp) {
+  if (!bp) return null
+  const xp = bp.xp_points || 0
+  const progress = Math.min(100, Math.round((xp / 1200) * 100))
+  const tones = ['coral', 'butter', 'lavender', 'honey']
+  const toneIndex = typeof bp.id === 'string' ? Math.abs(bp.id.charCodeAt(0) || 0) % tones.length : 0
+
+  return {
+    id: bp.id,
+    name: bp.understanding?.project_name?.trim() || bp.idea?.slice(0, 32) || 'Untitled Launch',
+    description: bp.understanding?.problem_statement?.trim() || bp.idea || 'Creative launchpad project',
+    category: bp.project_type || 'Startup',
+    status: bp.current_stage || 'flight_plan',
+    statusLabel: bp.current_stage === 'flight_plan' ? 'Active' : 'Planning',
+    level: bp.xp_level || 'Level 1: Idea Shaped',
+    domain: bp.domain || 'software',
+    hardwareBom: bp.hardware_bom || null,
+    businessModel: bp.business_model || null,
+    xp: `${xp} / 1,200 XP`,
+    xpPoints: xp,
+    progress: Math.max(progress, 15),
+    milestone: bp.workflow?.flight_plan?.milestones?.[0]?.title || 'Milestone 1: Market & Risk Validation',
+    stack: bp.repository?.detected_technologies?.length ? bp.repository.detected_technologies : ['Web Search', 'Gemini AI', 'FastAPI/Django'],
+    team: ['TS', 'AI'],
+    updated: 'Recently synced',
+    tone: tones[toneIndex],
+    idea: bp.idea,
+    attachment: bp.attachment || null,
+    understanding: bp.understanding || {},
+    workflow: bp.workflow || {},
+    marketRadar: bp.market_radar || bp.workflow?.market_radar || null,
+    mindmapGraph: bp.mindmap_graph || bp.workflow?.mindmap_graph || null,
+    startDate: bp.start_date || new Date().toISOString().split('T')[0],
+    deadline: bp.deadline || null,
+    teamSize: bp.team_size || 1,
+    weeklyHours: bp.weekly_hours || 20,
+    scheduleMetadata: bp.schedule_metadata || bp.workflow?.flight_plan?.schedule_assessment || {},
+    createdAt: bp.created_at || new Date().toISOString(),
+  }
+}
+
+export function syncBackendProjects(backendProjects = []) {
+  const current = readSavedProjects()
+  const map = new Map(current.map(p => [p.id, p]))
+
+  for (const bp of backendProjects) {
+    const normalized = normalizeBackendProject(bp)
+    if (normalized) {
+      map.set(normalized.id, {
+        ...(map.get(normalized.id) || {}),
+        ...normalized,
+      })
+    }
+  }
+
+  const merged = Array.from(map.values())
+  localStorage.setItem(projectsKey, JSON.stringify(merged))
+  return merged
 }
