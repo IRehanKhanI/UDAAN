@@ -5,7 +5,7 @@ import {
   Code2, Copy, ExternalLink, Github, Globe, Lightbulb, Plus, RefreshCw,
   Rocket, Save, Search, ShieldCheck, Sparkles, Target, Trash2, Users,
   X, Zap, Play, Star, Clock, ChevronDown, ChevronRight,
-  Cpu, CircleDollarSign, DollarSign, Package, ShoppingBag, Sliders,
+  Cpu, CircleDollarSign, DollarSign, Package, ShoppingBag, Sliders, Share2,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router-dom'
 import { analyzeIdeaDraft } from '../services/ideaAnalysisService.js'
@@ -14,9 +14,7 @@ import { saveIdeaProject } from '../services/projectStorage.js'
 import { parseRepositoryUrl, syncAndAnalyzeRepository, associateProjectRepository } from '../services/projectRepositoryService.js'
 import { initializeTeamWorkspace } from '../services/teamService.js'
 import { createGitHubRepo, getTechHistory, saveTechHistory, getYouTubeVideos } from '../services/githubService.js'
-import { startGitHubLogin } from '../services/authService.js'
 import { INDIAN_VENDORS, generateBillOfMaterials, searchHardwareProducts, predictBestRevenueModel, getComponentLiveImage, classifyProjectDomain } from '../services/hardwareService.js'
-import InteractiveMascot from '../components/mascot/InteractiveMascot.jsx'
 import Interactive3DCharacter from '../components/mascot/Interactive3DCharacter.jsx'
 
 export const PROJECT_DOMAINS = {
@@ -289,7 +287,7 @@ function getBestTechStackRecommendation(idea = '', understanding = {}, knownSkil
   return {
     stackId: 'nextjs-fullstack',
     badge: '★ Best Choice for Your Project',
-    reason: 'Next.js + Supabase is the top-tier stack for your app. It provides built-in user authentication for creators, instant PostgreSQL database to save stories and jokes, and 1-click deployment on Vercel.'
+    reason: 'Next.js + Supabase is the top-tier full-stack choice for your project: modern React server components, instant auth, PostgreSQL database, and high scalability out of the box.'
   }
 }
 
@@ -377,7 +375,6 @@ export default function IdeaAnalysis() {
   const [stageLoading, setStageLoading] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
-  const [mascotMode, setMascotMode] = useState('3d') // '3d' | '2d'
 
   // Domain & Multi-Select Categories
   const initialDomains = useMemo(() => {
@@ -528,6 +525,7 @@ export default function IdeaAnalysis() {
   const [customStacks, setCustomStacks] = useState(() => {
     try { return JSON.parse(localStorage.getItem('udaan:custom-stacks') || '[]') } catch { return [] }
   })
+  const allStacks = [...TECH_STACKS, ...customStacks]
   const [showCustomModal, setShowCustomModal] = useState(false)
   const [customForm, setCustomForm] = useState({ name: '', frontend: '', backend: '', database: '', cloud: '' })
   // YouTube videos
@@ -661,6 +659,18 @@ export default function IdeaAnalysis() {
     if (draft?.idea?.trim() && !understanding.project_name?.trim() && !loading) void analyzeUnderstanding()
   }, [])
 
+  // Auto-select best recommended tech stack by default if not yet chosen
+  useEffect(() => {
+    if (!selectedStack && allStacks.length > 0) {
+      const rec = getBestTechStackRecommendation(draft?.idea, understanding, techKnownInputs)
+      const bestId = rec?.stackId || allStacks[0]?.id
+      if (bestId) {
+        setSelectedStack(bestId)
+        persist({ selectedStack: bestId })
+      }
+    }
+  }, [draft?.idea, selectedStack, allStacks.length])
+
   // Auto-generate stage on entering unpopulated step
   useEffect(() => {
     if (step === 1 && !hasStageContent(research) && !stageLoading) void generateStageDirectly('research')
@@ -723,8 +733,6 @@ export default function IdeaAnalysis() {
     } catch (err) { setRepoError(err.message || 'Could not verify repository.') }
     finally { setRepoChecking(false) }
   }
-
-  const allStacks = [...TECH_STACKS, ...customStacks]
 
   // GitHub OAuth or Direct Token repo creation
   async function handleCreateGitHubRepo() {
@@ -846,6 +854,33 @@ export default function IdeaAnalysis() {
     finally { setLoading(false) }
   }
 
+  function handleShareOnLinkedIn() {
+    const projectName = understanding.project_name || draft?.idea?.slice(0, 40) || 'My Project'
+    const problem = understanding.problem_statement || draft?.idea || ''
+    const outcome = understanding.expected_outcome || ''
+    const chosenStack = allStacks.find(s => s.id === selectedStack)?.name || selectedStack || 'Modern Full-Stack'
+    const model = REVENUE_MODELS.find(m => m.id === selectedRevenueModel)?.name || 'Lean Startup Model'
+
+    const postText = `🚀 Excited to announce what I'm building: ${projectName}!\n\n` +
+      `💡 The Problem:\n${problem ? problem.slice(0, 220) : 'Solving a real-world friction point for modern users.'}\n\n` +
+      `🎯 What We're Delivering:\n${outcome ? outcome.slice(0, 200) : 'An intelligent, fast, and scalable solution.'}\n\n` +
+      `🛠️ Tech & Architecture:\n• Stack: ${chosenStack}\n• Execution: ${teamSize}-person team | ${weeksRemaining}-week milestone sprint\n• Revenue Model: ${model}\n\n` +
+      `Designed and planned with UDAAN 🚀\n\n` +
+      `Would love your thoughts, feedback, and suggestions from fellow builders and innovators! 👇\n\n` +
+      `#BuildInPublic #Startups #Innovation #Entrepreneurship #Tech #Udaan`
+
+    try {
+      navigator.clipboard.writeText(postText)
+    } catch { }
+
+    const encodedText = encodeURIComponent(postText)
+    const shareUrl = `https://www.linkedin.com/feed/?shareActive=true&text=${encodedText}`
+    window.open(shareUrl, '_blank', 'noopener,noreferrer')
+
+    setNotice('LinkedIn post text copied to clipboard & share dialog opened! 🚀')
+    setTimeout(() => setNotice(''), 5000)
+  }
+
   // Schedule metrics
   const todayIso = new Date().toISOString().split('T')[0]
   let daysRemaining = 0
@@ -932,39 +967,9 @@ export default function IdeaAnalysis() {
             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 sm:w-80 h-72 sm:h-80 bg-[#FFAAA6]/20 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-10 left-10 w-44 sm:w-52 h-44 sm:h-52 bg-[#FDE68A]/25 rounded-full blur-2xl pointer-events-none" />
 
-            {/* Toggle Mascot Mode */}
-            <div className="absolute top-3.5 right-4 z-20 flex items-center p-0.5 rounded-xl bg-white/90 border border-[#EFEAE4] shadow-xs backdrop-blur">
-              <button
-                type="button"
-                onClick={() => setMascotMode('3d')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${mascotMode === '3d'
-                    ? 'bg-[#1D1B18] text-white shadow-xs'
-                    : 'text-[#7C766F] hover:text-[#1D1B18]'
-                  }`}
-              >
-                3D Character
-              </button>
-              <button
-                type="button"
-                onClick={() => setMascotMode('2d')}
-                className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${mascotMode === '2d'
-                    ? 'bg-[#1D1B18] text-white shadow-xs'
-                    : 'text-[#7C766F] hover:text-[#1D1B18]'
-                  }`}
-              >
-                2D Bird
-              </button>
-            </div>
-
-            {/* Interactive Character Component */}
+            {/* Interactive 3D Character Component */}
             <div className="relative z-10 flex flex-col items-center justify-center py-2 sm:py-4 transition-transform duration-300">
-              {mascotMode === '3d' ? (
-                <Interactive3DCharacter phase={step} size="lg" />
-              ) : (
-                <div className="transform scale-95 sm:scale-105 lg:scale-120 xl:scale-130">
-                  <InteractiveMascot phase={step} />
-                </div>
-              )}
+              <Interactive3DCharacter phase={step} size="lg" />
             </div>
 
             {/* Companion Stage Pill */}
@@ -1588,6 +1593,10 @@ export default function IdeaAnalysis() {
                                   src={c.image || getComponentLiveImage(c.name, c.category)}
                                   alt={c.name}
                                   className="w-10 h-10 rounded-lg object-cover border border-[#EFEAE4] shrink-0"
+                                  onError={(e) => {
+                                    e.target.onerror = null
+                                    e.target.src = getComponentLiveImage(c.name, c.category)
+                                  }}
                                 />
                                 <div className="min-w-0 flex-1">
                                   <h4 className="text-xs font-bold text-[#1D1B18] truncate m-0">{c.name}</h4>
@@ -1654,21 +1663,29 @@ export default function IdeaAnalysis() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {allStacks.map(stack => {
                           const isSelected = selectedStack === stack.id
+                          const rec = getBestTechStackRecommendation(draft?.idea, understanding, techKnownInputs)
+                          const isAiRecommended = rec?.stackId === stack.id
                           return (
                             <button key={stack.id} type="button" onClick={() => handleSelectStack(stack.id)}
-                              className={`relative text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md ${isSelected ? 'border-[#1D1B18] bg-white shadow-md' : 'border-[#EFEAE4] bg-[#FAFAF9] hover:border-[#D4CFC9]'}`}
+                              className={`relative text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md cursor-pointer ${isSelected ? 'border-[#1D1B18] bg-white shadow-md ring-2 ring-[#1D1B18]/10' : 'border-[#EFEAE4] bg-[#FAFAF9] hover:border-[#D4CFC9]'}`}
                             >
-                              {isSelected && (
-                                <span className="absolute top-2 right-2 w-5 h-5 rounded-full bg-[#1D1B18] flex items-center justify-center">
-                                  <Check size={11} className="text-white" />
-                                </span>
-                              )}
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="text-xl">{stack.icon}</span>
-                                <span className="text-sm font-bold text-[#1D1B18]">{stack.name}</span>
+                              <div className="flex items-center justify-between gap-1 mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xl">{stack.icon}</span>
+                                  <span className="text-sm font-bold text-[#1D1B18]">{stack.name}</span>
+                                </div>
+                                {isSelected ? (
+                                  <span className="shrink-0 text-[10px] font-black px-2 py-0.5 rounded-full bg-[#1D1B18] text-white flex items-center gap-1">
+                                    <Check size={10} strokeWidth={3} /> Selected
+                                  </span>
+                                ) : isAiRecommended ? (
+                                  <span className="shrink-0 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-[#FFF1ED] text-[#8E4B49] border border-[#FFAAA6]">
+                                    ★ AI Pick
+                                  </span>
+                                ) : null}
                               </div>
-                              <p className="text-xs text-[#534342] mb-2">{stack.desc}</p>
-                              <div className="flex flex-wrap gap-1">
+                              <p className="text-xs text-[#534342] mb-3 leading-relaxed">{stack.desc}</p>
+                              <div className="flex flex-wrap gap-1 mt-auto">
                                 {stack.tags.map(t => (
                                   <span key={t} className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${isSelected ? 'bg-[#1D1B18] text-white border-[#1D1B18]' : 'bg-white text-[#534342] border-[#E5E0DA]'}`}>
                                     {t}
@@ -2432,6 +2449,39 @@ export default function IdeaAnalysis() {
                       </div>
                     )}
                   </div>
+
+                  {/* Section F: Share & Launch on LinkedIn */}
+                  <div className="bg-gradient-to-r from-[#0A66C2]/10 via-[#0A66C2]/5 to-transparent rounded-2xl border border-[#0A66C2]/30 p-5 space-y-3.5 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg bg-[#0A66C2] text-white flex items-center justify-center text-xs font-bold shadow-xs">
+                            in
+                          </span>
+                          <h3 className="text-sm font-bold text-[#1D1B18]">Share Your Launch on LinkedIn</h3>
+                        </div>
+                        <p className="text-xs text-[#534342] leading-relaxed">
+                          Announce your new project to your network with your verified problem statement, tech stack, and execution roadmap pre-filled.
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleShareOnLinkedIn}
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#0A66C2] hover:bg-[#004182] text-white text-xs font-black transition-all shadow-xs cursor-pointer shrink-0"
+                      >
+                        <Share2 size={13} />
+                        <span>Post to LinkedIn</span>
+                      </button>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-white/90 border border-[#0A66C2]/20 text-[11px] text-[#534342] flex items-center justify-between gap-2">
+                      <span className="truncate">
+                        🚀 <strong>{understanding.project_name || 'My Project'}</strong> · {allStacks.find(s => s.id === selectedStack)?.name || 'Modern Stack'} · {weeksRemaining}-week sprint · Built with UDAAN
+                      </span>
+                      <span className="text-[10px] text-[#0A66C2] font-bold shrink-0">1-Click Pre-filled</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -2468,11 +2518,23 @@ export default function IdeaAnalysis() {
                     Continue <ArrowRight size={13} />
                   </button>
                 ) : (
-                  <button type="button" onClick={createProject} disabled={loading}
-                    className="flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-[#8E4B49] text-white text-xs font-black hover:bg-[#7A3C3A] transition-all shadow-md disabled:opacity-60 cursor-pointer">
-                    {loading ? <MiniLoader color="#fff" /> : <Rocket size={14} />}
-                    Launch Project
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleShareOnLinkedIn}
+                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0A66C2] text-white text-xs font-bold hover:bg-[#004182] transition-all shadow-xs cursor-pointer"
+                      title="Share launch announcement to LinkedIn"
+                    >
+                      <Share2 size={13} />
+                      <span className="hidden sm:inline">Share on LinkedIn</span>
+                      <span className="sm:hidden">LinkedIn</span>
+                    </button>
+                    <button type="button" onClick={createProject} disabled={loading}
+                      className="flex items-center gap-2 px-5 sm:px-6 py-2.5 rounded-xl bg-[#8E4B49] text-white text-xs font-black hover:bg-[#7A3C3A] transition-all shadow-md disabled:opacity-60 cursor-pointer">
+                      {loading ? <MiniLoader color="#fff" /> : <Rocket size={14} />}
+                      Launch Project
+                    </button>
+                  </>
                 )}
               </div>
             </div>

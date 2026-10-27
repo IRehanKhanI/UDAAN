@@ -378,23 +378,65 @@ export async function searchHardwareProducts(query) {
 }
 
 export function getComponentLiveImage(name = '', category = '') {
-  const lower = `${name} ${category}`.toLowerCase()
-  if (lower.includes('raspberry') || lower.includes('pi 4') || lower.includes('sbc')) {
-    return 'https://upload.wikimedia.org/wikipedia/commons/f/f1/Raspberry_Pi_4_Model_B_-_Side.jpg'
+  const n = String(name || '').toLowerCase()
+  const c = String(category || '').toLowerCase()
+  const lower = `${n} ${c}`
+
+  // 1. ESP32-CAM Camera Module
+  if (lower.includes('esp32 cam') || lower.includes('esp32-cam') || (lower.includes('esp') && lower.includes('cam')) || lower.includes('ov2640')) {
+    return '/components/esp32_cam.jpg'
   }
-  if (lower.includes('arduino') || lower.includes('uno') || lower.includes('nano')) {
-    return 'https://upload.wikimedia.org/wikipedia/commons/3/38/Arduino_Uno_-_R3.jpg'
+
+  // 2. Relay Modules (1-channel, 2-channel, 4-channel, relay switch)
+  if (lower.includes('relay')) {
+    return '/components/relay_module.jpg'
   }
-  if (lower.includes('esp32') || lower.includes('esp8266') || lower.includes('microcontroller') || lower.includes('wifi') || lower.includes('node')) {
-    return 'https://images.unsplash.com/photo-1553406830-ef2513450d76?w=600&auto=format&fit=crop&q=80'
+
+  // 3. ESP32 / ESP8266 / NodeMCU Wi-Fi boards (check before generic arduino/microcontroller)
+  if (lower.includes('esp32') || lower.includes('esp8266') || lower.includes('nodemcu') || lower.includes('esp-wroom') || lower.includes('lolin')) {
+    return '/components/esp32_nodemcu.jpg'
   }
-  if (lower.includes('sensor') || lower.includes('ultrasonic') || lower.includes('pir') || lower.includes('dht') || lower.includes('temperature') || lower.includes('humidity') || lower.includes('camera') || lower.includes('lidar') || lower.includes('gyro')) {
-    return 'https://images.unsplash.com/photo-1608564697071-ddf911d81370?w=600&auto=format&fit=crop&q=80'
+
+  // 4. Arduino Uno / Nano / Mega
+  if (lower.includes('arduino') || lower.includes('atmega') || lower.includes('uno') || lower.includes('nano') || lower.includes('mega')) {
+    return '/components/arduino_uno.jpg'
   }
-  if (lower.includes('motor') || lower.includes('servo') || lower.includes('actuator') || lower.includes('driver') || lower.includes('l298n') || lower.includes('relay') || lower.includes('pump')) {
-    return 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=600&auto=format&fit=crop&q=80'
+
+  // 5. Raspberry Pi / SBC
+  if (lower.includes('raspberry') || lower.includes('rpi') || lower.includes('pi 4') || lower.includes('pi 5') || lower.includes('pi zero')) {
+    return '/components/raspberry_pi.jpg'
   }
-  return 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&auto=format&fit=crop&q=80'
+
+  // 6. Power Supply / Adapter / Battery
+  if (lower.includes('adapter') || lower.includes('power supply') || lower.includes('smps') || lower.includes('charger')) {
+    return '/components/power_adapter.jpg'
+  }
+  if (lower.includes('battery') || lower.includes('18650') || lower.includes('li-ion') || lower.includes('lipo') || lower.includes('bms')) {
+    return '/components/battery_18650.jpg'
+  }
+
+  // 7. Breadboard & Jumper wires / Prototyping
+  if (lower.includes('breadboard') || lower.includes('jumper') || lower.includes('wire') || lower.includes('prototyping')) {
+    return '/components/breadboard_kit.jpg'
+  }
+
+  // 8. OLED / LCD Displays
+  if (lower.includes('oled') || lower.includes('lcd') || lower.includes('display') || lower.includes('screen') || lower.includes('ssd1306')) {
+    return '/components/oled_display.jpg'
+  }
+
+  // 9. Motors / Servo / Actuator
+  if (lower.includes('servo') || lower.includes('motor') || lower.includes('sg90') || lower.includes('mg90s') || lower.includes('actuator') || lower.includes('driver')) {
+    return '/components/servo_motor.jpg'
+  }
+
+  // 10. Sensors (Camera, Ultrasonic, PIR, DHT, LDR, MQ gas, etc.)
+  if (lower.includes('sensor') || lower.includes('camera') || lower.includes('ultrasonic') || lower.includes('dht') || lower.includes('pir') || lower.includes('gyro') || lower.includes('mpu')) {
+    return '/components/sensor_generic.jpg'
+  }
+
+  // Fallback electronic circuit image
+  return '/components/esp32_nodemcu.jpg'
 }
 
 // ─── AI Business Model Recommendation ───────────────────────────────────────

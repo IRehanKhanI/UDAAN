@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle, CheckCircle2, ChevronDown, CircleDollarSign,
   Compass, FileCheck, Layers, PieChart, RefreshCw, Save,
-  Shield, Sparkles, TrendingUp, X
+  Shield, Sparkles, TrendingUp, X, Share2
 } from 'lucide-react'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
@@ -290,6 +290,33 @@ export default function BusinessModel() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleShareLinkedIn = () => {
+    const projectName = project?.name || 'My Startup'
+    const overview = modelData?.overview || {}
+    const purpose = overview.one_line_purpose || project?.description || 'Building an impactful solution.'
+    const pain = overview.quantified_pain || ''
+    const targetAudience = overview.who_pays || 'our target market'
+    const tamVal = modelData?.market_size?.total_customers ? `${modelData.market_size.total_customers.toLocaleString()} customers` : ''
+
+    const postText = `🚀 Excited to share what we're building with ${projectName}!\n\n` +
+      `💡 Value Proposition:\n${purpose}\n\n` +
+      (pain ? `🔥 Problem We're Solving:\n${pain}\n\n` : '') +
+      `🎯 Target Market & Customer:\n• Audience: ${targetAudience}\n` +
+      (tamVal ? `• Market Size: ${tamVal}\n` : '') +
+      `• Validated & structured with UDAAN Business Model Studio 📊\n\n` +
+      `We're actively validating our unit economics and execution roadmap. Would love feedback and perspectives from founders, investors, and operators! 👇\n\n` +
+      `#BuildInPublic #Startups #BusinessModel #Entrepreneurship #Innovation #Udaan`
+
+    try {
+      navigator.clipboard.writeText(postText)
+    } catch { }
+
+    const encoded = encodeURIComponent(postText)
+    window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encoded}`, '_blank', 'noopener,noreferrer')
+    setNotice('LinkedIn post copied to clipboard & share dialog opened! 🚀')
+    setTimeout(() => setNotice(''), 5000)
   }
 
   // One-click mathematical fix

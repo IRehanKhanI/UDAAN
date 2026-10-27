@@ -128,7 +128,7 @@ export default function Header({
           <button
             type="button"
             onClick={() => setProjectDropdownOpen(!projectDropdownOpen)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#53dbae] hover:bg-[#DDF2E3] rounded-full shadow-[0_1px_4px_rgba(31,29,26,0.02)] border border-[#CDEBD4] cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FBBF24] hover:bg-[#DDF2E3] rounded-full shadow-[0_1px_4px_rgba(31,29,26,0.02)] border border-[#CDEBD4] cursor-pointer transition-colors"
           >
             <span className="text-xs font-bold text-[#1D1B18] max-w-[140px] sm:max-w-[200px] truncate">
               {currentProject.name}

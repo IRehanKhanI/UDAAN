@@ -53,11 +53,16 @@ import {
   Bird,
   Flame,
   Rocket,
+  Play,
+  Video,
+  GraduationCap,
+  Sparkle,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { MiniLoader } from '../components/UdaanLoader.jsx'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
+import { getYouTubeVideos } from '../services/githubService.js'
 import { INDIAN_VENDORS, searchHardwareProducts, generateBillOfMaterials } from '../services/hardwareService.js'
 import AddTaskModal from '../components/modals/AddTaskModal.jsx'
 import PlainEnglishExplainerModal from '../components/modals/PlainEnglishExplainerModal.jsx'
@@ -2757,6 +2762,471 @@ function BusinessModelFlightPlanView({ project }) {
   )
 }
 
+// ─── Curated Tech Stacks for Flight Plan ─────────────────────────────────────────
+export const FLIGHT_PLAN_TECH_STACKS = [
+  {
+    id: 'nextjs-fullstack',
+    name: 'Next.js + Supabase',
+    tags: ['Full-Stack', 'Beginner-friendly'],
+    color: '#1D1B18',
+    accent: '#F0F0F0',
+    icon: '▲',
+    domain: 'software',
+    desc: 'Ship fast with React Server Components, built-in auth, PostgreSQL database and instant storage.',
+    best_for: ['SaaS', 'Startup', 'Web App', 'Solo Dev'],
+    skills: ['React', 'TypeScript', 'SQL'],
+    learn: ['Next.js', 'Supabase', 'TypeScript'],
+  },
+  {
+    id: 'react-node',
+    name: 'React + Node.js + PostgreSQL',
+    tags: ['Full-Stack', 'Scalable'],
+    color: '#3B82F6',
+    accent: '#EFF6FF',
+    icon: '⚛',
+    domain: 'software',
+    desc: 'Industry standard full-stack JavaScript architecture. Flexible, high performance & proven in production.',
+    best_for: ['Startup', 'Team project', 'API-heavy', 'Fintech'],
+    skills: ['JavaScript', 'Node.js', 'PostgreSQL'],
+    learn: ['React', 'Node.js', 'PostgreSQL'],
+  },
+  {
+    id: 'react-django',
+    name: 'React + Django + PostgreSQL',
+    tags: ['Full-Stack', 'Robust & Secure'],
+    color: '#16A34A',
+    accent: '#F0FDF4',
+    icon: '🐍',
+    domain: 'software',
+    desc: 'Python power. Best for data-heavy apps, AI integrations, with built-in admin dashboard & enterprise auth.',
+    best_for: ['Data apps', 'AI / ML projects', 'Fintech', 'Enterprise'],
+    skills: ['Python', 'Django', 'PostgreSQL'],
+    learn: ['Django', 'Python', 'React'],
+  },
+  {
+    id: 'react-firebase',
+    name: 'React + Firebase',
+    tags: ['Serverless', 'Fastest MVP'],
+    color: '#F59E0B',
+    accent: '#FFFBEB',
+    icon: '🔥',
+    domain: 'software',
+    desc: 'Zero-backend configuration. Real-time Firestore database, Google auth and hosting out of the box.',
+    best_for: ['MVP', 'Hackathon', 'Rapid Prototype'],
+    skills: ['React', 'Firebase', 'NoSQL'],
+    learn: ['React', 'Firebase'],
+  },
+  {
+    id: 'flutter-mobile',
+    name: 'Flutter + Firebase',
+    tags: ['Mobile', 'Cross-Platform'],
+    color: '#06B6D4',
+    accent: '#ECFEFF',
+    icon: '📱',
+    domain: 'software',
+    desc: 'One unified codebase for iOS & Android with smooth native 60fps rendering and instant deployment.',
+    best_for: ['Mobile app', 'Consumer app', 'Multi-device'],
+    skills: ['Flutter', 'Dart', 'Mobile UI'],
+    learn: ['Flutter', 'Firebase'],
+  },
+  {
+    id: 'static-site',
+    name: 'Astro + Tailwind CSS',
+    tags: ['Ultra-Fast', 'Content & SEO'],
+    color: '#8B5CF6',
+    accent: '#F5F3FF',
+    icon: '✦',
+    domain: 'software',
+    desc: 'Zero JavaScript by default for maximum SEO, instant loading speeds and markdown publishing.',
+    best_for: ['Landing page', 'Portfolio', 'Documentation', 'Blog'],
+    skills: ['Astro', 'Tailwind', 'HTML/CSS'],
+    learn: ['Astro', 'Tailwind'],
+  },
+  {
+    id: 'esp32-iot',
+    name: 'ESP32 + IoT Cloud + C++',
+    tags: ['Hardware', 'IoT', 'Wireless'],
+    color: '#D97706',
+    accent: '#FFFBEB',
+    icon: '⚡',
+    domain: 'hardware',
+    desc: 'Dual-core microcontroller with built-in Wi-Fi and Bluetooth for smart connected devices and sensors.',
+    best_for: ['IoT', 'Smart Home', 'Robotics', 'Automation', 'Sensors'],
+    skills: ['ESP32', 'C++', 'Arduino IDE'],
+    learn: ['ESP32', 'Arduino', 'C++'],
+  },
+  {
+    id: 'arduino-embedded',
+    name: 'Arduino Uno + Sensors + C++',
+    tags: ['Hardware', 'Embedded', 'Robotics'],
+    color: '#0D9488',
+    accent: '#F0FDFA',
+    icon: '🤖',
+    domain: 'hardware',
+    desc: 'Industry standard for physical computing, sensor reading, actuator control and hardware prototyping.',
+    best_for: ['Robotics', 'Hardware Prototypes', 'Electronics Education'],
+    skills: ['Arduino', 'C++', 'Electronics'],
+    learn: ['Arduino', 'C++', 'Electronics'],
+  },
+  {
+    id: 'raspberry-pi-python',
+    name: 'Raspberry Pi + Python + OpenCV',
+    tags: ['Edge AI', 'Hardware + Software'],
+    color: '#BE185D',
+    accent: '#FDF2F8',
+    icon: '🍓',
+    domain: 'hybrid',
+    desc: 'Full Linux single-board computer for edge computer vision, camera modules and gateway servers.',
+    best_for: ['Computer Vision', 'Edge AI', 'Home Automation', 'Media Hub'],
+    skills: ['Raspberry Pi', 'Python', 'Linux'],
+    learn: ['Raspberry Pi', 'Python', 'Linux'],
+  },
+]
+
+function resolveProjectStack(project) {
+  const explicit = project?.selectedStack ||
+    project?.workflow?.launch_timing?.selectedStack ||
+    project?.launch_timing?.selectedStack ||
+    project?.workflow?.feasibility?.selected_stack ||
+    project?.feasibility?.selected_stack
+
+  if (explicit) {
+    const found = FLIGHT_PLAN_TECH_STACKS.find(s => s.id === explicit || s.name.toLowerCase() === explicit.toLowerCase())
+    if (found) return found
+  }
+
+  const domain = project?.domain || project?.project_type || ''
+  const text = `${project?.name || ''} ${project?.description || ''} ${project?.category || ''}`.toLowerCase()
+
+  if (domain === 'hardware') {
+    if (text.includes('esp32') || text.includes('wifi') || text.includes('iot')) return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === 'esp32-iot')
+    return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === 'arduino-embedded')
+  }
+  if (domain === 'hybrid') {
+    return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === 'esp32-iot')
+  }
+  if (text.includes('python') || text.includes('django') || text.includes('ai') || text.includes('machine learning')) {
+    return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === 'react-django')
+  }
+  if (text.includes('mobile') || text.includes('ios') || text.includes('android')) {
+    return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === 'flutter-mobile')
+  }
+  if (text.includes('static') || text.includes('portfolio') || text.includes('blog')) {
+    return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === 'static-site')
+  }
+  if (text.includes('node') || text.includes('express')) {
+    return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === 'react-node')
+  }
+  return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === 'nextjs-fullstack') || FLIGHT_PLAN_TECH_STACKS[0]
+}
+
+function getYouTubeThumb(url) {
+  if (!url) return null
+  const regExp = /^.*(youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/
+  const match = url.match(regExp)
+  return (match && match[2].length === 11)
+    ? `https://img.youtube.com/vi/${match[2]}/mqdefault.jpg`
+    : null
+}
+
+function LearnTheStackFlightPlanView({ project, onSelectStack }) {
+  const initialStack = useMemo(() => resolveProjectStack(project), [project])
+  const [selectedStackId, setSelectedStackId] = useState(initialStack.id)
+  const [ytVideos, setYtVideos] = useState({})
+  const [ytLoading, setYtLoading] = useState(false)
+  const [customSearch, setCustomSearch] = useState('')
+
+  useEffect(() => {
+    const s = resolveProjectStack(project)
+    setSelectedStackId(s.id)
+  }, [project?.id, project?.selectedStack])
+
+  const activeStack = useMemo(() => {
+    return FLIGHT_PLAN_TECH_STACKS.find(s => s.id === selectedStackId) || initialStack
+  }, [selectedStackId, initialStack])
+
+  useEffect(() => {
+    if (!activeStack?.learn?.length) return
+    setYtLoading(true)
+    getYouTubeVideos(activeStack.learn)
+      .then(data => setYtVideos(data?.videos || {}))
+      .catch(() => {})
+      .finally(() => setYtLoading(false))
+  }, [activeStack])
+
+  const handleSwitchStack = (stackId) => {
+    setSelectedStackId(stackId)
+    onSelectStack && onSelectStack(stackId)
+  }
+
+  const handleCustomSearchSubmit = (e) => {
+    e.preventDefault()
+    if (!customSearch.trim()) return
+    window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(customSearch.trim() + ' tutorial for beginners')}`, '_blank', 'noreferrer')
+  }
+
+  return (
+    <section className="space-y-6 animate-fadeIn font-['Plus_Jakarta_Sans']">
+      {/* ── Top Header Banner (Matching user image 1) ── */}
+      <div className="bg-gradient-to-r from-[#FFF8F3] via-[#FFF1ED] to-[#FEF3C7]/40 rounded-3xl border border-[#FFAAA6]/50 p-6 shadow-xs flex items-center justify-between flex-wrap gap-4">
+        <div className="space-y-1.5 max-w-xl">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="w-8 h-8 rounded-xl bg-white text-[#FF0000] flex items-center justify-center border border-[#EFEAE4] shadow-xs">
+              <Play size={16} fill="#FF0000" className="ml-0.5" />
+            </div>
+            <h2 className="text-xl font-black text-[#1D1B18] tracking-tight">
+              Learn the stack
+            </h2>
+            <span className="text-xs font-medium text-[#7C766F]">
+              Best verified courses to get started, curated for you
+            </span>
+          </div>
+          <p className="text-xs text-[#534342] leading-relaxed">
+            Personalized learning paths and zero-fluff video tutorials aligned with <strong className="text-[#1D1B18]">{project?.name || 'this project'}</strong>'s architecture.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/learning?project=${encodeURIComponent(project?.id || '')}`}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white border border-[#EFEAE4] text-[#1D1B18] text-xs font-bold hover:bg-[#FAF8F5] transition-all shadow-2xs no-underline"
+          >
+            <GraduationCap size={14} className="text-[#8E4B49]" />
+            <span>Full Learning Hub</span>
+            <ExternalLink size={12} className="text-[#7C766F]" />
+          </Link>
+        </div>
+      </div>
+
+      {/* ── Active Stack Card + Switcher Bar ── */}
+      <div className="bg-white rounded-3xl border border-[#EFEAE4] p-5 sm:p-6 shadow-xs space-y-5">
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-[#7C766F] uppercase tracking-wider block">
+              Active Project Tech Stack
+            </span>
+            <div className="flex items-center gap-2.5">
+              <span className="w-7 h-7 rounded-lg bg-[#FAF8F5] border border-[#EFEAE4] flex items-center justify-center font-bold text-sm">
+                {activeStack.icon}
+              </span>
+              <h3 className="text-lg font-black text-[#1D1B18] tracking-tight">
+                {activeStack.name}
+              </h3>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {activeStack.tags.map(t => (
+                  <span key={t} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF8F5] text-[#8E4B49] border border-[#EFEAE4]">
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-[#534342] max-w-2xl pt-0.5">
+              {activeStack.desc}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold text-[#7C766F]">Core skills:</span>
+            {activeStack.skills.map(s => (
+              <span key={s} className="px-2 py-1 rounded-lg text-xs font-bold bg-[#EBF7EE] text-[#2D6A4F] border border-[#D5EAD9]">
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Stack Selection Pills */}
+        <div className="pt-2 border-t border-[#EFEAE4] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-[#534342]">
+              Explore or Switch Tech Stack:
+            </span>
+            <span className="text-[11px] text-[#7C766F]">
+              Click any stack to view verified courses
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
+            {FLIGHT_PLAN_TECH_STACKS.map(stack => {
+              const isSelected = stack.id === activeStack.id
+              return (
+                <button
+                  key={stack.id}
+                  type="button"
+                  onClick={() => handleSwitchStack(stack.id)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    isSelected
+                      ? 'bg-[#1D1B18] text-white shadow-xs'
+                      : 'bg-[#FAF8F5] text-[#534342] hover:bg-[#F3EFEA] border border-[#EFEAE4]'
+                  }`}
+                >
+                  <span>{stack.icon}</span>
+                  <span>{stack.name}</span>
+                  {isSelected && <span className="text-[9px] text-[#A7F3D0]">✓</span>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Verified Video Courses by Technology ── */}
+      <div className="space-y-6">
+        {ytLoading ? (
+          <div className="bg-white rounded-3xl border border-[#EFEAE4] p-10 flex flex-col items-center justify-center gap-3 text-center shadow-xs">
+            <MiniLoader color="#8E4B49" />
+            <p className="text-xs font-bold text-[#534342] m-0">Loading curated, verified courses from top educators…</p>
+            <span className="text-[11px] text-[#7C766F]">Curated from freeCodeCamp, Traversy Media, Fireship & trusted tech channels</span>
+          </div>
+        ) : (
+          activeStack.learn.map(tech => {
+            const vids = ytVideos[tech] || []
+            return (
+              <div key={tech} className="bg-white rounded-3xl border border-[#EFEAE4] p-5 sm:p-6 shadow-xs space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2 pb-1 border-b border-[#EFEAE4]/60">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider bg-[#FFF5F2] text-[#8E4B49] border border-[#FFAAA6]/40">
+                      {tech}
+                    </span>
+                    <span className="text-xs font-bold text-[#1D1B18]">
+                      Foundational &amp; Practical Tutorials
+                    </span>
+                  </div>
+                  <span className="text-xs text-[#7C766F]">
+                    {vids.length} verified course{vids.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {vids.length > 0 ? (
+                    vids.map((v, i) => {
+                      const thumb = getYouTubeThumb(v.url)
+                      return (
+                        <a
+                          key={i}
+                          href={v.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex flex-col rounded-2xl bg-[#FDFBF9] border border-[#EFEAE4] hover:border-[#FF6B6B] hover:shadow-md transition-all no-underline group overflow-hidden"
+                        >
+                          {/* Video Thumbnail */}
+                          <div className="relative w-full aspect-video rounded-t-2xl overflow-hidden bg-black shrink-0">
+                            {thumb ? (
+                              <img
+                                src={thumb}
+                                alt={v.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-[#1D1B18] flex items-center justify-center">
+                                <Play size={24} className="text-white" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/25 flex items-center justify-center group-hover:bg-black/10 transition-colors">
+                              <div className="w-10 h-10 rounded-full bg-[#FF0000] text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                <Play size={14} fill="white" className="ml-0.5" />
+                              </div>
+                            </div>
+                            {v.duration && v.duration !== '—' && (
+                              <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/85 text-[10.5px] font-bold text-white tracking-wide">
+                                {v.duration}
+                              </span>
+                            )}
+                            {v.badge && (
+                              <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-[#8E4B49]/90 text-[10px] font-bold text-white tracking-wide">
+                                {v.badge}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Video Info */}
+                          <div className="p-3.5 flex flex-col justify-between flex-1 space-y-2">
+                            <h4 className="text-xs font-bold text-[#1D1B18] line-clamp-2 group-hover:text-[#8E4B49] transition-colors leading-snug">
+                              {v.title}
+                            </h4>
+                            <div className="flex items-center justify-between text-[11px] text-[#7C766F] pt-1 border-t border-[#EFEAE4]/50">
+                              <span className="font-semibold flex items-center gap-1">
+                                {v.channel}
+                                <span className="text-[10px] text-[#059669] font-bold">✓</span>
+                              </span>
+                              <span className="inline-flex items-center gap-1 font-bold text-[#8E4B49] group-hover:translate-x-0.5 transition-transform">
+                                Watch <ExternalLink size={10} />
+                              </span>
+                            </div>
+                          </div>
+                        </a>
+                      )
+                    })
+                  ) : (
+                    <a
+                      href={`https://www.youtube.com/results?search_query=${encodeURIComponent(tech + ' tutorial for beginners')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="col-span-full flex items-center justify-between p-4 rounded-2xl bg-[#FFF8F3] border border-[#EFEAE4] hover:border-[#FF6B6B] transition-colors no-underline text-xs text-[#8E4B49] font-bold"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Play size={16} fill="#FF0000" className="text-[#FF0000]" />
+                        <span>Search authentic {tech} tutorials and playlists on YouTube</span>
+                      </div>
+                      <ExternalLink size={13} />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* ── Custom Tutorial Search & Flight Plan Roadmap Connection ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {/* Search any tutorial */}
+        <div className="bg-white rounded-3xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+          <div className="flex items-center gap-2">
+            <Search size={16} className="text-[#8E4B49]" />
+            <h4 className="text-sm font-bold text-[#1D1B18]">Search Custom Tutorial</h4>
+          </div>
+          <p className="text-xs text-[#7C766F]">
+            Need help with a specific library, API, or sensor? Search verified tutorials instantly.
+          </p>
+          <form onSubmit={handleCustomSearchSubmit} className="flex gap-2">
+            <input
+              type="text"
+              value={customSearch}
+              onChange={e => setCustomSearch(e.target.value)}
+              placeholder="e.g. Tailwind CSS, Stripe checkout, MQTT, OLED..."
+              className="flex-1 px-3.5 py-2 rounded-xl bg-[#FAF8F5] border border-[#EFEAE4] text-xs text-[#1D1B18] placeholder-[#9C948D] focus:bg-white focus:border-[#8E4B49] outline-none"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 rounded-xl bg-[#1D1B18] hover:bg-black text-white text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+            >
+              Search
+            </button>
+          </form>
+        </div>
+
+        {/* Roadmap milestone integration note */}
+        <div className="bg-white rounded-3xl border border-[#EFEAE4] p-5 shadow-xs space-y-3">
+          <div className="flex items-center gap-2">
+            <Rocket size={16} className="text-[#059669]" />
+            <h4 className="text-sm font-bold text-[#1D1B18]">Sprint Preparation Advice</h4>
+          </div>
+          <div className="space-y-2 text-xs text-[#534342]">
+            <p className="m-0 leading-relaxed">
+              💡 <strong>Step 1:</strong> Spend 2–3 hours on foundational syntax before starting <strong>Milestone 01 MVP Build</strong>.
+            </p>
+            <p className="m-0 leading-relaxed">
+              ⚡ <strong>Step 2:</strong> Follow the official documentation alongside video courses for faster debugging.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 const MILESTONE_THEMES = [
   {
     numBg: '#F59E0B',
@@ -3663,17 +4133,7 @@ function FlightPlanMilestoneInspector({
           </div>
         </div>
 
-        <div className="fp-v2-bar-row">
-          <div className="fp-v2-bar-label">
-            <span className="flex items-center gap-1.5 text-[#6366F1]">
-              <span className="w-2 h-2 rounded-full bg-[#6366F1]" /> Repository Evidence
-            </span>
-            <span>{repoEvidencePercent}%</span>
-          </div>
-          <div className="fp-v2-bar-track">
-            <div className="fp-v2-bar-fill bg-[#6366F1]" style={{ width: `${repoEvidencePercent}%` }} />
-          </div>
-        </div>
+
 
         <div className="fp-v2-bar-row">
           <div className="fp-v2-bar-label">
@@ -5000,6 +5460,15 @@ export default function FlightPlan() {
                       <CircleDollarSign size={14} />
                       <span>Business Model</span>
                     </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      className={`fp-v2-tab-pill ${view === 'learn_stack' ? 'active' : ''}`}
+                      onClick={() => setView('learn_stack')}
+                    >
+                      <Play size={13} className={view === 'learn_stack' ? 'text-white' : 'text-[#FF0000]'} fill={view === 'learn_stack' ? '#FFFFFF' : '#FF0000'} />
+                      <span>Learn the Stack</span>
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -5108,6 +5577,23 @@ export default function FlightPlan() {
                   />
                 ) : view === 'business_model' ? (
                   <BusinessModelFlightPlanView project={project} />
+                ) : view === 'learn_stack' ? (
+                  <LearnTheStackFlightPlanView
+                    project={project}
+                    onSelectStack={(stackId) => {
+                      if (project?.id) {
+                        updateSavedProject(project.id, cur => ({
+                          ...cur,
+                          selectedStack: stackId,
+                          launch_timing: {
+                            ...(cur.launch_timing || {}),
+                            selectedStack: stackId,
+                          },
+                        }))
+                        setProjects(readSavedProjects())
+                      }
+                    }}
+                  />
                 ) : (
                   <section className="fp-task-list-view">
                     <header className="fp-task-list-heading">

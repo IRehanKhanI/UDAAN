@@ -596,6 +596,33 @@ class YouTubeLearningView(APIView):
         'tailwind': [
             {'title': 'Tailwind CSS Full Course for Beginners', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=lCxcTsOHrjo', 'duration': '4h 15m', 'badge': 'Hands-on', 'channel_verified': True},
         ],
+        'esp32': [
+            {'title': 'Getting Started with ESP32 - Complete Guide (WiFi & Bluetooth)', 'channel': 'DroneBot Workshop', 'url': 'https://www.youtube.com/watch?v=k_D_Qu0cgu8', 'duration': '1h 15m', 'badge': 'Hardware Guide', 'channel_verified': True},
+            {'title': 'ESP32 IoT Web Server & Sensor Dashboard Tutorial', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=sqJ9_Z2zMms', 'duration': '45m', 'badge': 'IoT Project', 'channel_verified': True},
+            {'title': 'ESP32 in 100 Seconds', 'channel': 'Fireship', 'url': 'https://www.youtube.com/watch?v=sB_5iNf_m1Y', 'duration': '2m 30s', 'badge': 'Overview', 'channel_verified': True},
+        ],
+        'arduino': [
+            {'title': 'Arduino Course for Beginners - Open-Source Hardware Directory', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=zJ-LqeX_fLU', 'duration': '4h 08m', 'badge': 'Complete Course', 'channel_verified': True},
+            {'title': 'Arduino Tutorial: Basics, Sensors & Motor Drivers', 'channel': 'Paul McWhorter', 'url': 'https://www.youtube.com/watch?v=fJWR73zp1fI', 'duration': '35m', 'badge': 'Foundational', 'channel_verified': True},
+        ],
+        'c++': [
+            {'title': 'C++ Programming Course - Beginner to Advanced', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=8jLOx1hD3_o', 'duration': '31h 00m', 'badge': 'Complete Bootcamp', 'channel_verified': True},
+            {'title': 'C++ Crash Course for Beginners', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=1v_4dL8OP80', 'duration': '1h 22m', 'badge': 'Quick Start', 'channel_verified': True},
+        ],
+        'raspberry pi': [
+            {'title': 'Raspberry Pi Beginner Guide: Complete Setup & Python GPIO', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=dDCj49gIe68', 'duration': '2h 15m', 'badge': 'Hardware & OS', 'channel_verified': True},
+            {'title': 'Raspberry Pi 4 Getting Started Guide', 'channel': 'ExplainingComputers', 'url': 'https://www.youtube.com/watch?v=BpJCAafw2qE', 'duration': '22m', 'badge': 'Quick Start', 'channel_verified': True},
+        ],
+        'fastapi': [
+            {'title': 'FastAPI Course for Beginners - Full Web API Tutorial', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=tLKKmouU5OI', 'duration': '19h 00m', 'badge': 'Enterprise', 'channel_verified': True},
+            {'title': 'FastAPI Crash Course in 60 Minutes', 'channel': 'Traversy Media', 'url': 'https://www.youtube.com/watch?v=7t2alSnE2-I', 'duration': '1h 10m', 'badge': 'Quick Start', 'channel_verified': True},
+        ],
+        'docker': [
+            {'title': 'Docker Tutorial for Beginners - Hands-on DevOps', 'channel': 'freeCodeCamp.org', 'url': 'https://www.youtube.com/watch?v=fqMOX6JJhGo', 'duration': '2h 15m', 'badge': 'Containerization', 'channel_verified': True},
+        ],
+        'electronics': [
+            {'title': 'Basic Electronics For Beginners - Circuit Theory & Components', 'channel': 'The Organic Chemistry Tutor', 'url': 'https://www.youtube.com/watch?v=uXr4lXYjZuU', 'duration': '1h 42m', 'badge': 'Foundational', 'channel_verified': True},
+        ],
     }
 
     def get(self, request):

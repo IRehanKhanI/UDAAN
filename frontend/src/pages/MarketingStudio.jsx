@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Bookmark, Check, ChevronDown, Copy, Download,
   FileText, Mail, Megaphone, MessageSquareText, Pencil, RefreshCw,
-  Search, Sparkles, WandSparkles, X, Zap, TrendingUp, Globe, MapPin, Upload, AlertCircle
+  Search, Sparkles, WandSparkles, X, Zap, TrendingUp, Globe, MapPin, Upload, AlertCircle, Share2
 } from 'lucide-react'
 import Sidebar from '../layouts/Sidebar.jsx'
 import Header from '../layouts/Header.jsx'
@@ -418,6 +418,16 @@ export default function MarketingStudio() {
     setNotice('Draft exported as a text file.')
   }
 
+  const postToLinkedIn = item => {
+    const textToShare = [item.title, item.body, item.cta ? `\n${item.cta}` : '', item.hashtags?.length ? `\n${item.hashtags.join(' ')}` : ''].filter(Boolean).join('\n\n')
+    try {
+      navigator.clipboard.writeText(textToShare)
+    } catch { }
+    const encoded = encodeURIComponent(textToShare)
+    window.open(`https://www.linkedin.com/feed/?shareActive=true&text=${encoded}`, '_blank', 'noopener,noreferrer')
+    setNotice('Copied post to clipboard & opened LinkedIn share! 🚀')
+  }
+
   const continueStrategy = () => {
     setError('')
     if (!inputs.audience.trim()) { setError('Tell us who the ideal customer is.'); return }
@@ -437,7 +447,7 @@ export default function MarketingStudio() {
   const visibleLibrary = library.filter(item => !libraryFilters.q || `${item.title} ${item.body}`.toLowerCase().includes(libraryFilters.q.toLowerCase()))
 
   return (
-    <div className="min-h-screen bg-[#FFF8F3] text-[#1D1B18] flex flex-col ms-page">
+    <div className="min-h-screen bg-[#FDFBF9] text-[#1D1B18] flex flex-col ms-page font-['Plus_Jakarta_Sans'] antialiased">
       <Sidebar activePage="marketing-studio" open={menuOpen} onClose={() => setMenuOpen(false)} />
       <div className="lg:pl-80 flex-1 flex flex-col min-w-0">
         <Header
@@ -551,7 +561,7 @@ export default function MarketingStudio() {
                 {libraryBusy
                   ? <div className="ms-empty"><span className="ms-spinner" /> Loading your library…</div>
                   : visibleLibrary.length
-                    ? <div className="ms-library-grid">{visibleLibrary.map(item => <SavedCard key={item.id} item={item} onOpen={openSaved} onDuplicate={duplicateSaved} onDelete={deleteSaved} />)}</div>
+                    ? <div className="ms-library-grid">{visibleLibrary.map(item => <SavedCard key={item.id} item={item} onOpen={openSaved} onDuplicate={duplicateSaved} onDelete={deleteSaved} onPostLinkedIn={() => postToLinkedIn(item)} />)}</div>
                     : <EmptyState title={libraryLoaded ? 'Your library is empty' : 'Loading content'} copy={libraryLoaded ? 'Save a generated draft to keep it here for editing later.' : 'Fetching content saved to this workspace…'} />
                 }
               </section>
@@ -563,7 +573,7 @@ export default function MarketingStudio() {
               <>
                 <section className="ms-wizard">
                   <div className="ms-wizard-progress" aria-label="Marketing brief progress">
-                    {[['Audience & Strategy', 'Understand your customer'], ['Content Format', 'Choose what to create'], ['Creative Brief', 'Set the direction'], ['Generated Content', 'Edit and save']].map(([label, hint], index) => {
+                    {[['Audience & Strategy', 'Understand your customer'], ['Content Format', 'Choose what to create'], ['Creative Brief', 'Set the direction'], ['Generated Content', 'Edit, save & post']].map(([label, hint], index) => {
                       const number = index + 1
                       return <button type="button" key={label} className={wizardStep === number ? 'active' : wizardStep > number ? 'complete' : ''} onClick={() => number < wizardStep && setWizardStep(number)} disabled={number > wizardStep}><span>{String(number).padStart(2, '0')}</span><b>{label}</b><small>{hint}</small></button>
                     })}
@@ -613,277 +623,28 @@ export default function MarketingStudio() {
                     <div className="ms-wizard-actions"><button className="ms-secondary" type="button" onClick={backWizard}><ArrowLeft size={14} /> Back</button><button className="ms-primary" type="button" onClick={generate} disabled={generationBusy}>{generationBusy ? <><span className="ms-spinner" /> Generating…</> : <>Generate Marketing Content <Sparkles size={14} /></>}</button></div>
                   </section>}
                   {wizardStep === 4 && results.length === 0 && <section className="ms-wizard-panel ms-wizard-empty"><span className="ms-spinner" /><h2>Preparing your workspace</h2><p>Generation did not return content. Review the error above and try again.</p></section>}
+                  {wizardStep === 4 && results.length > 0 && (
+                    <section className="ms-wizard-panel ms-step4-header-panel">
+                      <div className="ms-step4-banner">
+                        <div>
+                          <span className="ms-eyebrow"><Sparkles size={13} /> Step 04 · Generated Content & 1-Click Publishing</span>
+                          <h2>Your marketing drafts are ready!</h2>
+                          <p className="ms-wizard-lede">
+                            Review and polish your content below. You can refine with AI, save to your library, export as a file, or click <b>Post to LinkedIn</b> to publish right away.
+                          </p>
+                        </div>
+                        <div className="ms-step4-quick-actions">
+                          <button type="button" className="ms-secondary" onClick={() => setWizardStep(3)}>
+                            <ArrowLeft size={13} /> Edit Brief
+                          </button>
+                          <button type="button" className="ms-primary" onClick={generate} disabled={generationBusy}>
+                            <RefreshCw size={13} /> Regenerate
+                          </button>
+                        </div>
+                      </div>
+                    </section>
+                  )}
                 </section>
-                <div className="ms-create-layout ms-legacy-create-layout">
-                  <div className="ms-panel ms-form-panel">
-                    {/* Panel heading */}
-                    <div className="ms-panel-heading">
-                      <div>
-                        <span className="ms-eyebrow"><Sparkles size={12} /> Create Content</span>
-                        <h2>Build your marketing brief</h2>
-                        <p>Start with the audience and outcome. UDAAN uses this brief and verified project context to create editable drafts.</p>
-                      </div>
-                      <span className="ms-lock-note"><Sparkles size={12} /> AI-Powered</span>
-                    </div>
-
-                    {/* Content Type Grid */}
-                    <div className="ms-type-section">
-                      <div className="ms-section-label"><Globe size={12} /> Choose content type</div>
-                      <div className="ms-type-grid">
-                        {contentTypes.map(type => <ContentTypeCard key={type.mode} item={type} selected={mode === type.mode} onClick={() => setMode(type.mode)} />)}
-                      </div>
-                    </div>
-
-                    {/* Project Context */}
-                    {selectedProject && (
-                      <section className="ms-context-card">
-                        <div className="ms-context-top">
-                          <span className="ms-context-mark">{selectedProject.name.slice(0, 1).toUpperCase()}</span>
-                          <div>
-                            <strong>{selectedProject.name}</strong>
-                            <small>{selectedProject.project_type} · project context added automatically</small>
-                          </div>
-                          <button type="button" onClick={() => setEditContext(v => !v)}>
-                            {editContext ? <><X size={12} /> Close editor</> : <><Pencil size={12} /> Edit context</>}
-                          </button>
-                        </div>
-                        {!editContext ? (
-                          <div className="ms-context-summary">
-                            <p>{selectedProject.description || selectedProject.idea || 'No project description added yet.'}</p>
-                            <div>
-                              {(selectedProject.repository?.detected_technologies || []).slice(0, 5).map(item => (
-                                <span key={item.name || item}>{item.name || item}</span>
-                              ))}
-                              <small>{summary.milestones.length} milestones · {summary.completed} completed · {summary.verified} verified</small>
-                            </div>
-                          </div>
-                        ) : (
-                          <label className="ms-context-edit">
-                            Add, correct or remove details for this generation
-                            <textarea
-                              rows="5"
-                              maxLength="7000"
-                              value={inputs.context_override}
-                              onChange={e => setField('context_override', e.target.value)}
-                              placeholder="Correct the project summary or add confirmed details. Avoid adding claims you cannot support."
-                            />
-                          </label>
-                        )}
-                        <p className="ms-context-footnote">
-                          Planned features remain plans. A task marked complete is user-recorded progress; verified claims require saved check evidence.
-                        </p>
-                      </section>
-                    )}
-
-                    {/* Main Form */}
-                    <form className="ms-form" onSubmit={generate}>
-                      <div className="ms-form-grid">
-
-                        {/* Topic / Source */}
-                        <label className="ms-field ms-wide">
-                          <span>
-                            {mode === 'repurpose' ? 'Source content' : mode === 'campaign' ? 'Campaign topic or project' : 'Topic, project or request'}{' '}
-                            <i>*</i>
-                          </span>
-                          <textarea
-                            rows={mode === 'repurpose' ? 5 : 3}
-                            maxLength={8000}
-                            value={mode === 'repurpose' ? inputs.source_content : inputs.topic}
-                            onChange={e => setField(mode === 'repurpose' ? 'source_content' : 'topic', e.target.value)}
-                            placeholder={
-                              mode === 'repurpose'
-                                ? 'Paste the text or rough notes to transform…'
-                                : selectedProject
-                                  ? 'For example: introduce the current booking flow in a portfolio post…'
-                                  : 'For example: write a friendly introduction for my design portfolio…'
-                            }
-                          />
-                        </label>
-
-                        <div className="ms-brief-divider ms-wide"><span><Zap size={12} /> Brief essentials</span><small>Required strategy inputs</small></div>
-
-                        {/* Goal + Audience */}
-                        {mode !== 'repurpose' && <>
-                          <label className="ms-field">
-                            <span>Marketing objective <i>*</i></span>
-                            <select value={inputs.objective} onChange={e => setField('objective', e.target.value)}>
-                              {['awareness', 'leads', 'pilot users', 'signups', 'sales', 'retention'].map(v => (
-                                <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="ms-field">
-                            <span>Target audience / ideal customer <i>*</i></span>
-                            <input value={inputs.audience} onChange={e => setField('audience', e.target.value)} placeholder={selectedProject ? 'Use project audience' : 'Who should this reach?'} />
-                          </label>
-                          <label className="ms-field">
-                            <span>Customer problem <i>*</i></span>
-                            <textarea rows="2" value={inputs.customer_problem} onChange={e => setField('customer_problem', e.target.value)} placeholder="What problem does this audience face?" />
-                          </label>
-                          <label className="ms-field">
-                            <span>Value proposition <i>*</i></span>
-                            <textarea rows="2" value={inputs.value_proposition} onChange={e => setField('value_proposition', e.target.value)} placeholder="Why is this useful to them?" />
-                          </label>
-                        </>}
-
-                        {/* Mode-specific fields */}
-                        {mode === 'showcase' && (
-                          <label className="ms-field">
-                            <span>Showcase type</span>
-                            <select value={inputs.showcase_type} onChange={e => setField('showcase_type', e.target.value)}>
-                              {showcaseTypes.map(v => <option key={v}>{v}</option>)}
-                            </select>
-                          </label>
-                        )}
-                        {mode === 'tool' && (
-                          <label className="ms-field">
-                            <span>Template</span>
-                            <select value={inputs.template} onChange={e => setField('template', e.target.value)}>
-                              {toolTypes.map(v => <option key={v}>{v}</option>)}
-                            </select>
-                          </label>
-                        )}
-                        {mode === 'repurpose' && (
-                          <div className="ms-field ms-wide">
-                            <span>Target formats</span>
-                            <div className="ms-format-list">
-                              {formats.map(format => (
-                                <label key={format}>
-                                  <input type="checkbox" checked={inputs.formats.includes(format)} onChange={() => toggleFormat(format)} />
-                                  {format}
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {mode === 'email' && <>
-                          <label className="ms-field">
-                            <span>Recipient type <i>*</i></span>
-                            <input value={inputs.recipient_type} onChange={e => setField('recipient_type', e.target.value)} placeholder="Early adopters, leads, customers…" />
-                          </label>
-                          <label className="ms-field">
-                            <span>Desired next action <i>*</i></span>
-                            <input value={inputs.desired_next_action} onChange={e => setField('desired_next_action', e.target.value)} placeholder="Book a pilot call, reply, activate…" />
-                          </label>
-                        </>}
-                        {mode === 'launch' && (
-                          <label className="ms-field">
-                            <span>Launch status <i>*</i></span>
-                            <select value={inputs.launch_status} onChange={e => setField('launch_status', e.target.value)}>
-                              <option>Not confirmed</option><option>Pre-launch</option><option>Ready to announce</option><option>Launched</option>
-                            </select>
-                          </label>
-                        )}
-                        {(mode === 'social' || mode === 'email' || mode === 'launch') && (
-                          <label className="ms-field">
-                            <span>Platform / destination</span>
-                            <select value={inputs.platform} onChange={e => setField('platform', e.target.value)}>
-                              {platforms.map(v => <option key={v}>{v}</option>)}
-                            </select>
-                          </label>
-                        )}
-                        {mode === 'campaign' && <>
-                          <label className="ms-field">
-                            <span>Duration</span>
-                            <select value={inputs.campaign_days} onChange={e => setField('campaign_days', Number(e.target.value))}>
-                              <option value={7}>7-day launch plan</option>
-                              <option value={14}>14-day campaign</option>
-                              <option value={30}>30-day calendar</option>
-                            </select>
-                          </label>
-                          <label className="ms-field">
-                            <span>Primary platform</span>
-                            <select value={inputs.campaign_platform} onChange={e => setField('campaign_platform', e.target.value)}>
-                              {platforms.map(v => <option key={v}>{v}</option>)}
-                            </select>
-                          </label>
-                        </>}
-
-                        <div className="ms-wide ms-brief-more">
-                          <button type="button" className="ms-brief-toggle" onClick={() => setAdvancedBriefOpen(value => !value)}>
-                            <ChevronDown size={14} className={advancedBriefOpen ? 'is-open' : ''} />
-                            {advancedBriefOpen ? 'Hide optional brief details' : 'Add optional brief details'}
-                          </button>
-                          <small>Budget, brand voice, references and campaign goals are optional.</small>
-                        </div>
-                        {advancedBriefOpen && <div className="ms-advanced-brief ms-wide">
-                          <label className="ms-field"><span>Brand voice <small>optional</small></span><textarea rows="2" maxLength="800" value={inputs.brand_voice} onChange={e => setField('brand_voice', e.target.value)} placeholder="Words to sound like, and words to avoid" /></label>
-                          <label className="ms-field"><span>Budget <small>optional</small></span><input value={inputs.budget} onChange={e => setField('budget', e.target.value)} placeholder="INR 10,000 or organic only" /></label>
-                          <label className="ms-field"><span>Competitor / reference links <small>one per line</small></span><textarea rows="2" value={inputs.competitor_links.join('\n')} onChange={e => setField('competitor_links', e.target.value.split('\n').map(v => v.trim()).filter(Boolean))} placeholder="https://example.com" /></label>
-                          <label className="ms-field"><span>Measurable goals <small>planned targets only</small></span><textarea rows="2" maxLength="1000" value={inputs.measurable_goals} onChange={e => setField('measurable_goals', e.target.value)} placeholder="20 pilot conversations; targets are not results" /></label>
-                          {mode === 'campaign' && <label className="ms-field ms-wide"><span>Campaign channels</span><div className="ms-format-list">{platforms.map(channel => <label key={channel}><input type="checkbox" checked={inputs.channels.includes(channel)} onChange={() => setField('channels', inputs.channels.includes(channel) ? inputs.channels.filter(value => value !== channel) : [...inputs.channels, channel])} />{channel}</label>)}</div></label>}
-                        </div>}
-
-                        {/* Common fields */}
-                        {mode !== 'repurpose' && mode !== 'campaign' && (
-                          <label className="ms-field">
-                            <span>Tone</span>
-                            <select value={inputs.tone} onChange={e => setField('tone', e.target.value)}>
-                              {tones.map(v => <option key={v}>{v}</option>)}
-                            </select>
-                          </label>
-                        )}
-                        {mode !== 'campaign' && mode !== 'repurpose' && (
-                          <label className="ms-field">
-                            <span>Length</span>
-                            <select value={inputs.length} onChange={e => setField('length', e.target.value)}>
-                              {['Short', 'Medium', 'Long'].map(v => <option key={v}>{v}</option>)}
-                            </select>
-                          </label>
-                        )}
-                        {mode !== 'repurpose' && mode !== 'campaign' && (
-                          <label className="ms-field">
-                            <span>Language</span>
-                            <input value={inputs.language} onChange={e => setField('language', e.target.value)} placeholder="English" />
-                          </label>
-                        )}
-                        {mode !== 'repurpose' && mode !== 'campaign' && (
-                          <label className="ms-field">
-                            <span>Key message <small>optional</small></span>
-                            <input value={inputs.key_message} onChange={e => setField('key_message', e.target.value)} placeholder="The one thing to remember" />
-                          </label>
-                        )}
-                        {mode !== 'repurpose' && mode !== 'campaign' && (
-                          <label className="ms-field">
-                            <span>Keywords <small>optional</small></span>
-                            <input value={inputs.keywords} onChange={e => setField('keywords', e.target.value)} placeholder="Terms to include" />
-                          </label>
-                        )}
-                        {mode !== 'repurpose' && (
-                          <label className="ms-field">
-                            <span>Desired call to action <i>*</i></span>
-                            <input value={inputs.cta} onChange={e => setField('cta', e.target.value)} placeholder="What should readers do next?" />
-                          </label>
-                        )}
-                        <label className="ms-field">
-                          <span>Source URL <small>optional</small></span>
-                          <input type="url" maxLength="500" value={inputs.source_url} onChange={e => setField('source_url', e.target.value)} placeholder="https://…" />
-                        </label>
-                        <label className="ms-field ms-wide">
-                          <span>Additional instructions <small>optional</small></span>
-                          <textarea rows="2" maxLength="1800" value={inputs.extra_instructions} onChange={e => setField('extra_instructions', e.target.value)} placeholder="Add confirmed details, phrases to avoid, or a specific creative direction." />
-                        </label>
-                      </div>
-
-                      {/* Form Footer */}
-                      <div className="ms-form-foot">
-                        <span>
-                          <Sparkles size={13} />
-                          {selectedProject
-                            ? 'Uses your saved project details and repository evidence.'
-                            : 'Custom mode — supports any creative request.'}
-                          {' '}No live trend research configured.
-                        </span>
-                        <button className="ms-primary" type="submit" disabled={generationBusy} id="ms-generate-btn">
-                          {generationBusy
-                            ? <><span className="ms-spinner" /> Generating drafts…</>
-                            : <><Sparkles size={15} /> Generate Content <ArrowRight size={15} /></>
-                          }
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
 
                 {/* Repurpose hint */}
                 {mode === 'repurpose' && (
@@ -916,8 +677,8 @@ export default function MarketingStudio() {
                     <div className="ms-results-heading">
                       <div>
                         <span className="ms-eyebrow"><Zap size={12} /> Your Drafts</span>
-                        <h2>Review, edit &amp; save</h2>
-                        <p>{results.length} editable option{results.length === 1 ? '' : 's'} · nothing is published automatically</p>
+                        <h2>Review, edit, save &amp; post</h2>
+                        <p>{results.length} editable option{results.length === 1 ? '' : 's'} · 1-click post to LinkedIn or save to library</p>
                       </div>
                       <button className="ms-secondary" onClick={generate} disabled={generationBusy}>
                         <RefreshCw size={13} /> Regenerate all
@@ -935,6 +696,7 @@ export default function MarketingStudio() {
                           onChange={(key, value) => setResults(current => current.map(row => row === item ? { ...row, [key]: value } : row))}
                           onCopy={() => void copyResult(item)}
                           onExport={() => exportResult(item)}
+                          onPostLinkedIn={() => postToLinkedIn(item)}
                           onSave={() => void (campaign ? saveCampaignCopy(item) : saveResult(item))}
                           onRefine={action => void refine(item, action)}
                           onRepurpose={() => repurposeResult(item)}
@@ -1135,7 +897,7 @@ function EmptyState({ title, copy }) {
   )
 }
 
-function ResultCard({ item, index, busy, copying, tone, onChange, onCopy, onExport, onSave, onRefine, onRepurpose }) {
+function ResultCard({ item, index, busy, copying, tone, onChange, onCopy, onExport, onPostLinkedIn, onSave, onRefine, onRepurpose }) {
   const key = item.localKey || item.id
   const refinements = [
     ['improve hook', 'Improve hook'],
@@ -1176,6 +938,16 @@ function ResultCard({ item, index, busy, copying, tone, onChange, onCopy, onExpo
         <button onClick={onCopy}>
           <Copy size={13} />{copying === key ? 'Copied!' : 'Copy'}
         </button>
+        {onPostLinkedIn && (
+          <button
+            type="button"
+            className="ms-linkedin-btn"
+            onClick={onPostLinkedIn}
+            title="Open in LinkedIn post composer with pre-filled content"
+          >
+            <Share2 size={13} /> Post to LinkedIn
+          </button>
+        )}
         <button onClick={onExport}><Download size={13} />Export</button>
         <button className="ms-save-draft" onClick={onSave}>
           <Bookmark size={13} />{item.id ? 'Save edits' : item.saved ? 'Saved ✓' : 'Save to library'}
@@ -1258,7 +1030,7 @@ function CampaignGallery({ campaign, onSelect, onRetry, onError }) {
   )
 }
 
-function SavedCard({ item, onOpen, onDuplicate, onDelete }) {
+function SavedCard({ item, onOpen, onDuplicate, onDelete, onPostLinkedIn }) {
   return (
     <article className="ms-saved-card">
       <div className="ms-saved-meta">
@@ -1271,6 +1043,11 @@ function SavedCard({ item, onOpen, onDuplicate, onDelete }) {
       <div className="ms-saved-foot">
         <span>{item.project_name || 'Custom content'} · {dateLabel(item.updated_at)}</span>
         <div>
+          {onPostLinkedIn && (
+            <button title="Post to LinkedIn" onClick={onPostLinkedIn} className="ms-btn-icon-linkedin">
+              <Share2 size={13} />
+            </button>
+          )}
           <button title="Open and edit" onClick={() => onOpen(item)}><Pencil size={13} /></button>
           <button title="Duplicate" onClick={() => onDuplicate(item)}><Copy size={13} /></button>
           <button title="Delete" onClick={() => onDelete(item)}><X size={14} /></button>

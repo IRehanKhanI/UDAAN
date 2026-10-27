@@ -182,11 +182,11 @@ def _generate_with_provider_fallback(payload, models, *, primary_retries=0, feat
     )
 
 
-def _gemini_models(default='gemini-3.8-flash'):
+def _gemini_models(default='gemini-2.5-flash'):
     primary = os.getenv('GEMINI_MODEL', default).strip() or default
     fallbacks = [
         item.strip() for item in os.getenv(
-            'GEMINI_FALLBACK_MODELS', 'gemini-3.6-flash,gemini-3.5-flash-lite'
+            'GEMINI_FALLBACK_MODELS', 'gemini-3.5-flash-lite,gemini-3.8-flash,gemini-3.6-flash'
         ).split(',') if item.strip()
     ]
     return list(dict.fromkeys([primary, *fallbacks]))
@@ -482,7 +482,6 @@ Other project context: {json.dumps(project_details, ensure_ascii=False)[:12000]}
 Live web search results, when available: {json.dumps(research_context[:6], ensure_ascii=False)[:10000] or '(none provided)'}"""
     payload = {
         'contents': [{'role': 'user', 'parts': [{'text': prompt}]}],
-        'tools': [{'google_search': {}}],
         'generationConfig': {
             'temperature': 0.2, 'maxOutputTokens': 2800,
             'thinkingConfig': {'thinkingLevel': 'low'},

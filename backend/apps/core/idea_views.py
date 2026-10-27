@@ -1441,21 +1441,31 @@ class ClassifyDomainView(APIView):
 # Curated catalog of verified product images and specifications
 CURATED_HARDWARE_PARTS = [
     {
-        'keywords': ['arduino', 'uno', 'microcontroller', 'atmega'],
+        'keywords': ['arduino', 'uno', 'atmega'],
         'name': 'Arduino Uno R3 (ATmega328P)',
         'category': 'Microcontroller',
         'price_range': '₹450 – ₹650',
-        'image': 'https://upload.wikimedia.org/wikipedia/commons/3/38/Arduino_Uno_-_R3.jpg',
+        'image': '/components/arduino_uno.jpg',
         'description': 'Industry-standard 8-bit microcontroller board with 14 digital I/O pins and 6 analog inputs.',
         'wiring_tip': 'Power via 5V USB or 7-12V DC jack. Use 220Ω resistors for LED pins.',
         'learn_url': 'https://docs.arduino.cc/hardware/uno-rev3/',
     },
     {
-        'keywords': ['esp32', 'nodemcu-32s', 'wifi', 'bluetooth', 'iot board'],
+        'keywords': ['esp32-cam', 'esp32 cam', 'ov2640', 'camera module'],
+        'name': 'ESP32 CAM Wi-Fi + OV2640 Camera Module',
+        'category': 'Sensor',
+        'price_range': '₹450 – ₹650',
+        'image': '/components/esp32_cam.jpg',
+        'description': 'Compact camera development board with ESP32 chip, OV2640 2MP camera, and TF card slot.',
+        'wiring_tip': 'Requires FTDI programmer to flash code. Supply steady 5V 2A power.',
+        'learn_url': 'https://randomnerdtutorials.com/esp32-cam-video-streaming-face-recognition-arduino-ide/',
+    },
+    {
+        'keywords': ['esp32', 'nodemcu', 'wifi', 'bluetooth', 'iot board', 'microcontroller'],
         'name': 'ESP32 NodeMCU Wi-Fi + Bluetooth Dev Board',
         'category': 'Microcontroller',
         'price_range': '₹350 – ₹550',
-        'image': 'https://upload.wikimedia.org/wikipedia/commons/8/87/ESP32_Espressif_ESP-WROOM-32.jpg',
+        'image': '/components/esp32_nodemcu.jpg',
         'description': 'Dual-core 240MHz MCU with integrated 2.4GHz Wi-Fi and Bluetooth BLE for IoT devices.',
         'wiring_tip': '3.3V logic board. Level shifter needed when interfacing with 5V sensors.',
         'learn_url': 'https://randomnerdtutorials.com/getting-started-with-esp32/',
@@ -1576,20 +1586,20 @@ CURATED_HARDWARE_PARTS = [
         'quantity': 1,
         'unit': 'kit',
         'unit_price': 160,
-        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Breadboard_complex.jpg/640px-Breadboard_complex.jpg',
+        'image': '/components/breadboard_kit.jpg',
         'description': 'Standard solderless breadboard with power rails plus flexible male-to-male and male-to-female jumper cables.',
         'wiring_tip': 'Use red rail for power (+5V/3.3V) and blue/black rail for common ground (GND).',
         'learn_url': 'https://www.instructables.com/How-to-Use-a-Breadboard/',
     },
     {
-        'keywords': ['relay', 'switch', 'ac control', 'relay module'],
-        'name': '5V 1-Channel Relay Module with Optocoupler',
+        'keywords': ['relay', 'switch', 'ac control', 'relay module', 'channel relay'],
+        'name': '5V Relay Module (1/2/4-Channel)',
         'category': 'Actuator',
-        'price_range': '₹60 – ₹110',
+        'price_range': '₹60 – ₹220',
         'quantity': 1,
         'unit': 'pcs',
-        'unit_price': 75,
-        'image': 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/50/Relay_module.jpg/640px-Relay_module.jpg',
+        'unit_price': 120,
+        'image': '/components/relay_module.jpg',
         'description': 'Isolates and switches 250V AC/10A or 30V DC/10A high-power appliances safely.',
         'wiring_tip': 'JD-VCC jumper controls optocoupler isolation. Active LOW signal trigger.',
         'learn_url': 'https://lastminuteengineers.com/one-channel-relay-module-arduino-tutorial/',
@@ -1790,10 +1800,24 @@ class HardwareBOMView(APIView):
             comp['vendors'] = build_vendor_store_links(comp_name)
             if not comp.get('image'):
                 lower_name = comp_name.lower()
-                for item in CURATED_HARDWARE_PARTS:
-                    if any(kw in lower_name for kw in item['keywords']):
-                        comp['image'] = item['image']
-                        break
+                # Specific overrides first to avoid generic keyword misclassification
+                if 'esp32 cam' in lower_name or 'ov2640' in lower_name or ('esp' in lower_name and 'cam' in lower_name):
+                    comp['image'] = '/components/esp32_cam.jpg'
+                elif 'relay' in lower_name:
+                    comp['image'] = '/components/relay_module.jpg'
+                elif 'esp32' in lower_name or 'esp8266' in lower_name or 'nodemcu' in lower_name:
+                    comp['image'] = '/components/esp32_nodemcu.jpg'
+                elif 'arduino' in lower_name or 'uno' in lower_name:
+                    comp['image'] = '/components/arduino_uno.jpg'
+                elif 'adapter' in lower_name or 'power supply' in lower_name:
+                    comp['image'] = '/components/power_adapter.jpg'
+                elif 'breadboard' in lower_name or 'jumper' in lower_name:
+                    comp['image'] = '/components/breadboard_kit.jpg'
+                else:
+                    for item in CURATED_HARDWARE_PARTS:
+                        if any(kw in lower_name for kw in item['keywords']):
+                            comp['image'] = item['image']
+                            break
 
         return Response({'components': components}, status=status.HTTP_200_OK)
 
